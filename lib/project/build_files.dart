@@ -159,7 +159,7 @@ class BuildFiles {
           'java -version 2>&1 | findstr /i "21." >nul\r\n'
           'if errorlevel 1 (\r\n'
           '    echo Installing Java 21 (this may take a minute)...\r\n'
-          '    powershell -NoProfile -ExecutionPolicy Bypass -Command "Invoke-WebRequest -Uri https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.4+11/OpenJDK21U-jdk_x64_windows_hotspot_21.0.4_11.msi -OutFile %TEMP%\\java21.msi"\r\n'
+          '    powershell -NoProfile -Command "Invoke-WebRequest -Uri https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.4+11/OpenJDK21U-jdk_x64_windows_hotspot_21.0.4_11.msi -OutFile %TEMP%\\java21.msi"\r\n'
           '    msiexec /i "%TEMP%\\java21.msi" /quiet /norestart\r\n'
           '    del "%TEMP%\\java21.msi"\r\n'
           ')\r\n'
