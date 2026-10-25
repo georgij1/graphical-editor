@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <base href="$FLUTTER_BASE_HREF">
+
+  <meta charset="UTF-8">
+  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
+  <meta name="description" content="FXML Editor — визуальный редактор JavaFX-сцен в браузере.">
+  <meta id="theme-color-meta" name="theme-color" content="#039ED3">
+
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-title" content="FXML Editor">
+  <link rel="apple-touch-icon" href="icons/Icon-192.png">
+
+  <link rel="icon" type="image/png" href="favicon.png"/>
+
+  <title>FXML Editor</title>
+  <link rel="manifest" href="manifest.json">
+
+  <style>
+    /* Light palette by default; the script below switches to the dark one when
+       the app settings (or the operating system) ask for it. */
+    :root {
+      --splash-bg: linear-gradient(180deg, #4FC3EB 0%, #039ED3 55%, #026996 100%);
+      --splash-fg: #ffffff;
+      --splash-dim: rgba(255, 255, 255, 0.85);
+      --splash-track: rgba(255, 255, 255, 0.28);
+      --splash-bar: #ffffff;
+      --splash-shadow: 0 12px 32px rgba(2, 60, 85, 0.35);
+      --splash-theme-color: #039ED3;
+    }
+
+    html[data-theme="dark"] {
+      --splash-bg: linear-gradient(180deg, #0E3A50 0%, #082636 55%, #04121B 100%);
+      --splash-fg: #E8F4FA;
+      --splash-dim: rgba(232, 244, 250, 0.72);
+      --splash-track: rgba(232, 244, 250, 0.20);
+      --splash-bar: #4FC3EB;
+      --splash-shadow: 0 12px 32px rgba(0, 0, 0, 0.55);
+      --splash-theme-color: #04121B;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      background: #039ED3;
+      overscroll-behavior: none;
+    }
+
+    html[data-theme="dark"], html[data-theme="dark"] body {
+      background: #04121B;
+    }
+
+    /* Loading screen shown until Flutter paints its first frame. */
+    #flutter-loading {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 20px;
+      background: var(--splash-bg);
+      color: var(--splash-fg);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+                   "Helvetica Neue", Arial, sans-serif;
+      transition: opacity 240ms ease-out;
+      z-index: 2147483647;
+    }
+
+    #flutter-loading.is-hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    #flutter-loading img {
+      width: 112px;
+      height: 112px;
+      border-radius: 26px;
+      box-shadow: var(--splash-shadow);
+      animation: flutter-loading-pulse 1.8s ease-in-out infinite;
+    }
+
+    #flutter-loading .title {
+      font-size: 20px;
+      font-weight: 600;
+      letter-spacing: 0.2px;
+    }
+
+    #flutter-loading .subtitle {
+      font-size: 13px;
+      color: var(--splash-dim);
+    }
+
+    #flutter-loading .progress {
+      width: 168px;
+      height: 4px;
+      border-radius: 2px;
+      background: var(--splash-track);
+      overflow: hidden;
+    }
+
+    #flutter-loading .progress::after {
+      content: "";
+      display: block;
+      width: 45%;
+      height: 100%;
+      border-radius: 2px;
+      background: var(--splash-bar);
+      animation: flutter-loading-slide 1.25s ease-in-out infinite;
+    }
+
+    @keyframes flutter-loading-pulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.04); }
+    }
+
+    @keyframes flutter-loading-slide {
+      0% { transform: translateX(-110%); }
+      100% { transform: translateX(240%); }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      #flutter-loading img,
+      #flutter-loading .progress::after {
+        animation: none;
+      }
+    }
+  </style>
+
+  <script>
+    // Apply the saved appearance before the first paint so the loading screen
+    // never flashes in the wrong colours.
+    (function () {
+      var STORAGE_THEME = 'app_theme';
+      var STORAGE_LANG = 'app_lang';
+
+      function stored(key) {
+        try {
+          return window.localStorage.getItem(key);
+        } catch (error) {
+          return null;
+        }
+      }
+
+      function prefersDark() {
+        return window.matchMedia
+          && window.matchMedia('(prefers-color-scheme: dark)').matches;
+      }
+
+      function applyTheme() {
+        var setting = stored(STORAGE_THEME) || 'system';
+        var dark = setting === 'dark' || (setting === 'system' && prefersDark());
+        document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+
+        var meta = document.getElementById('theme-color-meta');
+        if (meta) {
+          meta.setAttribute('content', dark ? '#04121B' : '#039ED3');
+        }
+      }
+
+      function applyLanguage() {
+        var subtitle = document.getElementById('flutter-loading-subtitle');
+        if (!subtitle) return;
+        subtitle.textContent = stored(STORAGE_LANG) === 'en'
+          ? 'Loading the editor…'
+          : 'Загрузка редактора…';
+      }
+
+      applyTheme();
+      applyLanguage();
+
+      if (window.matchMedia) {
+        var query = window.matchMedia('(prefers-color-scheme: dark)');
+        var onChange = function () {
+          if ((stored(STORAGE_THEME) || 'system') === 'system') applyTheme();
+        };
+        if (query.addEventListener) query.addEventListener('change', onChange);
+        else if (query.addListener) query.addListener(onChange);
+      }
+
+      // Hide the loading screen as soon as Flutter has rendered something.
+      var done = false;
+
+      function hide() {
+        if (done) return;
+        var overlay = document.getElementById('flutter-loading');
+        if (!overlay) return;
+        done = true;
+        overlay.classList.add('is-hidden');
+        window.setTimeout(function () {
+          if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+        }, 260);
+      }
+
+      function fail(message) {
+        var overlay = document.getElementById('flutter-loading');
+        if (!overlay) return;
+        var subtitle = document.getElementById('flutter-loading-subtitle');
+        if (subtitle) subtitle.textContent = message;
+        var progress = overlay.querySelector('.progress');
+        if (progress) progress.style.display = 'none';
+      }
+
+      window.addEventListener('flutter-first-frame', hide);
+
+      // Flutter dispatches the event above; older engines only mount the view,
+      // so poll for it as a fallback. The timeout makes sure the overlay can
+      // never permanently block the app.
+      var tries = 0;
+      var poll = window.setInterval(function () {
+        if (document.querySelector('flutter-view, flt-glass-pane')) {
+          window.clearInterval(poll);
+          hide();
+        } else if (++tries > 150) {
+          window.clearInterval(poll);
+          fail('Не удалось запустить редактор. Обновите страницу.');
+        }
+      }, 100);
+
+      window.addEventListener('error', function (event) {
+        if (event && event.message) {
+          fail('Ошибка загрузки: ' + event.message);
+        }
+      });
+    })();
+  </script>
+</head>
+<body>
+  <div id="flutter-loading">
+    <img src="icons/Icon-192.png" alt="FXML Editor">
+    <div class="title">FXML Editor</div>
+    <div class="progress"></div>
+    <div class="subtitle" id="flutter-loading-subtitle">Загрузка редактора…</div>
+  </div>
+
+  <script src="flutter_bootstrap.js" async></script>
+</body>
+</html>

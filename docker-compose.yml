@@ -1,0 +1,40 @@
+services:
+  backend:
+    build: ./backend
+    environment:
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
+      DATA_DIR: /data
+      PORT: 8080
+    volumes:
+      - backend-data:/data
+    restart: unless-stopped
+    networks:
+      - editor-net
+
+  # Compiles exported projects into a runnable JAR (no network at request time).
+  builder:
+    build: ./builder
+    restart: unless-stopped
+    networks:
+      - editor-net
+
+  frontend:
+    build: .
+    ports:
+      - "8080:80"
+    volumes:
+      - ./downloads:/usr/share/nginx/html/downloads:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      - backend
+      - builder
+    restart: unless-stopped
+    networks:
+      - editor-net
+
+volumes:
+  backend-data:
+
+networks:
+  editor-net:

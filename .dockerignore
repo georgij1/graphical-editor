@@ -1,0 +1,7 @@
+build/
+.dart_tool/
+backend/
+test/
+scripts/
+downloads/
+.git/

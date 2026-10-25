@@ -1,0 +1,11 @@
+name: fxml_editor_backend
+description: Auth + project storage server for the Flutter FXML editor.
+publish_to: none
+
+environment:
+  sdk: ">=3.3.0 <4.0.0"
+
+dependencies:
+  crypto: ^3.0.3
+  shelf: ^1.4.1
+  shelf_router: ^1.1.4

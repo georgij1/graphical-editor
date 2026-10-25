@@ -1,0 +1,1 @@
+{"version":1,"projects":[{"id":"p1","name":"Demo","package":"com.demo","mainClass":"MainApp","description":"","scenes":[{"name":"main","fxml":"<AnchorPane/>","controller":"com.demo.MainAppController"}]}]}
