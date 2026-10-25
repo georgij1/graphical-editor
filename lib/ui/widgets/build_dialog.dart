@@ -8,8 +8,7 @@ import '../../project/project.dart';
 import '../../project/project_history.dart';
 import '../../project/project_exporter.dart';
 
-/// Modal window for choosing what the build service should produce, and for
-/// running the build afterwards. Returns true when the artifact was saved.
+/// Shows a dialog that builds the project and downloads a ready-to-run JAR.
 Future<bool?> showBuildDialog(
   BuildContext context, {
   required EditorController controller,
@@ -32,23 +31,6 @@ class BuildDialog extends StatefulWidget {
 }
 
 class _BuildDialogState extends State<BuildDialog> {
-  static const List<(bool, String, String, IconData)> _artifacts =
-      <(bool, String, String, IconData)>[
-    (
-      false,
-      'JAR',
-      'app.jar — needs JavaFX on the classpath',
-      Icons.inventory_2_outlined,
-    ),
-    (
-      true,
-      'Bundle',
-      'JAR + JavaFX runtime + run scripts for Windows, Linux and macOS',
-      Icons.folder_zip_outlined,
-    ),
-  ];
-
-  bool _bundle = true;
   bool _busy = false;
   String? _error;
 
@@ -88,49 +70,21 @@ class _BuildDialogState extends State<BuildDialog> {
         children: <Widget>[
           const Icon(Icons.build_outlined),
           const SizedBox(width: 10),
-          Text(context.tr('Build project')),
+          Text(context.tr('Download ready JAR')),
         ],
       ),
       content: SizedBox(
         width: 440,
-        // The window has to survive a small screen, so the body scrolls.
         child: SingleChildScrollView(
           child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: <Widget>[
-            Text(context.tr('Artifact'), style: theme.textTheme.titleSmall),
-            const SizedBox(height: 8),
-            for (final (bundle, title, subtitle, icon) in _artifacts)
-              Card(
-                margin: const EdgeInsets.only(bottom: 8),
-                clipBehavior: Clip.antiAlias,
-                color: _bundle == bundle
-                    ? theme.colorScheme.primaryContainer.withValues(alpha: 0.45)
-                    : null,
-                child: ListTile(
-                  dense: true,
-                  enabled: !_busy,
-                  leading: Icon(icon),
-                  title: Text(context.tr(title)),
-                  subtitle: Text(
-                    context.tr(subtitle),
-                    style: theme.textTheme.bodySmall,
-                  ),
-                  trailing: _bundle == bundle
-                      ? Icon(Icons.check, color: theme.colorScheme.primary)
-                      : null,
-                  onTap: () => setState(() => _bundle = bundle),
-                ),
-              ),
-            const SizedBox(height: 8),
             Text(
-              context.tr('The project is compiled on the build server.'),
+              context.tr('The project will be compiled on the build server and a ready-to-run JAR will be downloaded.'),
               style: theme.textTheme.bodySmall,
             ),
-            const SizedBox(height: 12),
-            // The build is a release: the state of the project is fixed as a
-            // new version.
+            const SizedBox(height: 16),
             Text(context.tr('Release notes'), style: theme.textTheme.titleSmall),
             const SizedBox(height: 8),
             TextField(
@@ -144,7 +98,7 @@ class _BuildDialogState extends State<BuildDialog> {
                 isDense: true,
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 16),
             _VersionBanner(
               history: _history,
               revision: widget.project.revision,
@@ -186,7 +140,7 @@ class _BuildDialogState extends State<BuildDialog> {
             ],
           ],
         ),
-        ),
+      ),
       ),
       actions: <Widget>[
         TextButton(
@@ -195,8 +149,8 @@ class _BuildDialogState extends State<BuildDialog> {
         ),
         FilledButton.icon(
           onPressed: _busy ? null : _build,
-          icon: const Icon(Icons.build_outlined, size: 18),
-          label: Text(context.tr('Build')),
+          icon: const Icon(Icons.download_outlined, size: 18),
+          label: Text(context.tr('Download ready JAR')),
         ),
       ],
     );
@@ -210,17 +164,13 @@ class _BuildDialogState extends State<BuildDialog> {
     try {
       final ok = await widget.controller.buildProject(
         widget.project,
-        bundle: _bundle,
+        bundle: false,
         options: const ExportOptions(),
         releaseNotes: _notes.text.trim(),
       );
       if (!mounted) return;
-      // The build has released a version: the history of the window is
-      // refreshed before it closes.
       setState(() => _history = widget.controller.history);
       if (ok) {
-        // Run the mini neural network analysis on the just-built project and
-        // show the report in a modal dialog.
         final latest = widget.controller.history.builds.isNotEmpty
             ? widget.controller.history.builds.first
             : null;

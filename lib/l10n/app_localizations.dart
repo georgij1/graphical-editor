@@ -219,6 +219,7 @@ class AppLocalizations {
     'Build project': 'Собрать проект',
     'Build finished.': 'Сборка завершена.',
     'Build failed.': 'Сборка не удалась.',
+    'Download ready JAR': 'Скачать готовый JAR',
     'Artifact': 'Артефакт',
     'app.jar — needs JavaFX on the classpath':
         'app.jar — нужен JavaFX в classpath',

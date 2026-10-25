@@ -434,8 +434,8 @@ class _ProjectSettingsDialogState extends State<ProjectSettingsDialog> {
                             onPressed: _busy ? null : _export,
                           ),
                           _ActionButton(
-                            icon: Icons.build_outlined,
-                            label: context.tr('Build'),
+                            icon: Icons.download_outlined,
+                            label: context.tr('Download ready JAR'),
                             onPressed: _busy ? null : _build,
                           ),
                           if (controller.userEmail == project.ownerEmail)
