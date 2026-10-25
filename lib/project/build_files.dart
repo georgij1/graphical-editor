@@ -29,6 +29,8 @@ class BuildFiles {
         _gradleBuild(project),
         _gradleSettings(project),
       ],
+      _runBat(project, tool),
+      _runShell(project, tool),
       _gitignore,
       _readme(project, tool),
     ];
@@ -144,6 +146,37 @@ class BuildFiles {
         path: 'settings.gradle',
         content: "rootProject.name = '${artifactId(p)}'\n",
       );
+
+  /// Windows batch file that launches the project with the configured build tool.
+  GeneratedFile _runBat(Project p, BuildTool tool) {
+    final command = switch (tool) {
+      BuildTool.maven => 'mvn javafx:run',
+      BuildTool.gradle => 'gradle run',
+      BuildTool.none => 'echo No build tool configured. Use javac with JavaFX SDK.',
+    };
+    return GeneratedFile(
+      path: 'run.bat',
+      content: '@echo off\n'
+          'cd /d "%~dp0"\n'
+          '$command\n'
+          'pause\n',
+    );
+  }
+
+  /// Shell script that launches the project with the configured build tool.
+  GeneratedFile _runShell(Project p, BuildTool tool) {
+    final command = switch (tool) {
+      BuildTool.maven => 'mvn javafx:run',
+      BuildTool.gradle => 'gradle run',
+      BuildTool.none => 'echo "No build tool configured. Use javac with JavaFX SDK."',
+    };
+    return GeneratedFile(
+      path: 'run.sh',
+      content: '#!/usr/bin/env bash\n'
+          'set -e\n'
+          '$command\n',
+    );
+  }
 
   GeneratedFile get _gitignore => GeneratedFile(
         path: '.gitignore',
