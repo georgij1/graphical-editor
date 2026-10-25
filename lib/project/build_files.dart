@@ -147,34 +147,40 @@ class BuildFiles {
         content: "rootProject.name = '${artifactId(p)}'\n",
       );
 
-  /// Windows batch file that launches the project with the configured build tool.
+  /// Windows batch file that launches the project with a ready JAR.
+  /// Automatically downloads and installs Java 21 if it is missing.
   GeneratedFile _runBat(Project p, BuildTool tool) {
-    final command = switch (tool) {
-      BuildTool.maven => 'mvn javafx:run',
-      BuildTool.gradle => 'gradle run',
-      BuildTool.none => 'echo No build tool configured. Use javac with JavaFX SDK.',
-    };
     return GeneratedFile(
       path: 'run.bat',
       content: '@echo off\n'
           'cd /d "%~dp0"\n'
-          '$command\n'
+          '\n'
+          ':: Check if Java 21+ is available\n'
+          'java -version >nul 2>&1\n'
+          'if errorlevel 1 (\n'
+          '    echo Installing Java 21...\n'
+          '    powershell -NoProfile -Command "Invoke-WebRequest -Uri https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.4+11/OpenJDK21U-jdk_x64_windows_hotspot_21.0.4_11.msi -OutFile %TEMP%\\java21.msi"\n'
+          '    msiexec /i "%TEMP%\\java21.msi" /quiet /norestart\n'
+          '    del "%TEMP%\\java21.msi"\n'
+          '    echo Java 21 installed. Restarting...\n'
+          '    cmd /c "%~f0"\n'
+          '    goto :eof\n'
+          ')\n'
+          '\n'
+          ':: Run the application\n'
+          'java -jar app.jar\n'
           'pause\n',
     );
   }
 
-  /// Shell script that launches the project with the configured build tool.
+  /// Shell script that launches the project with the ready JAR.
   GeneratedFile _runShell(Project p, BuildTool tool) {
-    final command = switch (tool) {
-      BuildTool.maven => 'mvn javafx:run',
-      BuildTool.gradle => 'gradle run',
-      BuildTool.none => 'echo "No build tool configured. Use javac with JavaFX SDK."',
-    };
     return GeneratedFile(
       path: 'run.sh',
       content: '#!/usr/bin/env bash\n'
           'set -e\n'
-          '$command\n',
+          'cd "\$(dirname "\$0")"\n'
+          'java -jar app.jar\n',
     );
   }
 

@@ -62,17 +62,15 @@ Future<EditorController> _controller() async {
 }
 
 void main() {
-  testWidgets('the dialog offers both artifacts', (tester) async {
+  testWidgets('the dialog offers the build button', (tester) async {
     final controller = await _controller();
     await tester.pumpWidget(_app(const Locale('en'), controller));
     await tester.pumpAndSettle();
     await tester.tap(find.text('open'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Build project'), findsOneWidget);
-    expect(find.text('JAR'), findsOneWidget);
-    expect(find.text('Bundle'), findsOneWidget);
-    expect(find.widgetWithText(FilledButton, 'Build'), findsOneWidget);
+    expect(find.text('Download ready JAR'), findsNWidgets(2));
+    expect(find.widgetWithText(FilledButton, 'Download ready JAR'), findsOneWidget);
   });
 
   testWidgets('building closes the dialog', (tester) async {
@@ -82,9 +80,7 @@ void main() {
     await tester.tap(find.text('open'));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('JAR'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(FilledButton, 'Build'));
+    await tester.tap(find.widgetWithText(FilledButton, 'Download ready JAR'));
     // The (stubbed) save fails in the test binding, so the dialog stays open
     // and simply stops spinning.
     await tester.pumpAndSettle();
@@ -99,8 +95,7 @@ void main() {
     await tester.tap(find.text('open'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Собрать проект'), findsOneWidget);
-    expect(find.text('Артефакт'), findsOneWidget);
+    expect(find.text('Скачать готовый JAR'), findsNWidgets(2));
     expect(find.text('Проект компилируется на сервере сборки.'), findsOneWidget);
   });
 }
