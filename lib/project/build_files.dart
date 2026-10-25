@@ -156,7 +156,7 @@ class BuildFiles {
           'cd /d "%~dp0"\r\n'
           '\r\n'
           ':: Check if Java 21+ is available\r\n'
-          'java -version 2>&1 | findstr /i "21\\." >nul\r\n'
+          'java -version 2>&1 | findstr /i "21." >nul\r\n'
           'if errorlevel 1 (\r\n'
           '    echo Installing Java 21 (this may take a minute)...\r\n'
           '    powershell -NoProfile -ExecutionPolicy Bypass -Command "Invoke-WebRequest -Uri https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.4+11/OpenJDK21U-jdk_x64_windows_hotspot_21.0.4_11.msi -OutFile %TEMP%\\java21.msi"\r\n'
@@ -188,7 +188,7 @@ class BuildFiles {
       path: 'run.sh',
       content: '#!/usr/bin/env bash\n'
           'set -e\n'
-          r'cd "$(dirname "$0")"' '\n'
+          'cd "\$(dirname "\$0")"\n'
           'java -jar app.jar\n',
     );
   }
