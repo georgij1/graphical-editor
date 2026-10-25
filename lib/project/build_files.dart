@@ -148,7 +148,7 @@ class BuildFiles {
       );
 
   /// Windows batch file that launches the project with a ready JAR.
-  /// Automatically downloads and installs Java 21 if it is missing.
+  /// Automatically downloads and installs Java 21 if it is missing or older.
   GeneratedFile _runBat(Project p, BuildTool tool) {
     return GeneratedFile(
       path: 'run.bat',
@@ -156,19 +156,28 @@ class BuildFiles {
           'cd /d "%~dp0"\n'
           '\n'
           ':: Check if Java 21+ is available\n'
-          'java -version >nul 2>&1\n'
+          'java -version 2>&1 | findstr /i "21\\." >nul\n'
           'if errorlevel 1 (\n'
-          '    echo Installing Java 21...\n'
-          '    powershell -NoProfile -Command "Invoke-WebRequest -Uri https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.4+11/OpenJDK21U-jdk_x64_windows_hotspot_21.0.4_11.msi -OutFile %TEMP%\\java21.msi"\n'
+          '    echo Installing Java 21 (this may take a minute)...\n'
+          '    powershell -NoProfile -ExecutionPolicy Bypass -Command "Invoke-WebRequest -Uri "https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.4%2B11/OpenJDK21U-jdk_x64_windows_hotspot_21.0.4_11.msi" -OutFile "%TEMP%\\java21.msi"\n'
           '    msiexec /i "%TEMP%\\java21.msi" /quiet /norestart\n'
           '    del "%TEMP%\\java21.msi"\n'
-          '    echo Java 21 installed. Restarting...\n'
-          '    cmd /c "%~f0"\n'
-          '    goto :eof\n'
+          ')\n'
+          '\n'
+          ':: Find Java 21 executable\n'
+          'set JAVA_EXE=\n'
+          'for /d %%d in ("C:\\Program Files\\Eclipse Adoptium\\jdk-*") do (\n'
+          '    if exist "%%d\\bin\\java.exe" set JAVA_EXE=%%d\\bin\\java.exe\n'
+          ')\n'
+          '\n'
+          'if "%JAVA_EXE%"=="" (\n'
+          '    echo ERROR: Java 21 not found\n'
+          '    pause\n'
+          '    exit /b 1\n'
           ')\n'
           '\n'
           ':: Run the application\n'
-          'java -jar app.jar\n'
+          '"%JAVA_EXE%" -jar app.jar\n'
           'pause\n',
     );
   }

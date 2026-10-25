@@ -227,6 +227,8 @@ class AppLocalizations {
         'JAR + среда JavaFX + скрипты запуска для Windows, Linux и macOS',
     'The project is compiled on the build server.':
         'Проект компилируется на сервере сборки.',
+    'The project will be compiled on the build server and a ready-to-run JAR will be downloaded.':
+        'Проект будет скомпилирован на сервере сборки, и вы сможете скачать готовый JAR.',
     'Compiling…': 'Компиляция…',
     'Build analysis': 'Анализ сборки',
     'Score': 'Оценка',

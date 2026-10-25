@@ -96,7 +96,10 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Скачать готовый JAR'), findsNWidgets(2));
-    expect(find.text('Проект компилируется на сервере сборки.'), findsOneWidget);
+    expect(
+        find.text(
+            'Проект будет скомпилирован на сервере сборки, и вы сможете скачать готовый JAR.'),
+        findsOneWidget);
   });
 }
 
