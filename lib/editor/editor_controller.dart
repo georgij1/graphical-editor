@@ -1393,6 +1393,7 @@ class EditorController extends ChangeNotifier {
       ..shared = true;
     project.replaceMembers(saved.members);
     _collabRevision = saved.revision;
+    _persist();
     collaborationNotice =
         'The project has been published for the participants.';
     notifyListeners();
@@ -1428,6 +1429,7 @@ class EditorController extends ChangeNotifier {
     project.shared = true;
     project.replaceMembers(result.value!.members);
     _startCollaboration(project);
+    _persist();
     collaborationNotice = 'The participant has been added.';
     notifyListeners();
     return true;
@@ -1445,6 +1447,7 @@ class EditorController extends ChangeNotifier {
       return false;
     }
     project.replaceMembers(result.value!.members);
+    _persist();
     notifyListeners();
     return true;
   }
@@ -1537,6 +1540,7 @@ class EditorController extends ChangeNotifier {
       return false;
     }
     project.replaceMembers(result.value!.members);
+    _persist();
     notifyListeners();
     return true;
   }
