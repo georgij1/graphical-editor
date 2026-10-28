@@ -1402,7 +1402,17 @@ class EditorController extends ChangeNotifier {
   Future<bool> inviteCollaborator(String email, String role) async {
     final token = _token;
     final project = _currentProject;
-    if (token == null || project == null) return false;
+    if (token == null) {
+      collaborationNotice = 'Sign in to invite participants.';
+      notifyListeners();
+      return false;
+    }
+    if (project == null) return false;
+    // The project must exist on the server before a participant can be added.
+    if (!project.shared) {
+      final published = await publishSharedProject(project);
+      if (!published) return false;
+    }
     final result = await _api.addProjectMember(
       token,
       project.id,
