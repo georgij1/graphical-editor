@@ -885,7 +885,10 @@ class EditorController extends ChangeNotifier {
       final data = WorkspaceData.fromJson(jsonDecode(raw));
       if (data.projects.isEmpty) return false;
       _projects.clear();
-      _projects.addAll(data.projects);
+      final seen = <String>{};
+      for (final p in data.projects) {
+        if (seen.add(p.id)) _projects.add(p);
+      }
       _currentProject = null;
       _activeScene = null;
       return true;
@@ -941,7 +944,12 @@ class EditorController extends ChangeNotifier {
       // The list of projects is replaced, not merged: the projects of the
       // previous owner must not stay on screen.
       _projects.clear();
-      _projects.addAll(data.projects);
+      // Drop duplicates that may have crept in (same id) so the picker
+      // never shows the same project twice.
+      final seen = <String>{};
+      for (final p in data.projects) {
+        if (seen.add(p.id)) _projects.add(p);
+      }
       _looseDocument = data.document;
       _looseDocumentName = data.documentName;
       // A saved document outside of any project reopens straight away, so
@@ -1718,15 +1726,23 @@ class EditorController extends ChangeNotifier {
     notifyListeners();
   }
 
-  void deleteProject(Project project) {
+  Future<void> deleteProject(Project project) async {
     _flushToScene();
     _projects.remove(project);
     if (identical(_currentProject, project)) {
       _currentProject = null;
       _activeScene = null;
     }
-    _persist();
     notifyListeners();
+    // A published project also lives on the server; remove it there too,
+    // otherwise loadSharedProjects brings it back after the next sync.
+    final token = _token;
+    if (token != null && project.shared && project.id.isNotEmpty) {
+      try {
+        await _api.deleteSharedProject(token, project.id);
+      } catch (_) {}
+    }
+    await _persist();
   }
 
   /// Packs the project into an archive and saves it. Returns false when the save
