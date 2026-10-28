@@ -1303,7 +1303,7 @@ class EditorController extends ChangeNotifier {
   void _startPresence(Project project) {
     _stopPresence();
     final token = _token;
-    if (token == null || project.id.isEmpty) return;
+    if (token == null || project.id.isEmpty || !project.shared) return;
     // Heartbeat + refresh immediately, then repeat.
     _presenceTick(project.id, token);
     _presenceTimer = Timer.periodic(const Duration(seconds: 2), (_) {
@@ -1450,6 +1450,7 @@ class EditorController extends ChangeNotifier {
       final published = await publishSharedProject(project);
       if (!published) return false;
     }
+    _startPresence(project);
     final result = await _api.addProjectMember(
       token,
       project.id,

@@ -11,7 +11,7 @@ import '../../l10n/app_localizations.dart';
 /// Full project tree: the JavaFX application laid out like a real source tree
 /// (`src/main/java/...` for the launcher + controllers and
 /// `src/main/resources/...` for the FXML scenes).
-class ProjectTreePanel extends StatelessWidget {
+class ProjectTreePanel extends StatefulWidget {
   const ProjectTreePanel({
     super.key,
     required this.controller,
@@ -24,24 +24,79 @@ class ProjectTreePanel extends StatelessWidget {
   final void Function(SceneFile scene) onDeleteScene;
 
   @override
+  State<ProjectTreePanel> createState() => _ProjectTreePanelState();
+}
+
+class _ProjectTreePanelState extends State<ProjectTreePanel> {
+  final Set<String> _collapsed = <String>{};
+
+  EditorController get controller => widget.controller;
+
+  bool _isCollapsed(String path) => _collapsed.contains(path);
+
+  void _toggle(String path) {
+    setState(() {
+      if (_collapsed.contains(path)) {
+        _collapsed.remove(path);
+      } else {
+        _collapsed.add(path);
+      }
+    });
+  }
+
+  void _collapseAll(_DirNode dir) {
+    setState(() {
+      _collectDirs(dir, _collapsed);
+    });
+  }
+
+  void _expandAll(_DirNode dir) {
+    setState(() {
+      _collapsed.clear();
+    });
+  }
+
+  void _collectDirs(_DirNode dir, Set<String> out) {
+    out.add(dir.path);
+    for (final child in dir.dirs.values) {
+      _collectDirs(child, out);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final project = controller.currentProject;
     if (project == null) return const SizedBox.shrink();
-final root = _buildTree(project);
-    // Not a lazy list: the pane measures its content so the divider can sit
-    // right below the last row.
+    final root = _buildTree(project);
     return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: IntrinsicWidth(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.only(bottom: 12),
-          physics: const ClampingScrollPhysics(),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: _renderChildren(context, project, root, 0),
+      padding: const EdgeInsets.only(bottom: 12),
+      physics: const ClampingScrollPhysics(),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          Padding(
+            padding: const EdgeInsets.fromLTRB(6, 4, 6, 2),
+            child: Row(
+              children: <Widget>[
+                IconButton(
+                  tooltip: context.tr('Expand all'),
+                  icon: const Icon(Icons.unfold_more, size: 16),
+                  visualDensity: VisualDensity.compact,
+                  onPressed: () => _expandAll(root),
+                ),
+                IconButton(
+                  tooltip: context.tr('Collapse all'),
+                  icon: const Icon(Icons.unfold_less, size: 16),
+                  visualDensity: VisualDensity.compact,
+                  onPressed: () => _collapseAll(root),
+                ),
+              ],
+            ),
           ),
-        ),
+          const Divider(height: 1),
+          ..._renderChildren(context, project, root, 0),
+        ],
       ),
     );
   }
@@ -51,7 +106,7 @@ final root = _buildTree(project);
   _DirNode _buildTree(Project project) {
     final root = _DirNode(project.name, project.name);
 
-void addFile(
+    void addFile(
       String path, {
       String? content,
       SceneFile? scene,
@@ -73,7 +128,7 @@ void addFile(
       ));
     }
 
-for (final source in JavaGenerator.generate(project)) {
+    for (final source in JavaGenerator.generate(project)) {
       addFile(source.path, content: source.content, isJava: true);
     }
     for (final file in const BuildFiles().generate(project, BuildTool.maven)) {
@@ -129,6 +184,7 @@ for (final source in JavaGenerator.generate(project)) {
   ) {
     final padding = EdgeInsets.only(left: 6 + depth * 14.0, right: 8);
     final empty = dir.dirs.isEmpty && dir.files.isEmpty;
+    final collapsed = _isCollapsed(dir.path);
     if (empty) {
       return Padding(
         padding: padding,
@@ -147,22 +203,37 @@ for (final source in JavaGenerator.generate(project)) {
         ),
       );
     }
-    return Theme(
-      data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-      child: ExpansionTile(
-        key: PageStorageKey<String>('ptdir:${dir.path}'),
-        initiallyExpanded: true,
-        tilePadding: padding,
-        childrenPadding: EdgeInsets.zero,
-        minTileHeight: 34,
-        leading: const Icon(Icons.folder_outlined, size: 17),
-        title: Text(
-          dir.name,
-          style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w500),
-          overflow: TextOverflow.ellipsis,
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        InkWell(
+          onTap: () => _toggle(dir.path),
+          child: Padding(
+            padding: padding,
+            child: Row(
+              children: <Widget>[
+                Icon(
+                  collapsed ? Icons.chevron_right : Icons.expand_more,
+                  size: 18,
+                ),
+                const SizedBox(width: 2),
+                const Icon(Icons.folder_outlined, size: 17),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    dir.name,
+                    style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w500),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
-        children: _renderChildren(context, project, dir, depth + 1),
-      ),
+        if (!collapsed)
+          ..._renderChildren(context, project, dir, depth + 1),
+      ],
     );
   }
 
@@ -172,7 +243,7 @@ for (final source in JavaGenerator.generate(project)) {
     _FileNode file,
     int depth,
   ) {
-final padding = EdgeInsets.only(left: 6 + depth * 14.0, right: 6);
+    final padding = EdgeInsets.only(left: 6 + depth * 14.0, right: 6);
     if (file.isBuildFile) {
       return ListTile(
         dense: true,
@@ -229,9 +300,9 @@ final padding = EdgeInsets.only(left: 6 + depth * 14.0, right: 6);
         onSelected: (value) {
           switch (value) {
             case 'rename':
-              onRenameScene(scene);
+              widget.onRenameScene(scene);
             case 'delete':
-              onDeleteScene(scene);
+              widget.onDeleteScene(scene);
           }
         },
         itemBuilder: (context) => <PopupMenuEntry<String>>[
@@ -246,10 +317,7 @@ final padding = EdgeInsets.only(left: 6 + depth * 14.0, right: 6);
 class _DirNode {
   _DirNode(this.name, this.path);
 
-  final String name;
-
-  /// Full slash separated path, so nested folders sharing a name keep their
-  /// own expansion state.
+  String name;
   final String path;
   final Map<String, _DirNode> dirs = <String, _DirNode>{};
   final List<_FileNode> files = <_FileNode>[];
