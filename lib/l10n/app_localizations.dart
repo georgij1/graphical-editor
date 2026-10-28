@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 
 /// Lightweight localization for the editor UI.
 ///
@@ -51,9 +51,8 @@ class AppLocalizations {
   String scenes(int n) =>
       '$n ${isRussian ? _plural(n, enOne: 'scene', enMany: 'scenes', ruOne: 'сцена', ruFew: 'сцены', ruMany: 'сцен') : (n == 1 ? 'scene' : 'scenes')}';
 
-  String issuesFound(int n) => isRussian
-      ? 'Найдено проблем: $n'
-      : '$n issue${n == 1 ? '' : 's'} found';
+  String issuesFound(int n) =>
+      isRussian ? 'Найдено проблем: $n' : '$n issue${n == 1 ? '' : 's'} found';
 
   String selected(String name) =>
       isRussian ? 'Выбрано: $name' : 'Selected: $name';
@@ -61,8 +60,9 @@ class AppLocalizations {
   String canvasSize(int width, int height) =>
       isRussian ? 'Холст $width×$height' : 'Canvas $width×$height';
 
-  String deleteProject(String name) =>
-      isRussian ? 'Удалить «$name» и все его сцены?' : 'Delete "$name" and all its scenes?';
+  String deleteProject(String name) => isRussian
+      ? 'Удалить «$name» и все его сцены?'
+      : 'Delete "$name" and all its scenes?';
 
   String deleteScene(String name) =>
       isRussian ? 'Удалить «$name.fxml»?' : 'Delete "$name.fxml"?';
@@ -95,8 +95,7 @@ class AppLocalizations {
     'Email': 'Эл. почта',
     'Password': 'Пароль',
     'Confirm password': 'Подтвердите пароль',
-    'Enter a valid email address.':
-        'Введите корректный адрес эл. почты.',
+    'Enter a valid email address.': 'Введите корректный адрес эл. почты.',
     'Password must be at least 6 characters.':
         'Пароль должен содержать не менее 6 символов.',
     'Passwords do not match.': 'Пароли не совпадают.',
@@ -108,7 +107,8 @@ class AppLocalizations {
     'Sign out': 'Выйти',
     'Projects': 'Проекты',
     'Components': 'Компоненты',
-    'Drag to resize. Double click to fit the content.':'Потяните, чтобы изменить размер. Двойной щелчок — по содержимому.',
+    'Drag to resize. Double click to fit the content.':
+        'Потяните, чтобы изменить размер. Двойной щелчок — по содержимому.',
     'Project': 'Проект',
     'Run preview': 'Запустить превью',
     'Browser preview of the current scene': 'Превью текущей сцены в браузере',
@@ -150,10 +150,8 @@ class AppLocalizations {
     'Light': 'Светлая',
     'Dark': 'Тёмная',
     'Interface language': 'Язык интерфейса',
-    'Language of the editor interface.':
-        'Язык интерфейса редактора.',
-    'Could not open the selected file.':
-        'Не удалось открыть выбранный файл.',
+    'Language of the editor interface.': 'Язык интерфейса редактора.',
+    'Could not open the selected file.': 'Не удалось открыть выбранный файл.',
     'Document saved.': 'Документ сохранён.',
     'Save cancelled.': 'Сохранение отменено.',
 
@@ -191,8 +189,7 @@ class AppLocalizations {
     'New project': 'Новый проект',
     'Import project': 'Импорт проекта',
     'No projects yet': 'Пока нет проектов',
-    'Create a JavaFX application to start building. Projects (FXML scenes and generated Java sources) are saved automatically on this device.':
-        'Создайте JavaFX-приложение, чтобы начать. Проекты (FXML-сцены и сгенерированный Java-код) сохраняются автоматически на этом устройстве.',
+    'Create a JavaFX application to start building. Projects (FXML scenes and generated Java sources) are saved automatically on this device.': 'Создайте JavaFX-приложение, чтобы начать. Проекты (FXML-сцены и сгенерированный Java-код) сохраняются автоматически на этом устройстве.',
     'Back to projects': 'К списку проектов',
     'New scene': 'Новая сцена',
     'Rename project': 'Переименовать проект',
@@ -227,15 +224,15 @@ class AppLocalizations {
         'JAR + среда JavaFX + скрипты запуска для Windows, Linux и macOS',
     'The project is compiled on the build server.':
         'Проект компилируется на сервере сборки.',
-    'The project will be compiled on the build server and a ready-to-run JAR will be downloaded.':
-        'Проект будет скомпилирован на сервере сборки, и вы сможете скачать готовый JAR.',
+    'The project will be compiled on the build server and a ready-to-run JAR will be downloaded.': 'Проект будет скомпилирован на сервере сборки, и вы сможете скачать готовый JAR.',
     'Compiling…': 'Компиляция…',
     'Build analysis': 'Анализ сборки',
     'Score': 'Оценка',
     'Build time': 'Время сборки',
     'Issues found': 'Найденные проблемы',
     'Recommendations': 'Рекомендации',
-    'No issues found. The project looks healthy.': 'Проблем не обнаружено. Проект выглядит здоровым.',
+    'No issues found. The project looks healthy.':
+        'Проблем не обнаружено. Проект выглядит здоровым.',
     'Add the generated Java files to the archive.':
         'Добавить сгенерированные Java-файлы в архив.',
     'Kiosk mode': 'Режим киоска',
@@ -243,14 +240,15 @@ class AppLocalizations {
         'Запуск на весь экран без заголовка. ESC отключён.',
     // ---- Export check / build analysis report ----
     'Export check': 'Проверка экспорта',
+    'Project check': 'Проверка проекта',
+    'Details': 'Подробнее',
     'Export anyway': 'Всё равно экспортировать',
     'Fix issues': 'Исправить',
     'No scenes in the project.': 'В проекте нет сцен.',
     'Add at least one scene to the project.':
         'Добавьте в проект хотя бы одну сцену.',
     'Java package is invalid.': 'Некорректный Java-пакет.',
-    'Fix the Java package in project settings (letters, digits, underscores, dots).':
-        'Исправьте Java-пакет в настройках проекта (буквы, цифры, подчёркивания, точки).',
+    'Fix the Java package in project settings (letters, digits, underscores, dots).': 'Исправьте Java-пакет в настройках проекта (буквы, цифры, подчёркивания, точки).',
     'Main class is not set.': 'Не задан главный класс.',
     'Set the main class in project settings.':
         'Задайте главный класс в настройках проекта.',
@@ -262,20 +260,14 @@ class AppLocalizations {
     'Build took more than 10 seconds.': 'Сборка заняла более 10 секунд.',
     'Consider simplifying the project or scenes.':
         'Упростите проект или сцены.',
-    'The controller package must match the project package "{0}". Update the scene controllers or the package in the settings.':
-        'Пакет контроллера должен совпадать с пакетом проекта «{0}». Обновите контроллеры сцен или пакет в настройках.',
-    'Scene "{0}": the FXML refers to the controller "{1}", but the project package is "{2}". The application will not start.':
-        'Сцена «{0}»: FXML ссылается на контроллер «{1}», а пакет проекта — «{2}». Приложение не запустится.',
-    'Scene "{0}": the FXML controller "{1}" differs from the scene controller "{2}".':
-        'Сцена «{0}»: контроллер в FXML «{1}» отличается от контроллера сцены «{2}».',
-    'Scene "{0}": the FXML refers to a controller, but the scene has no controller class.':
-        'Сцена «{0}»: FXML ссылается на контроллер, но у сцены нет класса контроллера.',
+    'The controller package must match the project package "{0}". Update the scene controllers or the package in the settings.': 'Пакет контроллера должен совпадать с пакетом проекта «{0}». Обновите контроллеры сцен или пакет в настройках.',
+    'Scene "{0}": the FXML refers to the controller "{1}", but the project package is "{2}". The application will not start.': 'Сцена «{0}»: FXML ссылается на контроллер «{1}», а пакет проекта — «{2}». Приложение не запустится.',
+    'Scene "{0}": the FXML controller "{1}" differs from the scene controller "{2}".': 'Сцена «{0}»: контроллер в FXML «{1}» отличается от контроллера сцены «{2}».',
+    'Scene "{0}": the FXML refers to a controller, but the scene has no controller class.': 'Сцена «{0}»: FXML ссылается на контроллер, но у сцены нет класса контроллера.',
     'Scene "{0}": the controller "{1}" lies outside the project package "{2}".':
         'Сцена «{0}»: контроллер «{1}» находится вне пакета проекта «{2}».',
-    'Scene "{0}": the element "{1}" is used, but the import "{2}" is missing. The application will not start.':
-        'Сцена «{0}»: используется элемент «{1}», но импорт «{2}» отсутствует. Приложение не запустится.',
-    'Every element used in a scene needs its own <?import?> line in the FXML file. The automatic fix adds the missing imports.':
-        'Каждый элемент сцены должен иметь строку <?import?> в файле FXML. Автоисправление добавит недостающие импорты.',
+    'Scene "{0}": the element "{1}" is used, but the import "{2}" is missing. The application will not start.': 'Сцена «{0}»: используется элемент «{1}», но импорт «{2}» отсутствует. Приложение не запустится.',
+    'Every element used in a scene needs its own <?import?> line in the FXML file. The automatic fix adds the missing imports.': 'Каждый элемент сцены должен иметь строку <?import?> в файле FXML. Автоисправление добавит недостающие импорты.',
     'Scene actions': 'Действия со сценой',
     'Project files': 'Файлы проекта',
     'Project actions': 'Действия с проектом',
@@ -304,7 +296,8 @@ class AppLocalizations {
     'Author': 'Автор',
     'Scenes': 'Сцены',
     'Notes': 'Заметки',
-    'Changes compared to the previous version:': 'Изменения по сравнению с предыдущей версией:',
+    'Changes compared to the previous version:':
+        'Изменения по сравнению с предыдущей версией:',
     'Added scenes:': 'Добавленные сцены:',
     'Removed scenes:': 'Удалённые сцены:',
     'This is the first version of the project.': 'Это первая версия проекта.',
@@ -315,12 +308,10 @@ class AppLocalizations {
     'Copied': 'Скопировано',
     'You have joined the project.': 'Вы присоединились к проекту.',
     'Could not join the project.': 'Не удалось присоединиться к проекту.',
-    'Send the link to the person: they join the project when they open it.':
-        'Отправьте ссылку человеку: он присоединится к проекту, когда её откроет.',
+    'Send the link to the person: they join the project when they open it.': 'Отправьте ссылку человеку: он присоединится к проекту, когда её откроет.',
     'You are invited to the project "{0}" of {1}. Do you want to join it?':
         'Вас пригласили в проект «{0}» ({1}). Присоединиться?',
-    'Pick an account or type an email':
-        'Выберите аккаунт или введите почту',
+    'Pick an account or type an email': 'Выберите аккаунт или введите почту',
     'Add participant': 'Добавить участника',
     'Remove participant': 'Убрать участника',
     'Publish for the participants': 'Опубликовать для участников',
@@ -328,10 +319,8 @@ class AppLocalizations {
     'The participant has been removed.': 'Участник удалён.',
     'The project has been published for the participants.':
         'Проект опубликован для участников.',
-    'Enter the email of the participant.':
-        'Введите почту участника.',
-    'Nobody has been invited yet. Add a participant to work on the project together.':
-        'Участники ещё не приглашены. Добавьте участника для совместной работы над проектом.',
+    'Enter the email of the participant.': 'Введите почту участника.',
+    'Nobody has been invited yet. Add a participant to work on the project together.': 'Участники ещё не приглашены. Добавьте участника для совместной работы над проектом.',
     'Open project': 'Открыть проект',
     'Actions': 'Действия',
     'Project renamed.': 'Проект переименован.',
@@ -340,13 +329,11 @@ class AppLocalizations {
     'Description': 'Описание',
     'Description saved.': 'Описание сохранено.',
     'Project updated.': 'Проект обновлён.',
-    'Shown in the README of the export.':
-        'Показывается в README при экспорте.',
+    'Shown in the README of the export.': 'Показывается в README при экспорте.',
     'Previous page': 'Предыдущая страница',
     'Next page': 'Следующая страница',
     'Choose a project': 'Выберите проект',
-    'Create your first JavaFX application to start building scenes and generating Java sources.':
-        'Создайте первое JavaFX-приложение, чтобы начать строить сцены и генерировать Java-код.',
+    'Create your first JavaFX application to start building scenes and generating Java sources.': 'Создайте первое JavaFX-приложение, чтобы начать строить сцены и генерировать Java-код.',
     'Open an existing project or start a new one.':
         'Откройте существующий проект или создайте новый.',
 
@@ -357,25 +344,34 @@ class AppLocalizations {
     'Main class': 'Главный класс',
     'Invalid Java package': 'Недопустимый Java-пакет',
     'Package cannot be empty.': 'Пакет не может быть пустым.',
-    'Package must not start or end with a dot.': 'Пакет не может начинаться или заканчиваться точкой.',
-    'Package must not contain consecutive dots.': 'Пакет не может содержать две точки подряд.',
+    'Package must not start or end with a dot.':
+        'Пакет не может начинаться или заканчиваться точкой.',
+    'Package must not contain consecutive dots.':
+        'Пакет не может содержать две точки подряд.',
     'Package must not contain spaces.': 'Пакет не может содержать пробелы.',
-    'Each package segment must not be empty.': 'Каждый сегмент пакета не может быть пустым.',
+    'Each package segment must not be empty.':
+        'Каждый сегмент пакета не может быть пустым.',
     'Each segment must start with a letter and contain only letters, digits and underscores.': 'Каждый сегмент должен начинаться с буквы и содержать только буквы, цифры и знаки подчёркивания.',
-    'Segment cannot be a Java keyword.': 'Сегмент не может быть зарезервированным словом Java.',
+    'Segment cannot be a Java keyword.':
+        'Сегмент не может быть зарезервированным словом Java.',
     'Owner': 'Владелец',
-    'You are the owner of this project.': 'Вы являетесь владельцем этого проекта.',
+    'You are the owner of this project.':
+        'Вы являетесь владельцем этого проекта.',
     'Transfer ownership': 'Передать право владения',
     'New owner': 'Новый владелец',
     'Transfer': 'Передать',
-    'Only the project owner can transfer ownership.': 'Только владелец проекта может передать право владения.',
-    'The new owner must be a participant of the project.': 'Новый владелец должен быть участником проекта.',
+    'Only the project owner can transfer ownership.':
+        'Только владелец проекта может передать право владения.',
+    'The new owner must be a participant of the project.':
+        'Новый владелец должен быть участником проекта.',
     'Ownership transferred to {0}.': 'Право владения передано {0}.',
     'Failed to transfer ownership.': 'Не удалось передать право владения.',
     'The project belongs to {0}.': 'Проект принадлежит {0}.',
-    'No participants available to transfer ownership to.': 'Нет участников, которым можно передать право владения.',
+    'No participants available to transfer ownership to.':
+        'Нет участников, которым можно передать право владения.',
     'Select the new owner:': 'Выберите нового владельца:',
-    'Used for the generated Java sources.': 'Используется для сгенерированных исходников Java.',
+    'Used for the generated Java sources.':
+        'Используется для сгенерированных исходников Java.',
     'Description (optional)': 'Описание (необязательно)',
     'Cancel': 'Отмена',
     'Create': 'Создать',
@@ -394,8 +390,7 @@ class AppLocalizations {
     'AI suggestion loaded. Review and Apply.':
         'Предложение ИИ загружено. Проверьте и нажмите «Применить».',
     'No issues found.': 'Ошибок нет.',
-    'Cannot apply invalid source.':
-        'Нельзя применить некорректный исходник.',
+    'Cannot apply invalid source.': 'Нельзя применить некорректный исходник.',
     'Java source applied.': 'Java-код применён.',
     'FXML applied.': 'FXML применён.',
     'Invalid FXML — not applied.': 'Некорректный FXML — не применён.',
@@ -413,14 +408,12 @@ class AppLocalizations {
     'Loading models…': 'Загрузка моделей…',
     'No models found. Is Ollama running?':
         'Модели не найдены. Запущена ли Ollama?',
-    'AI result copied to clipboard.':
-        'Результат ИИ скопирован в буфер обмена.',
+    'AI result copied to clipboard.': 'Результат ИИ скопирован в буфер обмена.',
 
     // ------------------------------------------------------------- downloads
     'Download': 'Скачать',
     'Soon': 'Скоро',
-    'Ready-made builds are served from the downloads/ folder. Unavailable platforms are marked “Soon”.':
-        'Готовые сборки раздаются из папки downloads/. Недоступные платформы помечены как «Скоро».',
+    'Ready-made builds are served from the downloads/ folder. Unavailable platforms are marked “Soon”.': 'Готовые сборки раздаются из папки downloads/. Недоступные платформы помечены как «Скоро».',
     'Desktop': 'Десктоп',
     'Mobile': 'Мобильные',
     'Portable client for Windows 10/11 (x64)':

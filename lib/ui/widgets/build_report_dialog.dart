@@ -15,7 +15,8 @@ enum ReportDialogAction {
   fix,
 }
 
-/// Which flow opened the report: a server build or a pre-export check.
+/// Which flow opened the report: a server build, a pre-export check or the
+/// live check shown in the editor itself.
 enum ReportDialogMode {
   /// After a build: shows the build time and a single Close button.
   build,
@@ -23,6 +24,10 @@ enum ReportDialogMode {
   /// Before an export: offers Export / Export anyway and, when the scene
   /// controllers or imports can be repaired, a Fix issues button.
   export,
+
+  /// Live validation after a save inside the editor: Close and, when
+  /// possible, a Fix issues button.
+  editor,
 }
 
 /// Shows the mini neural network analysis report of the project.
@@ -59,18 +64,25 @@ class BuildReportDialog extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isExport = mode == ReportDialogMode.export;
+    final isEditor = mode == ReportDialogMode.editor;
+    // Build time is only meaningful for a real server build.
+    final showBuildTime = mode == ReportDialogMode.build;
     final isOk = report.buildSucceeded;
     final badgeColor = report.isHealthy
         ? Colors.green
         : report.score >= 50
-            ? theme.colorScheme.primary
-            : theme.colorScheme.error;
+        ? theme.colorScheme.primary
+        : theme.colorScheme.error;
 
     final title = isExport
         ? context.tr('Export check')
+        : isEditor
+        ? context.tr('Project check')
         : context.tr('Build analysis');
     final headerIcon = isExport
         ? Icons.fact_check_outlined
+        : isEditor
+        ? Icons.rule_outlined
         : (isOk ? Icons.build : Icons.error);
 
     return Dialog(
@@ -125,14 +137,14 @@ class BuildReportDialog extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: <Widget>[
-                  if (!isExport)
+                  if (showBuildTime)
                     Text(
                       '${context.tr('Build time')}: '
                       '${(report.buildDurationMs / 1000).toStringAsFixed(1)} s',
                       style: theme.textTheme.bodyMedium,
                     ),
                   if (report.issues.isNotEmpty) ...<Widget>[
-                    if (!isExport) const SizedBox(height: 12),
+                    if (showBuildTime) const SizedBox(height: 12),
                     Text(
                       context.tr('Issues found'),
                       style: theme.textTheme.titleMedium?.copyWith(
@@ -146,8 +158,11 @@ class BuildReportDialog extends StatelessWidget {
                         child: Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: <Widget>[
-                            const Icon(Icons.error_outline,
-                                size: 14, color: Colors.red),
+                            const Icon(
+                              Icons.error_outline,
+                              size: 14,
+                              color: Colors.red,
+                            ),
                             const SizedBox(width: 6),
                             Expanded(child: Text(issue.render(context.tr))),
                           ],
@@ -169,10 +184,15 @@ class BuildReportDialog extends StatelessWidget {
                         child: Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: <Widget>[
-                            const Icon(Icons.lightbulb_outline,
-                                size: 14, color: Colors.amber),
+                            const Icon(
+                              Icons.lightbulb_outline,
+                              size: 14,
+                              color: Colors.amber,
+                            ),
                             const SizedBox(width: 6),
-                            Expanded(child: Text(suggestion.render(context.tr))),
+                            Expanded(
+                              child: Text(suggestion.render(context.tr)),
+                            ),
                           ],
                         ),
                       ),
@@ -220,9 +240,28 @@ class BuildReportDialog extends StatelessWidget {
                     FilledButton(
                       onPressed: () =>
                           Navigator.of(context).pop(ReportDialogAction.proceed),
-                      child: Text(report.issues.isNotEmpty
-                          ? context.tr('Export anyway')
-                          : context.tr('Export')),
+                      child: Text(
+                        report.issues.isNotEmpty
+                            ? context.tr('Export anyway')
+                            : context.tr('Export'),
+                      ),
+                    ),
+                  ] else if (isEditor) ...<Widget>[
+                    // The live check: repair what can be repaired, otherwise
+                    // just look at the details.
+                    if (report.hasFixableIssues) ...<Widget>[
+                      FilledButton.tonalIcon(
+                        onPressed: () =>
+                            Navigator.of(context).pop(ReportDialogAction.fix),
+                        icon: const Icon(Icons.build_outlined, size: 18),
+                        label: Text(context.tr('Fix issues')),
+                      ),
+                      const SizedBox(width: 8),
+                    ],
+                    FilledButton(
+                      onPressed: () =>
+                          Navigator.of(context).pop(ReportDialogAction.close),
+                      child: Text(context.tr('Close')),
                     ),
                   ] else
                     FilledButton(

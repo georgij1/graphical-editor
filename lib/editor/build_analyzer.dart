@@ -34,13 +34,21 @@ enum BuildReportKind {
 /// `{1}` … placeholders plus the arguments. Resolved into the active
 /// language when the report is displayed.
 class ReportLine {
-  const ReportLine(this.key, [this.args = const <String>[]]);
+  const ReportLine(this.key, [this.args = const <String>[]]) : critical = false;
+
+  /// A problem that breaks the build or the launch of the exported
+  /// application. Shown in the editor right after a save.
+  const ReportLine.critical(this.key, [this.args = const <String>[]])
+    : critical = true;
 
   /// English template (used as the localization key).
   final String key;
 
   /// Values substituted for `{0}`, `{1}` …
   final List<String> args;
+
+  /// True when the problem prevents the application from starting.
+  final bool critical;
 
   /// Renders the line: [tr] translates the template, then the placeholders
   /// are replaced with [args].
@@ -67,6 +75,7 @@ class BuildReport {
     this.kind = BuildReportKind.build,
     this.controllerIssueCount = 0,
     this.importIssueCount = 0,
+    this.criticalIssueCount = 0,
   });
 
   /// Overall health score in [0, 100]. Higher is better.
@@ -95,8 +104,16 @@ class BuildReport {
   /// statement. These can also be repaired automatically.
   final int importIssueCount;
 
+  /// Number of problems that break the build or the launch of the exported
+  /// application (invalid package, missing scenes, controller/import
+  /// mismatches, failed build).
+  final int criticalIssueCount;
+
   /// True when the report came from the pre-export validation.
   bool get isExport => kind == BuildReportKind.export;
+
+  /// True when at least one problem prevents the application from starting.
+  bool get hasCriticalIssues => criticalIssueCount > 0;
 
   /// True when the controller mismatches can be fixed automatically.
   bool get hasControllerIssues => controllerIssueCount > 0;
@@ -132,18 +149,13 @@ class BuildAnalyzer {
   BuildAnalyzer._();
 
   /// Analyzes the just-built project and returns a [BuildReport].
-  static BuildReport analyze(Project project, BuildRecord build) => _run(
-        project,
-        kind: BuildReportKind.build,
-        build: build,
-      );
+  static BuildReport analyze(Project project, BuildRecord build) =>
+      _run(project, kind: BuildReportKind.build, build: build);
 
   /// Static pre-export check: runs the same network without a build record,
   /// so only the project consistency neurons are active.
-  static BuildReport validate(Project project) => _run(
-        project,
-        kind: BuildReportKind.export,
-      );
+  static BuildReport validate(Project project) =>
+      _run(project, kind: BuildReportKind.export);
 
   static BuildReport _run(
     Project project, {
@@ -225,43 +237,56 @@ class BuildAnalyzer {
       if (value < 1.0) {
         switch (name) {
           case 'sceneCheck':
-            issues.add(const ReportLine('No scenes in the project.'));
-            suggestions
-                .add(const ReportLine('Add at least one scene to the project.'));
+            issues.add(const ReportLine.critical('No scenes in the project.'));
+            suggestions.add(
+              const ReportLine('Add at least one scene to the project.'),
+            );
           case 'packageCheck':
-            issues.add(const ReportLine('Java package is invalid.'));
-            suggestions.add(const ReportLine(
-                'Fix the Java package in project settings (letters, digits, underscores, dots).'));
+            issues.add(const ReportLine.critical('Java package is invalid.'));
+            suggestions.add(
+              const ReportLine(
+                'Fix the Java package in project settings (letters, digits, underscores, dots).',
+              ),
+            );
           case 'mainClassCheck':
-            issues.add(const ReportLine('Main class is not set.'));
-            suggestions
-                .add(const ReportLine('Set the main class in project settings.'));
+            issues.add(const ReportLine.critical('Main class is not set.'));
+            suggestions.add(
+              const ReportLine('Set the main class in project settings.'),
+            );
           case 'descriptionCheck':
             issues.add(const ReportLine('Project description is empty.'));
-            suggestions.add(const ReportLine(
-                'Add a description — it will appear in the exported README.'));
-          case 'buildCheck':
-            issues.add(const ReportLine('Build failed.'));
             suggestions.add(
-                const ReportLine('Check the build log in the history window.'));
+              const ReportLine(
+                'Add a description — it will appear in the exported README.',
+              ),
+            );
+          case 'buildCheck':
+            issues.add(const ReportLine.critical('Build failed.'));
+            suggestions.add(
+              const ReportLine('Check the build log in the history window.'),
+            );
           case 'speedCheck':
-            issues
-                .add(const ReportLine('Build took more than 10 seconds.'));
-            suggestions.add(const ReportLine(
-                'Consider simplifying the project or scenes.'));
+            issues.add(const ReportLine('Build took more than 10 seconds.'));
+            suggestions.add(
+              const ReportLine('Consider simplifying the project or scenes.'),
+            );
           case 'controllerCheck':
             issues.addAll(controllerIssues);
-            suggestions.add(ReportLine(
-              'The controller package must match the project package "{0}". '
-              'Update the scene controllers or the package in the settings.',
-              <String>[project.package],
-            ));
+            suggestions.add(
+              ReportLine(
+                'The controller package must match the project package "{0}". '
+                'Update the scene controllers or the package in the settings.',
+                <String>[project.package],
+              ),
+            );
           case 'importCheck':
             issues.addAll(importIssues);
-            suggestions.add(const ReportLine(
-              'Every element used in a scene needs its own <?import?> line '
-              'in the FXML file. The automatic fix adds the missing imports.',
-            ));
+            suggestions.add(
+              const ReportLine(
+                'Every element used in a scene needs its own <?import?> line '
+                'in the FXML file. The automatic fix adds the missing imports.',
+              ),
+            );
         }
       }
     }
@@ -277,6 +302,7 @@ class BuildAnalyzer {
       kind: kind,
       controllerIssueCount: controllerIssues.length,
       importIssueCount: importIssues.length,
+      criticalIssueCount: issues.where((line) => line.critical).length,
     );
   }
 
@@ -299,25 +325,31 @@ class BuildAnalyzer {
 
       if (fxmlFqn != null && fxmlFqn.isNotEmpty) {
         if (_packageOf(fxmlFqn) != pkg) {
-          problems.add(ReportLine(
-            'Scene "{0}": the FXML refers to the controller "{1}", but the '
-            'project package is "{2}". The application will not start.',
-            <String>[name, fxmlFqn, pkg],
-          ));
+          problems.add(
+            ReportLine.critical(
+              'Scene "{0}": the FXML refers to the controller "{1}", but the '
+              'project package is "{2}". The application will not start.',
+              <String>[name, fxmlFqn, pkg],
+            ),
+          );
         } else if (declared.isNotEmpty &&
             _simpleNameOf(fxmlFqn) != _simpleNameOf(declared)) {
-          problems.add(ReportLine(
-            'Scene "{0}": the FXML controller "{1}" differs from the scene '
-            'controller "{2}".',
-            <String>[name, _simpleNameOf(fxmlFqn), _simpleNameOf(declared)],
-          ));
+          problems.add(
+            ReportLine.critical(
+              'Scene "{0}": the FXML controller "{1}" differs from the scene '
+              'controller "{2}".',
+              <String>[name, _simpleNameOf(fxmlFqn), _simpleNameOf(declared)],
+            ),
+          );
         }
         if (declared.isEmpty) {
-          problems.add(ReportLine(
-            'Scene "{0}": the FXML refers to a controller, but the scene has '
-            'no controller class.',
-            <String>[name],
-          ));
+          problems.add(
+            ReportLine.critical(
+              'Scene "{0}": the FXML refers to a controller, but the scene has '
+              'no controller class.',
+              <String>[name],
+            ),
+          );
         }
       }
 
@@ -327,11 +359,13 @@ class BuildAnalyzer {
           declared.contains('.') &&
           _packageOf(declared) != pkg &&
           declared != fxmlFqn) {
-        problems.add(ReportLine(
-          'Scene "{0}": the controller "{1}" lies outside the project '
-          'package "{2}".',
-          <String>[name, declared, pkg],
-        ));
+        problems.add(
+          ReportLine.critical(
+            'Scene "{0}": the controller "{1}" lies outside the project '
+            'package "{2}".',
+            <String>[name, declared, pkg],
+          ),
+        );
       }
     }
     return problems;
@@ -351,11 +385,13 @@ class BuildAnalyzer {
     for (final scene in project.scenes) {
       final missing = _missingImports(scene.fxml);
       missing.forEach((tag, importStatement) {
-        problems.add(ReportLine(
-          'Scene "{0}": the element "{1}" is used, but the import "{2}" is '
-          'missing. The application will not start.',
-          <String>[scene.name, tag, importStatement],
-        ));
+        problems.add(
+          ReportLine.critical(
+            'Scene "{0}": the element "{1}" is used, but the import "{2}" is '
+            'missing. The application will not start.',
+            <String>[scene.name, tag, importStatement],
+          ),
+        );
       });
     }
     return problems;
@@ -374,8 +410,10 @@ class BuildAnalyzer {
     for (final tag in _usedTags(fxml)) {
       final importStatement = FxCatalog.importFor(tag);
       if (importStatement == null) continue;
-      final package =
-          importStatement.substring(0, importStatement.lastIndexOf('.'));
+      final package = importStatement.substring(
+        0,
+        importStatement.lastIndexOf('.'),
+      );
       if (declared.contains(importStatement) ||
           declared.contains('$package.*')) {
         continue;
@@ -402,9 +440,8 @@ class BuildAnalyzer {
           .toSet();
 
   /// The `fx:controller` value of an FXML document, or null when absent.
-  static String? _fxmlController(String fxml) => RegExp(r'fx:controller\s*=\s*"([^"]+)"')
-      .firstMatch(fxml)
-      ?.group(1);
+  static String? _fxmlController(String fxml) =>
+      RegExp(r'fx:controller\s*=\s*"([^"]+)"').firstMatch(fxml)?.group(1);
 
   static String _packageOf(String fqn) {
     final i = fqn.lastIndexOf('.');

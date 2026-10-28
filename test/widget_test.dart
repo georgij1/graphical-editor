@@ -18,17 +18,20 @@ import 'package:graphical_editor/ui/widgets/status_bar.dart';
 import 'test_doubles.dart';
 
 EditorController standaloneController() => EditorController(
-      storage: InMemoryProjectStorage(),
-      tokenStore: InMemoryKeyValueStore(),
-      api: FakeApiClient(),
-    );
+  storage: InMemoryProjectStorage(),
+  tokenStore: InMemoryKeyValueStore(),
+  api: FakeApiClient(),
+);
 
 void main() {
-  testWidgets('editor toolbar is hidden until a project is opened',
-      (tester) async {
+  testWidgets('editor toolbar is hidden until a project is opened', (
+    tester,
+  ) async {
     final controller = standaloneController();
     await controller.register('a@b.com', 'secret1');
-    await tester.pumpWidget(MaterialApp(home: EditorPage(controller: controller)));
+    await tester.pumpWidget(
+      MaterialApp(home: EditorPage(controller: controller)),
+    );
     await tester.pump();
     expect(find.byType(AppBar), findsOneWidget);
 
@@ -78,11 +81,14 @@ void main() {
     );
   });
 
-testWidgets('the status bar is hidden until a project is opened',
-      (tester) async {
+  testWidgets('the status bar is hidden until a project is opened', (
+    tester,
+  ) async {
     final controller = standaloneController();
     await controller.register('a@b.com', 'secret1');
-    await tester.pumpWidget(MaterialApp(home: EditorPage(controller: controller)));
+    await tester.pumpWidget(
+      MaterialApp(home: EditorPage(controller: controller)),
+    );
     await tester.pump();
 
     // Nothing to describe before a project is opened.
@@ -104,15 +110,18 @@ testWidgets('the status bar is hidden until a project is opened',
     expect(find.text('Unsaved changes'), findsOneWidget);
   });
 
-  testWidgets('the inspector is hidden until a project is opened',
-      (tester) async {
+  testWidgets('the inspector is hidden until a project is opened', (
+    tester,
+  ) async {
     tester.view.physicalSize = const Size(1400, 900);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
 
     final controller = standaloneController();
     await controller.register('a@b.com', 'secret1');
-    await tester.pumpWidget(MaterialApp(home: EditorPage(controller: controller)));
+    await tester.pumpWidget(
+      MaterialApp(home: EditorPage(controller: controller)),
+    );
     await tester.pump();
 
     // Wide layout: the inspector column is not rendered at all.
@@ -128,11 +137,14 @@ testWidgets('the status bar is hidden until a project is opened',
     expect(find.byType(InspectorPanel), findsOneWidget);
   });
 
-  testWidgets('the narrow layout drops the inspector tab without a project',
-      (tester) async {
+  testWidgets('the narrow layout drops the inspector tab without a project', (
+    tester,
+  ) async {
     final controller = standaloneController();
     await controller.register('a@b.com', 'secret1');
-    await tester.pumpWidget(MaterialApp(home: EditorPage(controller: controller)));
+    await tester.pumpWidget(
+      MaterialApp(home: EditorPage(controller: controller)),
+    );
     await tester.pump();
 
     expect(find.text('Inspector'), findsNothing);
@@ -147,15 +159,18 @@ testWidgets('the status bar is hidden until a project is opened',
     expect(find.text('Inspector'), findsOneWidget);
   });
 
-  testWidgets('components and outline stay hidden until a project is opened',
-      (tester) async {
+  testWidgets('components and outline stay hidden until a project is opened', (
+    tester,
+  ) async {
     tester.view.physicalSize = const Size(1400, 900);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
 
     final controller = standaloneController();
     await controller.register('a@b.com', 'secret1');
-    await tester.pumpWidget(MaterialApp(home: EditorPage(controller: controller)));
+    await tester.pumpWidget(
+      MaterialApp(home: EditorPage(controller: controller)),
+    );
     await tester.pump();
 
     // No side panels and no scene bar: the picker owns the whole area.
@@ -172,13 +187,18 @@ testWidgets('the status bar is hidden until a project is opened',
 
     // The project tabs and the scene bar show up together.
     final tabs = find.byType(TabBar);
-    expect(find.descendant(of: tabs, matching: find.text('Components')),
-        findsOneWidget);
     expect(
-        find.descendant(of: tabs, matching: find.text('Outline')),
-        findsOneWidget);
-    expect(find.descendant(of: tabs, matching: find.text('Projects')),
-        findsNothing);
+      find.descendant(of: tabs, matching: find.text('Components')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: tabs, matching: find.text('Outline')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: tabs, matching: find.text('Projects')),
+      findsNothing,
+    );
     expect(find.byType(ProjectPanel), findsOneWidget);
 
     // Opening the tab reveals the palette it hosts.
@@ -190,7 +210,9 @@ testWidgets('the status bar is hidden until a project is opened',
   testWidgets('the header returns to the project list', (tester) async {
     final controller = standaloneController();
     await controller.register('a@b.com', 'secret1');
-    await tester.pumpWidget(MaterialApp(home: EditorPage(controller: controller)));
+    await tester.pumpWidget(
+      MaterialApp(home: EditorPage(controller: controller)),
+    );
     await tester.pump();
 
     controller.createProject(
@@ -203,10 +225,7 @@ testWidgets('the status bar is hidden until a project is opened',
     expect(find.byType(ProjectPanel), findsOneWidget);
     expect(find.byType(ProjectTreePanel), findsOneWidget);
     expect(
-      find.descendant(
-        of: find.byType(TabBar),
-        matching: find.text('Project'),
-      ),
+      find.descendant(of: find.byType(TabBar), matching: find.text('Project')),
       findsOneWidget,
     );
 
@@ -225,15 +244,18 @@ testWidgets('the status bar is hidden until a project is opened',
     expect(controller.currentProject, isNull);
   });
 
-  testWidgets('the tree and the inspector share the right column',
-      (tester) async {
+  testWidgets('the tree and the inspector share the right column', (
+    tester,
+  ) async {
     tester.view.physicalSize = const Size(1400, 900);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
 
     final controller = standaloneController();
     await controller.register('a@b.com', 'secret1');
-    await tester.pumpWidget(MaterialApp(home: EditorPage(controller: controller)));
+    await tester.pumpWidget(
+      MaterialApp(home: EditorPage(controller: controller)),
+    );
     await tester.pump();
 
     controller.createProject(
@@ -249,24 +271,33 @@ testWidgets('the status bar is hidden until a project is opened',
     expect(inspector, findsOneWidget);
 
     // Both are on the right of the canvas, tree above the inspector.
-    final canvasCenter =
-        tester.getCenter(find.byType(CanvasView)).dx;
+    final canvasCenter = tester.getCenter(find.byType(CanvasView)).dx;
     expect(tester.getCenter(tree).dx, greaterThan(canvasCenter));
     expect(tester.getCenter(inspector).dx, greaterThan(canvasCenter));
-    expect(tester.getTopLeft(tree).dy, lessThan(tester.getTopLeft(inspector).dy));
+    expect(
+      tester.getTopLeft(tree).dy,
+      lessThan(tester.getTopLeft(inspector).dy),
+    );
 
     // The left panel keeps only the components and the outline.
     final tabs = find.byType(TabBar);
-    expect(find.descendant(of: tabs, matching: find.text('Components')),
-        findsOneWidget);
-    expect(find.descendant(of: tabs, matching: find.text('Outline')),
-        findsOneWidget);
-    expect(find.descendant(of: tabs, matching: find.text('Project')),
-        findsNothing);
+    expect(
+      find.descendant(of: tabs, matching: find.text('Components')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: tabs, matching: find.text('Outline')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: tabs, matching: find.text('Project')),
+      findsNothing,
+    );
   });
 
-  testWidgets('the divider between tree and inspector is draggable',
-      (tester) async {
+  testWidgets('the divider between tree and inspector is draggable', (
+    tester,
+  ) async {
     tester.view.physicalSize = const Size(1400, 900);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
@@ -278,7 +309,9 @@ testWidgets('the status bar is hidden until a project is opened',
       package: 'com.example',
       mainClass: 'MainApp',
     );
-    await tester.pumpWidget(MaterialApp(home: EditorPage(controller: controller)));
+    await tester.pumpWidget(
+      MaterialApp(home: EditorPage(controller: controller)),
+    );
     await tester.pump();
 
     final treeRect = tester.getRect(find.byType(ProjectTreePanel));
@@ -328,14 +361,15 @@ testWidgets('the status bar is hidden until a project is opened',
     expect(controller.treeFraction, lessThan(shrunk));
     // The top pane never shrinks below its minimum, so the header stays
     // visible instead of being squeezed away.
-    expect(tester.getRect(find.byType(ProjectPanel)).height,
-        greaterThanOrEqualTo(120));
+    expect(
+      tester.getRect(find.byType(ProjectPanel)).height,
+      greaterThanOrEqualTo(120),
+    );
     expect(tester.takeException(), isNull);
     expect(find.byType(InspectorPanel), findsOneWidget);
   });
 
-  testWidgets('scrolled tree content stays inside the section',
-      (tester) async {
+  testWidgets('scrolled tree content stays inside the section', (tester) async {
     tester.view.physicalSize = const Size(1400, 900);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
@@ -350,7 +384,9 @@ testWidgets('the status bar is hidden until a project is opened',
     for (var i = 0; i < 6; i++) {
       controller.newScene('scene$i');
     }
-    await tester.pumpWidget(MaterialApp(home: EditorPage(controller: controller)));
+    await tester.pumpWidget(
+      MaterialApp(home: EditorPage(controller: controller)),
+    );
     await tester.pump();
 
     // Shrink the section so its content cannot possibly fit.
@@ -362,10 +398,9 @@ testWidgets('the status bar is hidden until a project is opened',
 
     // Scrolled content must stay clipped to the section instead of painting
     // over the divider.
-    final list = tester.widget<SingleChildScrollView>(find.descendant(
-      of: tree,
-      matching: find.byType(SingleChildScrollView),
-    ));
+    final list = tester.widget<SingleChildScrollView>(
+      find.descendant(of: tree, matching: find.byType(SingleChildScrollView)),
+    );
     expect(list.physics, isA<ClampingScrollPhysics>());
 
     // Scrolling reaches the last row without errors, and it stays inside the
@@ -373,8 +408,11 @@ testWidgets('the status bar is hidden until a project is opened',
     final scrollable = find
         .descendant(of: tree, matching: find.byType(Scrollable))
         .first;
-    await tester.scrollUntilVisible(find.text('scene5.fxml'), 120,
-        scrollable: scrollable);
+    await tester.scrollUntilVisible(
+      find.text('scene5.fxml'),
+      120,
+      scrollable: scrollable,
+    );
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
 
@@ -383,8 +421,7 @@ testWidgets('the status bar is hidden until a project is opened',
     expect(lastScene.top, greaterThanOrEqualTo(section.top));
   });
 
-  testWidgets('a squeezed inspector pane does not overflow',
-      (tester) async {
+  testWidgets('a squeezed inspector pane does not overflow', (tester) async {
     tester.view.physicalSize = const Size(1400, 620);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
@@ -396,7 +433,9 @@ testWidgets('the status bar is hidden until a project is opened',
       package: 'com.example',
       mainClass: 'MainApp',
     );
-    await tester.pumpWidget(MaterialApp(home: EditorPage(controller: controller)));
+    await tester.pumpWidget(
+      MaterialApp(home: EditorPage(controller: controller)),
+    );
     await tester.pump();
 
     // Almost the whole column goes to the tree.
@@ -405,13 +444,16 @@ testWidgets('the status bar is hidden until a project is opened',
     expect(tester.takeException(), isNull);
 
     // And with nothing selected the inspector shows its hint.
-    final hint = find.text('Select an element on the canvas to edit its properties.');
+    final hint = find.text(
+      'Select an element on the canvas to edit its properties.',
+    );
     expect(hint, findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('the divider follows the tree content until it is dragged',
-      (tester) async {
+  testWidgets('the divider follows the tree content until it is dragged', (
+    tester,
+  ) async {
     // Tall enough for the whole tree, so nothing has to be cut.
     tester.view.physicalSize = const Size(1400, 1200);
     tester.view.devicePixelRatio = 1;
@@ -425,7 +467,9 @@ testWidgets('the status bar is hidden until a project is opened',
       mainClass: 'MainApp',
     );
     controller.newScene('main');
-    await tester.pumpWidget(MaterialApp(home: EditorPage(controller: controller)));
+    await tester.pumpWidget(
+      MaterialApp(home: EditorPage(controller: controller)),
+    );
     await tester.pumpAndSettle();
     // A project with one scene: the pane ends right below the tree, leaving
     // the rest of the column to the inspector.
@@ -444,13 +488,16 @@ testWidgets('the status bar is hidden until a project is opened',
     await tester.pumpAndSettle();
     final grown = tester.getRect(find.byType(ProjectPanel));
     expect(grown.height, greaterThan(section.height));
-    expect(tester.getRect(find.byType(InspectorPanel)).top - grown.bottom,
-        lessThanOrEqualTo(16));
+    expect(
+      tester.getRect(find.byType(InspectorPanel)).top - grown.bottom,
+      lessThanOrEqualTo(16),
+    );
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('a double click on the divider restores the fitted height',
-      (tester) async {
+  testWidgets('a double click on the divider restores the fitted height', (
+    tester,
+  ) async {
     tester.view.physicalSize = const Size(1400, 900);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
@@ -462,7 +509,9 @@ testWidgets('the status bar is hidden until a project is opened',
       package: 'com.example',
       mainClass: 'MainApp',
     );
-    await tester.pumpWidget(MaterialApp(home: EditorPage(controller: controller)));
+    await tester.pumpWidget(
+      MaterialApp(home: EditorPage(controller: controller)),
+    );
     await tester.pumpAndSettle();
 
     final fitted = tester.getRect(find.byType(ProjectPanel));
@@ -476,23 +525,28 @@ testWidgets('the status bar is hidden until a project is opened',
     );
     await tester.pumpAndSettle();
     expect(controller.treeFraction, isNotNull);
-    expect(tester.getRect(find.byType(ProjectPanel)).height,
-        lessThan(fitted.height));
+    expect(
+      tester.getRect(find.byType(ProjectPanel)).height,
+      lessThan(fitted.height),
+    );
 
     // Double click puts it back.
     final squeezedTree = tester.getRect(find.byType(ProjectTreePanel));
     final squeezedInspector = tester.getRect(find.byType(InspectorPanel));
-    await tester.tapAt(Offset(1200, (squeezedTree.bottom + squeezedInspector.top) / 2));
+    await tester.tapAt(
+      Offset(1200, (squeezedTree.bottom + squeezedInspector.top) / 2),
+    );
     await tester.pumpAndSettle();
-    await tester.tapAt(Offset(1200, (squeezedTree.bottom + squeezedInspector.top) / 2));
+    await tester.tapAt(
+      Offset(1200, (squeezedTree.bottom + squeezedInspector.top) / 2),
+    );
     await tester.pumpAndSettle();
 
     expect(controller.treeFraction, isNull);
     expect(tester.getRect(find.byType(ProjectPanel)).height, fitted.height);
   });
 
-  testWidgets('many small pointer moves add up to one drag',
-      (tester) async {
+  testWidgets('many small pointer moves add up to one drag', (tester) async {
     tester.view.physicalSize = const Size(1400, 900);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
@@ -504,7 +558,9 @@ testWidgets('the status bar is hidden until a project is opened',
       package: 'com.example',
       mainClass: 'MainApp',
     );
-    await tester.pumpWidget(MaterialApp(home: EditorPage(controller: controller)));
+    await tester.pumpWidget(
+      MaterialApp(home: EditorPage(controller: controller)),
+    );
     await tester.pumpAndSettle();
 
     final before = tester.getRect(find.byType(ProjectPanel)).height;
@@ -536,8 +592,7 @@ testWidgets('the status bar is hidden until a project is opened',
     expect(before - tester.getRect(find.byType(ProjectPanel)).height, 180);
   });
 
-  testWidgets('each pane paints its ink inside its own clip',
-      (tester) async {
+  testWidgets('each pane paints its ink inside its own clip', (tester) async {
     tester.view.physicalSize = const Size(1400, 900);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
@@ -549,7 +604,9 @@ testWidgets('the status bar is hidden until a project is opened',
       package: 'com.example',
       mainClass: 'MainApp',
     );
-    await tester.pumpWidget(MaterialApp(home: EditorPage(controller: controller)));
+    await tester.pumpWidget(
+      MaterialApp(home: EditorPage(controller: controller)),
+    );
     await tester.pumpAndSettle();
 
     // Ink features go to the closest Material. Without one inside the clip the
@@ -582,7 +639,7 @@ testWidgets('the status bar is hidden until a project is opened',
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
 
-final controller = standaloneController();
+    final controller = standaloneController();
     await controller.register('a@b.com', 'secret1');
     controller.createProject(
       name: 'Demo',
@@ -595,69 +652,78 @@ final controller = standaloneController();
     );
     await tester.pumpAndSettle();
 
-      // The switch is back in the header.
-      final switchFinder = find.descendant(
-        of: find.byType(AppBar),
+    // The switch is back in the header.
+    final switchFinder = find.descendant(
+      of: find.byType(AppBar),
+      matching: find.byType(SegmentedButton<int>),
+    );
+    expect(switchFinder, findsOneWidget, reason: 'width $width');
+    expect(
+      find.descendant(
+        of: find.byType(StatusBar),
         matching: find.byType(SegmentedButton<int>),
-      );
-      expect(switchFinder, findsOneWidget, reason: 'width $width');
-      expect(
-        find.descendant(
-          of: find.byType(StatusBar),
-          matching: find.byType(SegmentedButton<int>),
-        ),
-        findsNothing,
-      );
-      expect(
-        find.descendant(
-          of: find.byType(CanvasArea),
-          matching: find.byType(SegmentedButton<int>),
-        ),
-        findsNothing,
-      );
-      // It sits in the header, above the editing area.
-      expect(
-        tester.getTopLeft(find.byType(CanvasArea)).dy,
-        greaterThan(tester.getTopLeft(switchFinder).dy),
-      );
+      ),
+      findsNothing,
+    );
+    expect(
+      find.descendant(
+        of: find.byType(CanvasArea),
+        matching: find.byType(SegmentedButton<int>),
+      ),
+      findsNothing,
+    );
+    // It sits in the header, above the editing area.
+    expect(
+      tester.getTopLeft(find.byType(CanvasArea)).dy,
+      greaterThan(tester.getTopLeft(switchFinder).dy),
+    );
 
-      // Nothing is cut off by the window edge and nothing overflows.
-      expect(tester.takeException(), isNull, reason: 'width $width');
-      expect(tester.getRect(find.byType(EditorToolbar)).right,
-          lessThanOrEqualTo(width), reason: 'width $width');
+    // Nothing is cut off by the window edge and nothing overflows.
+    expect(tester.takeException(), isNull, reason: 'width $width');
+    expect(
+      tester.getRect(find.byType(EditorToolbar)).right,
+      lessThanOrEqualTo(width),
+      reason: 'width $width',
+    );
 
-      // Switching works from the header.
-      await tester.tap(find.descendant(
-        of: switchFinder,
-        matching: find.text('Code'),
-      ));
-      await tester.pumpAndSettle();
-      expect(controller.codeMode, isTrue, reason: 'width $width');
+    // Switching works from the header.
+    await tester.tap(
+      find.descendant(of: switchFinder, matching: find.text('Code')),
+    );
+    await tester.pumpAndSettle();
+    expect(controller.codeMode, isTrue, reason: 'width $width');
     expect(find.byType(CodeView), findsOneWidget);
   }
 
-  testWidgets('the header switch fits a narrow window',
-      (tester) async => checkCanvasSwitch(tester, 800));
+  testWidgets(
+    'the header switch fits a narrow window',
+    (tester) async => checkCanvasSwitch(tester, 800),
+  );
 
-  testWidgets('the header switch fits a medium window',
-      (tester) async => checkCanvasSwitch(tester, 1100));
+  testWidgets(
+    'the header switch fits a medium window',
+    (tester) async => checkCanvasSwitch(tester, 1100),
+  );
 
-  testWidgets('the header switch fits a wide window',
-      (tester) async => checkCanvasSwitch(tester, 1600));
+  testWidgets(
+    'the header switch fits a wide window',
+    (tester) async => checkCanvasSwitch(tester, 1600),
+  );
 
   Future<void> scroll(WidgetTester tester, Offset at, double dy) async {
-  await tester.sendEventToBinding(PointerScrollEvent(
-    position: at,
-    scrollDelta: Offset(0, dy),
-    kind: PointerDeviceKind.mouse,
-  ));
-  await tester.pump();
-  // The scroll correction for the focal point runs after the zoomed frame.
-  await tester.pump(const Duration(milliseconds: 20));
-}
+    await tester.sendEventToBinding(
+      PointerScrollEvent(
+        position: at,
+        scrollDelta: Offset(0, dy),
+        kind: PointerDeviceKind.mouse,
+      ),
+    );
+    await tester.pump();
+    // The scroll correction for the focal point runs after the zoomed frame.
+    await tester.pump(const Duration(milliseconds: 20));
+  }
 
-  testWidgets('the wheel zooms the canvas around the cursor',
-      (tester) async {
+  testWidgets('the wheel zooms the canvas around the cursor', (tester) async {
     tester.view.physicalSize = const Size(1400, 900);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
@@ -669,7 +735,9 @@ final controller = standaloneController();
       package: 'com.example',
       mainClass: 'MainApp',
     );
-    await tester.pumpWidget(MaterialApp(home: EditorPage(controller: controller)));
+    await tester.pumpWidget(
+      MaterialApp(home: EditorPage(controller: controller)),
+    );
     await tester.pumpAndSettle();
 
     final canvas = tester.getRect(find.byType(CanvasView));
@@ -692,8 +760,9 @@ final controller = standaloneController();
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('zooming keeps the point under the cursor in place',
-      (tester) async {
+  testWidgets('zooming keeps the point under the cursor in place', (
+    tester,
+  ) async {
     tester.view.physicalSize = const Size(900, 700);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
@@ -705,7 +774,9 @@ final controller = standaloneController();
       package: 'com.example',
       mainClass: 'MainApp',
     );
-    await tester.pumpWidget(MaterialApp(home: EditorPage(controller: controller)));
+    await tester.pumpWidget(
+      MaterialApp(home: EditorPage(controller: controller)),
+    );
     await tester.pumpAndSettle();
 
     // Zoom in far enough that the design surface no longer fits and has to be
@@ -719,22 +790,28 @@ final controller = standaloneController();
     // InteractiveViewer handles panning internally — check it exists and has
     // non-zero pan values after zoom (surface moved under cursor).
     final iv = tester.widget<InteractiveViewer>(find.byType(InteractiveViewer));
-    expect(iv.transformationController?.value.getMaxScaleOnAxis(),
-        greaterThan(2.0));
+    expect(
+      iv.transformationController?.value.getMaxScaleOnAxis(),
+      greaterThan(2.0),
+    );
     expect(tester.takeException(), isNull);
   });
 
-
   testWidgets('login screen shows before choosing an account', (tester) async {
     final controller = standaloneController();
-    await tester.pumpWidget(MaterialApp(home: EditorPage(controller: controller)));
+    await tester.pumpWidget(
+      MaterialApp(home: EditorPage(controller: controller)),
+    );
     await tester.pump();
-    expect(find.text('Sign in to store your projects in the cloud.'),
-        findsOneWidget);
+    expect(
+      find.text('Sign in to store your projects in the cloud.'),
+      findsOneWidget,
+    );
   });
 
-  testWidgets('editor exposes Canvas/Code tabs with an editable source',
-      (tester) async {
+  testWidgets('editor exposes Canvas/Code tabs with an editable source', (
+    tester,
+  ) async {
     final controller = standaloneController();
     await controller.register('a@b.com', 'secret1');
     controller.createProject(
@@ -743,7 +820,9 @@ final controller = standaloneController();
       mainClass: 'MainApp',
     );
     controller.setCodeMode(true);
-    await tester.pumpWidget(MaterialApp(home: EditorPage(controller: controller)));
+    await tester.pumpWidget(
+      MaterialApp(home: EditorPage(controller: controller)),
+    );
     await tester.pump();
 
     expect(find.text('Canvas'), findsOneWidget);
@@ -752,11 +831,14 @@ final controller = standaloneController();
     expect(find.text('src/main/resources/com/example/main.fxml'), findsWidgets);
   });
 
-  testWidgets('shows a project picker instead of an empty canvas',
-      (tester) async {
+  testWidgets('shows a project picker instead of an empty canvas', (
+    tester,
+  ) async {
     final controller = standaloneController();
     await controller.register('a@b.com', 'secret1');
-    await tester.pumpWidget(MaterialApp(home: EditorPage(controller: controller)));
+    await tester.pumpWidget(
+      MaterialApp(home: EditorPage(controller: controller)),
+    );
     await tester.pump();
 
     expect(find.text('Choose a project'), findsOneWidget);
@@ -765,8 +847,9 @@ final controller = standaloneController();
     expect(find.text('Code'), findsNothing);
   });
 
-  testWidgets('opening a project replaces the picker with the editor',
-      (tester) async {
+  testWidgets('opening a project replaces the picker with the editor', (
+    tester,
+  ) async {
     final controller = standaloneController();
     await controller.register('a@b.com', 'secret1');
     controller.createProject(
@@ -774,11 +857,45 @@ final controller = standaloneController();
       package: 'com.example',
       mainClass: 'MainApp',
     );
-    await tester.pumpWidget(MaterialApp(home: EditorPage(controller: controller)));
+    await tester.pumpWidget(
+      MaterialApp(home: EditorPage(controller: controller)),
+    );
     await tester.pump();
 
     expect(find.text('Choose a project'), findsNothing);
     expect(find.text('Canvas'), findsOneWidget);
+  });
+
+  testWidgets('the validation strip reports build problems and fixes them', (
+    tester,
+  ) async {
+    final controller = standaloneController();
+    await controller.register('a@b.com', 'secret1');
+    controller.createProject(name: 'P', mainClass: 'MainApp');
+    // Break an inactive scene: use Font without the <?import?> statement.
+    controller.newScene('second');
+    final broken = controller.currentProject!.scenes.first;
+    broken.fxml = broken.fxml.replaceAll(
+      '<?import javafx.scene.text.Font?>',
+      '',
+    );
+    controller.onModelChanged();
+    await tester.pumpWidget(
+      MaterialApp(home: EditorPage(controller: controller)),
+    );
+    await tester.pump();
+
+    // The strip appears above the status bar with the repair action.
+    expect(find.textContaining('issues found'), findsOneWidget);
+    expect(find.text('Fix issues'), findsOneWidget);
+    expect(find.text('Details'), findsOneWidget);
+
+    await tester.tap(find.text('Fix issues'));
+    await tester.pumpAndSettle();
+
+    // The scene is repaired, so the strip disappears.
+    expect(find.textContaining('issues found'), findsNothing);
+    expect(broken.fxml, contains('<?import javafx.scene.text.Font?>'));
   });
 
   group('EditorController', () {
@@ -796,7 +913,10 @@ final controller = standaloneController();
       expect(controller.root.children.first.tag, 'Button');
       expect(controller.selected, isNotNull);
       expect(controller.canUndo, isTrue);
-      expect(controller.document.imports, contains('javafx.scene.control.Button'));
+      expect(
+        controller.document.imports,
+        contains('javafx.scene.control.Button'),
+      );
     });
 
     test('undo restores the previous document', () {
@@ -827,11 +947,11 @@ final controller = standaloneController();
 
       // Without the import the exported FXML fails to load in JavaFX with
       // "Font is not a valid type".
+      expect(controller.document.imports, contains('javafx.scene.text.Font'));
       expect(
-        controller.document.imports,
-        contains('javafx.scene.text.Font'),
+        controller.serialize(),
+        contains('<?import javafx.scene.text.Font?>'),
       );
-      expect(controller.serialize(), contains('<?import javafx.scene.text.Font?>'));
     });
 
     test('delete removes the selected node', () {
@@ -858,6 +978,34 @@ final controller = standaloneController();
       controller.moveSelected(3, 10);
       final after = node.attributes['AnchorPane.leftAnchor'];
       expect(after, isNot(before));
+    });
+
+    test('validation runs on save and flags a missing import as critical', () {
+      final controller = standaloneController();
+      controller.createProject(name: 'P', mainClass: 'MainApp');
+      // A freshly created project passes the check: the sample scene ships
+      // with the required imports.
+      final report = controller.validation!;
+      expect(report.hasCriticalIssues, isFalse);
+      expect(report.hasImportIssues, isFalse);
+
+      // Open a second scene so the broken one stays inactive — the active
+      // scene is re-serialized from the canvas on every save.
+      controller.newScene('second');
+      final project = controller.currentProject!;
+      final broken = project.scenes.first;
+      broken.fxml = broken.fxml.replaceAll(
+        '<?import javafx.scene.text.Font?>',
+        '',
+      );
+      controller.onModelChanged();
+      expect(controller.validation!.hasCriticalIssues, isTrue);
+      expect(controller.validation!.importIssueCount, greaterThan(0));
+
+      // The repair button fixes the scene and the check turns green again.
+      controller.fixValidationIssues();
+      expect(controller.validation!.hasCriticalIssues, isFalse);
+      expect(broken.fxml, contains('<?import javafx.scene.text.Font?>'));
     });
   });
 

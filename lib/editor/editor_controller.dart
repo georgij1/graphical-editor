@@ -33,17 +33,17 @@ class EditorController extends ChangeNotifier {
     KeyValueStore? tokenStore,
     InviteLinks? inviteLinks,
     this.buildClient,
-  })  : _fileService = fileService ?? const FileService(),
-        _projectStorage = storage ?? createProjectStorage(),
-        _api = api ?? HttpApiClient(),
-        _tokenStore = tokenStore ?? createKeyValueStore(),
-        _inviteLinks = inviteLinks ?? createInviteLinks() {
+  }) : _fileService = fileService ?? const FileService(),
+       _projectStorage = storage ?? createProjectStorage(),
+       _api = api ?? HttpApiClient(),
+       _tokenStore = tokenStore ?? createKeyValueStore(),
+       _inviteLinks = inviteLinks ?? createInviteLinks() {
     _document = FxmlDocument.empty();
     Future.microtask(() async {
       try {
         await _loadLanguage();
       } catch (_) {}
-try {
+      try {
         await _loadTheme();
       } catch (_) {}
       try {
@@ -58,7 +58,7 @@ try {
     });
   }
 
-final FileService _fileService;
+  final FileService _fileService;
   final ProjectStorage _projectStorage;
   final ApiClient _api;
   final KeyValueStore _tokenStore;
@@ -90,7 +90,7 @@ final FileService _fileService;
   bool _authDecided = false;
   bool _authBusy = false;
   String? _authError;
-String? _token;
+  String? _token;
   String? _userEmail;
   String? _userId;
   String? _avatar;
@@ -136,6 +136,11 @@ String? _token;
   double _zoom = 1.0;
   bool _showGrid = true;
   final double _gridSize = 10;
+
+  /// Result of the last project validation. Recomputed on every save, so the
+  /// editor shows build problems (missing imports, wrong controllers, invalid
+  /// package…) as soon as they appear — not only when exporting.
+  BuildReport? _validation;
   // ------------------------------------------------------------------ getters
 
   FxmlDocument get document => _document;
@@ -144,6 +149,10 @@ String? _token;
   String? get fileName => _fileName;
   bool get dirty => _dirty;
   GeneratedFile? get openSource => _openSource;
+
+  /// The up-to-date validation of the open project, or null when no project
+  /// is open.
+  BuildReport? get validation => _validation;
 
   /// True when the main pane shows the text editor instead of the canvas.
   bool get codeMode => _codeMode;
@@ -205,15 +214,15 @@ String? _token;
       600;
 
   FxRenderContext buildRenderContext() => FxRenderContext(
-        selected: _selected,
-        zoom: _zoom,
-        showGrid: _showGrid,
-        gridSize: _gridSize,
-        canvasSize: Size(canvasWidth, canvasHeight),
-        onSelect: select,
-        onBeginEdit: onBeginEdit,
-        onModelChanged: onModelChanged,
-      );
+    selected: _selected,
+    zoom: _zoom,
+    showGrid: _showGrid,
+    gridSize: _gridSize,
+    canvasSize: Size(canvasWidth, canvasHeight),
+    onSelect: select,
+    onBeginEdit: onBeginEdit,
+    onModelChanged: onModelChanged,
+  );
 
   double? _num(String? value) => value == null ? null : double.tryParse(value);
 
@@ -291,6 +300,7 @@ String? _token;
     _activeScene = null;
     _standaloneOpen = true;
     _dirty = false;
+    _validation = null;
     _endEditChain();
     notifyListeners();
   }
@@ -330,7 +340,10 @@ String? _token;
   Future<bool> openFile() async {
     final picked = await _fileService.open();
     if (picked == null) return false;
-    final name = picked.fileName.replaceAll(RegExp(r'\.fxml$', caseSensitive: false), '');
+    final name = picked.fileName.replaceAll(
+      RegExp(r'\.fxml$', caseSensitive: false),
+      '',
+    );
     final ok = loadFromString(picked.content, fileName: name);
     if (ok) {
       _standaloneOpen = true;
@@ -462,7 +475,7 @@ String? _token;
     notifyListeners();
   }
 
-Future<void> _loadTheme() async {
+  Future<void> _loadTheme() async {
     final stored = await _tokenStore.read(_themeKey);
     if (stored == null ||
         (stored != 'system' && stored != 'light' && stored != 'dark')) {
@@ -512,7 +525,8 @@ Future<void> _loadTheme() async {
   /// The Ollama model the user picked for AI fixes, if any.
   Future<String?> readAiModel() => _tokenStore.read(_aiModelKey);
 
-  Future<void> writeAiModel(String model) => _tokenStore.write(_aiModelKey, model);
+  Future<void> writeAiModel(String model) =>
+      _tokenStore.write(_aiModelKey, model);
 
   /// Persists the open document into the workspace: no file is downloaded.
   ///
@@ -582,7 +596,7 @@ Future<void> _loadTheme() async {
       notifyListeners();
       return;
     }
-_token = token;
+    _token = token;
     // Do not clobber a value that a concurrent profile update already set.
     _userEmail ??= email ?? '';
     _userId ??= userId;
@@ -895,12 +909,13 @@ _token = token;
     } catch (_) {}
   }
 
-  String _workspaceJson() =>
-      jsonEncode(WorkspaceData(
-        projects: _projects,
-        document: _looseDocument,
-        documentName: _looseDocumentName,
-      ).toJson());
+  String _workspaceJson() => jsonEncode(
+    WorkspaceData(
+      projects: _projects,
+      document: _looseDocument,
+      documentName: _looseDocumentName,
+    ).toJson(),
+  );
 
   /// Loads the persisted projects of the current owner (from device storage /
   /// browser localStorage). Every account has its own storage slot.
@@ -961,7 +976,11 @@ _token = token;
 
   /// Persists the whole workspace. Concurrent calls are coalesced so only the
   /// latest state is written locally (and pushed to the server when signed in).
+  ///
+  /// Every save also refreshes [validation], so the editor always shows the
+  /// up-to-date state of the project.
   Future<void> _persist() {
+    revalidate();
     final generation = ++_persistGeneration;
     _persistChain = _persistChain.then((_) async {
       if (generation != _persistGeneration) return;
@@ -971,6 +990,27 @@ _token = token;
       } catch (_) {}
     });
     return _persistChain;
+  }
+
+  /// Runs the mini neural network validation of the open project right away
+  /// and rebuilds the UI only when the visible result changed. Called after
+  /// every save; null when no project is open.
+  void revalidate() {
+    final project = _currentProject;
+    final next = project == null ? null : BuildAnalyzer.validate(project);
+    final prev = _validation;
+    _validation = next;
+    if ((next == null) != (prev == null)) {
+      notifyListeners();
+      return;
+    }
+    if (next == null) return;
+    // Only rebuild when something the user can see has changed.
+    if (next.score != prev!.score ||
+        next.issues.length != prev.issues.length ||
+        next.criticalIssueCount != prev.criticalIssueCount) {
+      notifyListeners();
+    }
   }
 
   /// Completes when all scheduled autosaves have been written.
@@ -1012,7 +1052,9 @@ _token = token;
     final doc = _parser.parse(sample ? exampleFxml : _emptySceneFxml);
     doc.root.attributes['fx:controller'] = controllerFqn;
     doc.root.attributes.putIfAbsent(
-        'xmlns:fx', () => 'http://javafx.com/fxml/1');
+      'xmlns:fx',
+      () => 'http://javafx.com/fxml/1',
+    );
     return doc;
   }
 
@@ -1023,8 +1065,9 @@ _token = token;
     String description = '',
   }) {
     final safeName = (name ?? '').trim().isEmpty ? 'Untitled' : name!.trim();
-    final safeMain =
-        (mainClass ?? '').trim().isEmpty ? 'MainApp' : mainClass!.trim();
+    final safeMain = (mainClass ?? '').trim().isEmpty
+        ? 'MainApp'
+        : mainClass!.trim();
     final project = Project(
       id: _newId(),
       name: safeName,
@@ -1041,11 +1084,13 @@ _token = token;
         : '${project.package}.$controllerSimple';
     final doc = _projectSceneFxml(controllerFqn, sample: true);
     _flushToScene();
-    project.scenes.add(SceneFile(
-      name: 'main',
-      fxml: _serializer.serialize(doc),
-      controllerClass: controllerFqn,
-    ));
+    project.scenes.add(
+      SceneFile(
+        name: 'main',
+        fxml: _serializer.serialize(doc),
+        controllerClass: controllerFqn,
+      ),
+    );
     _projects.add(project);
     _currentProject = project;
     _activeScene = project.scenes.first;
@@ -1072,6 +1117,7 @@ _token = token;
     } else {
       _activeScene = null;
       _openSource = null;
+      revalidate();
       notifyListeners();
     }
     // A shared project keeps checking the server for the changes of the
@@ -1090,6 +1136,7 @@ _token = token;
     _selected = null;
     _dirty = false;
     _endEditChain();
+    revalidate();
     notifyListeners();
   }
 
@@ -1134,13 +1181,11 @@ _token = token;
       // Projects without an owner are shown apart.
       if (project.ownerId == null) return false;
       if (userId != null && project.ownerId == userId) return true;
-      if (email != null &&
-          project.ownerEmail?.toLowerCase() == email) {
+      if (email != null && project.ownerEmail?.toLowerCase() == email) {
         return true;
       }
       if (email == null) return false;
-      return project.members
-          .any((m) => m.email.toLowerCase() == email);
+      return project.members.any((m) => m.email.toLowerCase() == email);
     }).toList();
   }
 
@@ -1170,9 +1215,11 @@ _token = token;
   List<Account> availableAccounts(Project project) {
     final members = project.members.map((m) => m.email.toLowerCase()).toSet();
     return _accounts
-        .where((a) =>
-            !members.contains(a.email.toLowerCase()) &&
-            a.email.toLowerCase() != _userEmail?.toLowerCase())
+        .where(
+          (a) =>
+              !members.contains(a.email.toLowerCase()) &&
+              a.email.toLowerCase() != _userEmail?.toLowerCase(),
+        )
         .toList();
   }
 
@@ -1257,7 +1304,8 @@ _token = token;
         _endEditChain();
       }
     }
-    collaborationNotice = 'The project has been updated by another participant.';
+    collaborationNotice =
+        'The project has been updated by another participant.';
     notifyListeners();
   }
 
@@ -1284,7 +1332,8 @@ _token = token;
       ..shared = true;
     project.replaceMembers(saved.members);
     _collabRevision = saved.revision;
-    collaborationNotice = 'The project has been published for the participants.';
+    collaborationNotice =
+        'The project has been published for the participants.';
     notifyListeners();
     return true;
   }
@@ -1294,8 +1343,12 @@ _token = token;
     final token = _token;
     final project = _currentProject;
     if (token == null || project == null) return false;
-    final result =
-        await _api.addProjectMember(token, project.id, email.trim(), role);
+    final result = await _api.addProjectMember(
+      token,
+      project.id,
+      email.trim(),
+      role,
+    );
     if (!result.isOk || result.value == null) {
       collaborationNotice = result.message ?? 'Could not add the participant.';
       notifyListeners();
@@ -1314,8 +1367,7 @@ _token = token;
     final token = _token;
     final project = _currentProject;
     if (token == null || project == null) return false;
-    final result =
-        await _api.addProjectMember(token, project.id, email, role);
+    final result = await _api.addProjectMember(token, project.id, email, role);
     if (!result.isOk || result.value == null) {
       collaborationNotice = result.message ?? 'Could not change the rights.';
       notifyListeners();
@@ -1348,8 +1400,7 @@ _token = token;
       final published = await publishSharedProject();
       if (!published) return null;
     }
-    final result =
-        await _api.createProjectInvite(token, project.id, role);
+    final result = await _api.createProjectInvite(token, project.id, role);
     if (!result.isOk || result.value == null) {
       collaborationNotice = result.message ?? 'Could not create the link.';
       notifyListeners();
@@ -1377,8 +1428,11 @@ _token = token;
   Future<bool> acceptInvite(Invite invite) async {
     final token = _token;
     if (token == null) return false;
-    final result =
-        await _api.joinProject(token, invite.projectId, invite.token);
+    final result = await _api.joinProject(
+      token,
+      invite.projectId,
+      invite.token,
+    );
     if (!result.isOk || result.value == null) {
       collaborationNotice = result.message ?? 'Could not join the project.';
       notifyListeners();
@@ -1387,7 +1441,9 @@ _token = token;
     final project = result.value!;
     if (!project.members.any((m) => m.email == _userEmail) &&
         project.ownerEmail != _userEmail) {
-      project.members.add(ProjectMember(email: _userEmail ?? '', role: 'editor'));
+      project.members.add(
+        ProjectMember(email: _userEmail ?? '', role: 'editor'),
+      );
     }
     if (!_projects.any((p) => p.id == project.id)) {
       _projects.add(project);
@@ -1398,12 +1454,14 @@ _token = token;
   }
 
   /// Removes a participant from the open project.
-  Future<bool> removeCollaborator(String email) async {    final token = _token;
+  Future<bool> removeCollaborator(String email) async {
+    final token = _token;
     final project = _currentProject;
     if (token == null || project == null) return false;
     final result = await _api.removeProjectMember(token, project.id, email);
     if (!result.isOk || result.value == null) {
-      collaborationNotice = result.message ?? 'Could not remove the participant.';
+      collaborationNotice =
+          result.message ?? 'Could not remove the participant.';
       notifyListeners();
       return false;
     }
@@ -1429,10 +1487,14 @@ _token = token;
     final project = _currentProject;
     if (project == null) return;
     final safe = _uniqueSceneName(
-        project, baseName.trim().isEmpty ? 'scene' : baseName.trim());
+      project,
+      baseName.trim().isEmpty ? 'scene' : baseName.trim(),
+    );
     final controllerSimple = '${_toClassName(safe)}Controller';
-    final doc = _projectSceneFxml(_fqnController(controllerSimple),
-        sample: false);
+    final doc = _projectSceneFxml(
+      _fqnController(controllerSimple),
+      sample: false,
+    );
     final scene = SceneFile(
       name: safe,
       fxml: _serializer.serialize(doc),
@@ -1473,7 +1535,7 @@ _token = token;
     notifyListeners();
   }
 
-void renameProject(Project project, String newName) {
+  void renameProject(Project project, String newName) {
     final safe = newName.trim();
     if (safe.isEmpty) return;
     project.name = safe;
@@ -1519,8 +1581,8 @@ void renameProject(Project project, String newName) {
     for (final scene in project.scenes) {
       var fxml = scene.fxml;
       final declared = (scene.controllerClass ?? '').trim();
-      final fxmlMatch =
-          RegExp(r'fx:controller\s*=\s*"([^"]+)"').firstMatch(fxml);
+      final fxmlMatch = RegExp(r'fx:controller\s*=\s*"([^"]+)"')
+          .firstMatch(fxml);
       final fxmlFqn = fxmlMatch?.group(1);
       final source = declared.isNotEmpty ? declared : (fxmlFqn ?? '');
       if (source.isNotEmpty) {
@@ -1549,8 +1611,7 @@ void renameProject(Project project, String newName) {
 
       // Insert the <?import?> statements the scene relies on but does not
       // declare.
-      final missingImports =
-          BuildAnalyzer.missingImportStatements(fxml);
+      final missingImports = BuildAnalyzer.missingImportStatements(fxml);
       if (missingImports.isNotEmpty) {
         fxml = _insertImports(fxml, missingImports);
         changed = true;
@@ -1572,13 +1633,27 @@ void renameProject(Project project, String newName) {
     return changed;
   }
 
+  /// Repairs everything the live validation reported (controllers and
+  /// `<?import?>` statements) and re-runs the check. Returns true when
+  /// something was changed.
+  bool fixValidationIssues() {
+    final project = _currentProject;
+    if (project == null) return false;
+    final changed = fixSceneControllers(project);
+    // fixSceneControllers persists (and revalidates) only when it changed
+    // something; refresh the report either way so the UI matches the model.
+    if (!changed) revalidate();
+    return changed;
+  }
+
   /// Inserts `<?import?>` lines into [fxml] right after the last existing
   /// import (or after the XML declaration when there are none).
   static String _insertImports(String fxml, List<String> imports) {
     final lines = fxml.split('\n');
     var index = lines.indexWhere((line) => line.trimLeft().startsWith('<?xml'));
-    final lastImport = lines
-        .lastIndexWhere((line) => line.trimLeft().startsWith('<?import'));
+    final lastImport = lines.lastIndexWhere(
+      (line) => line.trimLeft().startsWith('<?import'),
+    );
     if (lastImport >= 0) {
       index = lastImport + 1;
     } else if (index >= 0) {
@@ -1587,8 +1662,7 @@ void renameProject(Project project, String newName) {
     } else {
       index = 0;
     }
-    lines.insertAll(
-        index, imports.map((statement) => '<?import $statement?>'));
+    lines.insertAll(index, imports.map((statement) => '<?import $statement?>'));
     return lines.join('\n');
   }
 
@@ -1602,12 +1676,16 @@ void renameProject(Project project, String newName) {
   /// Transfers project ownership to another participant. Only the current
   /// owner may do this, and the new owner must already take part in the
   /// project.
-  Future<bool> transferProjectOwnership(Project project, String newOwnerEmail) async {
+  Future<bool> transferProjectOwnership(
+    Project project,
+    String newOwnerEmail,
+  ) async {
     final currentUser = _userEmail;
     if (currentUser == null || project.ownerEmail != currentUser) return false;
 
     final newOwner = newOwnerEmail.trim();
-    if (newOwner.isEmpty || newOwner.toLowerCase() == currentUser.toLowerCase()) return false;
+    if (newOwner.isEmpty || newOwner.toLowerCase() == currentUser.toLowerCase())
+      return false;
 
     final isParticipant = project.members.any(
       (m) => m.email.toLowerCase() == newOwner.toLowerCase(),
@@ -1651,7 +1729,7 @@ void renameProject(Project project, String newName) {
     notifyListeners();
   }
 
-/// Packs the project into an archive and saves it. Returns false when the save
+  /// Packs the project into an archive and saves it. Returns false when the save
   /// was cancelled or failed.
   Future<bool> exportProject(Project project, ExportOptions options) {
     final bytes = _exporter.build(project, options);
@@ -1679,7 +1757,9 @@ void renameProject(Project project, String newName) {
     // published before the build. When that is not possible (nobody is signed
     // in, the server is down) the build still runs, only without the history.
     final published = await publishSharedProject(project);
-    final version = published ? await _releaseVersion(project, releaseNotes) : null;
+    final version = published
+        ? await _releaseVersion(project, releaseNotes)
+        : null;
     final archive = _exporter.build(project, options);
     final started = DateTime.now();
     try {
@@ -1687,8 +1767,9 @@ void renameProject(Project project, String newName) {
         archive,
         bundle: bundle,
       );
-      final extension =
-          artifact.fileName.contains('.') && bundle ? 'zip' : 'jar';
+      final extension = artifact.fileName.contains('.') && bundle
+          ? 'zip'
+          : 'jar';
       await _recordBuild(
         project,
         version: version ?? project.revision,
@@ -1839,7 +1920,10 @@ void renameProject(Project project, String newName) {
   /// Ensures `owner.properties[propertyTag]` contains a child of type
   /// [valueTag] and returns it, then sets one of its attributes.
   FxmlNode ensurePropertyChild(
-      FxmlNode owner, String propertyTag, String valueTag) {
+    FxmlNode owner,
+    String propertyTag,
+    String valueTag,
+  ) {
     final property = owner.properties.putIfAbsent(
       propertyTag,
       () => FxmlNode(propertyTag, isProperty: true),
@@ -1901,12 +1985,12 @@ void renameProject(Project project, String newName) {
     switch (parent.tag) {
       case 'ScrollPane':
       case 'TitledPane':
-        parent.properties['content'] =
-            FxmlNode('content', isProperty: true)..addChild(child);
+        parent.properties['content'] = FxmlNode('content', isProperty: true)
+          ..addChild(child);
         break;
       case 'BorderPane':
-        parent.properties['center'] =
-            FxmlNode('center', isProperty: true)..addChild(child);
+        parent.properties['center'] = FxmlNode('center', isProperty: true)
+          ..addChild(child);
         break;
       case 'TabPane':
         final tab = FxmlNode('Tab')..attributes['text'] = 'Tab';
@@ -1959,10 +2043,12 @@ void renameProject(Project project, String newName) {
   /// any value, so the serialized FXML stays clean.
   void _cleanupEmptyProperties() {
     for (final node in _document.allNodes.toList()) {
-      node.properties.removeWhere((_, property) =>
-          property.children.isEmpty &&
-          property.attributes.isEmpty &&
-          property.text == null);
+      node.properties.removeWhere(
+        (_, property) =>
+            property.children.isEmpty &&
+            property.attributes.isEmpty &&
+            property.text == null,
+      );
     }
   }
 
@@ -2027,7 +2113,8 @@ class NodeGeometryOffset {
   NodeGeometryOffset(this.node);
   final FxmlNode node;
 
-  double _attr(String name) => double.tryParse(node.attributes[name] ?? '') ?? 0;
+  double _attr(String name) =>
+      double.tryParse(node.attributes[name] ?? '') ?? 0;
 
   void move(int direction, double step) {
     // direction: 0=up, 1=down, 2=left, 3=right

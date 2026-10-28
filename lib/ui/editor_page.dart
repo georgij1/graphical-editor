@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../auth/login_screen.dart';
@@ -13,6 +13,7 @@ import 'widgets/profile_dialog.dart';
 import 'widgets/project_panel.dart';
 import 'widgets/settings_dialog.dart';
 import 'widgets/status_bar.dart';
+import 'widgets/validation_strip.dart';
 import 'widgets/toolbar.dart';
 import 'widgets/user_avatar.dart';
 import 'widgets/vertical_split_view.dart';
@@ -29,7 +30,8 @@ class EditorPage extends StatefulWidget {
 }
 
 class _EditorPageState extends State<EditorPage> {
-  late final EditorController _controller = widget.controller ?? EditorController();
+  late final EditorController _controller =
+      widget.controller ?? EditorController();
   late final bool _ownsController = widget.controller == null;
   final GlobalKey<ScaffoldMessengerState> _messengerKey =
       GlobalKey<ScaffoldMessengerState>();
@@ -54,9 +56,14 @@ class _EditorPageState extends State<EditorPage> {
       context: context,
       builder: (context) => AlertDialog(
         title: Text(context.tr('Invitation')),
-        content: Text(context.tr(
-            'You are invited to the project "{0}" of {1}. Do you want to join it?',
-        ).replaceAll('{0}', info.projectName).replaceAll('{1}', info.ownerEmail)),
+        content: Text(
+          context
+              .tr(
+                'You are invited to the project "{0}" of {1}. Do you want to join it?',
+              )
+              .replaceAll('{0}', info.projectName)
+              .replaceAll('{1}', info.ownerEmail),
+        ),
         actions: <Widget>[
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
@@ -75,8 +82,10 @@ class _EditorPageState extends State<EditorPage> {
     if (ok) {
       _showMessage(context.tr('You have joined the project.'));
     } else {
-      _showMessage(_controller.collaborationNotice ??
-          context.tr('Could not join the project.'));
+      _showMessage(
+        _controller.collaborationNotice ??
+            context.tr('Could not join the project.'),
+      );
     }
   }
 
@@ -104,20 +113,22 @@ class _EditorPageState extends State<EditorPage> {
   Future<void> _download() async {
     final ok = await _controller.saveFile();
     if (mounted) {
-      _showMessage(ok
-          ? context.tr('Document saved.')
-          : context.tr('Save cancelled.'));
+      _showMessage(
+        ok ? context.tr('Document saved.') : context.tr('Save cancelled.'),
+      );
     }
   }
 
   void _showMessage(String message) {
     _messengerKey.currentState
       ?..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(
-        content: Text(message),
-        behavior: SnackBarBehavior.floating,
-        duration: const Duration(seconds: 2),
-      ));
+      ..showSnackBar(
+        SnackBar(
+          content: Text(message),
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 2),
+        ),
+      );
   }
 
   void _showCode() => _controller.editSceneSource();
@@ -125,67 +136,69 @@ class _EditorPageState extends State<EditorPage> {
   List<Widget> _accountActions() {
     return <Widget>[
       PopupMenuButton<String>(
-          tooltip: context.tr('Account'),
-          onSelected: (value) {
-            switch (value) {
-              case 'profile':
-                showProfileDialog(context, controller: _controller);
-              case 'settings':
-                showSettingsDialog(context, controller: _controller);
-              case 'download':
-                DownloadsDialog.show(context);
-              case 'out':
-                _controller.signOut();
-            }
-          },
-          itemBuilder: (context) => <PopupMenuEntry<String>>[
-            // Tapping the login opens the profile, so it is no longer inert.
-            PopupMenuItem<String>(
-              value: 'profile',
-              child: ListTile(
-                dense: true,
-                contentPadding: EdgeInsets.zero,
-                leading: UserAvatar(
-                  dataUrl: _controller.avatarDataUrl,
-                  email: _controller.userEmail,
-                  radius: 16,
-                ),
-                title: Text(
-                  (_controller.userEmail ?? '').isEmpty
-                      ? context.tr('Signed in')
-                      : _controller.userEmail!,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                subtitle: Text(context.tr('Profile'),
-                    style: Theme.of(context).textTheme.bodySmall),
+        tooltip: context.tr('Account'),
+        onSelected: (value) {
+          switch (value) {
+            case 'profile':
+              showProfileDialog(context, controller: _controller);
+            case 'settings':
+              showSettingsDialog(context, controller: _controller);
+            case 'download':
+              DownloadsDialog.show(context);
+            case 'out':
+              _controller.signOut();
+          }
+        },
+        itemBuilder: (context) => <PopupMenuEntry<String>>[
+          // Tapping the login opens the profile, so it is no longer inert.
+          PopupMenuItem<String>(
+            value: 'profile',
+            child: ListTile(
+              dense: true,
+              contentPadding: EdgeInsets.zero,
+              leading: UserAvatar(
+                dataUrl: _controller.avatarDataUrl,
+                email: _controller.userEmail,
+                radius: 16,
+              ),
+              title: Text(
+                (_controller.userEmail ?? '').isEmpty
+                    ? context.tr('Signed in')
+                    : _controller.userEmail!,
+                overflow: TextOverflow.ellipsis,
+              ),
+              subtitle: Text(
+                context.tr('Profile'),
+                style: Theme.of(context).textTheme.bodySmall,
               ),
             ),
-            const PopupMenuDivider(),
-            PopupMenuItem<String>(
-              value: 'settings',
-              child: ListTile(
-                dense: true,
-                contentPadding: EdgeInsets.zero,
-                leading: const Icon(Icons.settings_outlined),
-                title: Text(context.tr('Settings')),
-              ),
+          ),
+          const PopupMenuDivider(),
+          PopupMenuItem<String>(
+            value: 'settings',
+            child: ListTile(
+              dense: true,
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.settings_outlined),
+              title: Text(context.tr('Settings')),
             ),
-            PopupMenuItem<String>(
-              value: 'download',
-              child: ListTile(
-                dense: true,
-                contentPadding: EdgeInsets.zero,
-                leading: const Icon(Icons.download_outlined),
-                title: Text(context.tr('Download client')),
-              ),
+          ),
+          PopupMenuItem<String>(
+            value: 'download',
+            child: ListTile(
+              dense: true,
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.download_outlined),
+              title: Text(context.tr('Download client')),
             ),
-            PopupMenuItem<String>(
-              value: 'out',
-              child: Text(context.tr('Sign out')),
-            ),
-          ],
-          icon: _AccountButton(controller: _controller),
-        ),
+          ),
+          PopupMenuItem<String>(
+            value: 'out',
+            child: Text(context.tr('Sign out')),
+          ),
+        ],
+        icon: _AccountButton(controller: _controller),
+      ),
     ];
   }
 
@@ -260,9 +273,16 @@ class _EditorPageState extends State<EditorPage> {
                         ),
                 ),
                 // The status bar describes an open document, so it stays hidden on the
-                // project picker.
+                // project picker. The validation strip above it reports build
+                // problems found by the check that runs on every save.
                 bottomNavigationBar: _controller.hasOpenDocument
-                    ? StatusBar(controller: _controller)
+                    ? Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: <Widget>[
+                          ValidationStrip(controller: _controller),
+                          StatusBar(controller: _controller),
+                        ],
+                      )
                     : null,
               );
             },
@@ -327,10 +347,8 @@ class _Title extends StatelessWidget {
     };
     // The theme colour is explicit: a hard coded style here lost its contrast
     // on the dark theme and the project name became invisible.
-    final titleStyle = Theme.of(context).textTheme.titleMedium?.copyWith(
-          fontSize: 15,
-          fontWeight: FontWeight.w600,
-        );
+    final titleStyle = Theme.of(context).textTheme.titleMedium
+        ?.copyWith(fontSize: 15, fontWeight: FontWeight.w600);
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: <Widget>[
@@ -383,11 +401,13 @@ class _WideLayout extends StatelessWidget {
                 TabBar(
                   tabs: <Widget>[
                     Tab(
-                        icon: const Icon(Icons.widgets, size: 18),
-                        text: context.tr('Components')),
+                      icon: const Icon(Icons.widgets, size: 18),
+                      text: context.tr('Components'),
+                    ),
                     Tab(
-                        icon: const Icon(Icons.account_tree, size: 18),
-                        text: context.tr('Outline')),
+                      icon: const Icon(Icons.account_tree, size: 18),
+                      text: context.tr('Outline'),
+                    ),
                   ],
                   labelStyle: const TextStyle(fontSize: 12),
                 ),
@@ -480,17 +500,21 @@ class _NarrowLayoutState extends State<_NarrowLayout> {
                   onTap: (index) => setState(() => _tab = index),
                   tabs: <Widget>[
                     Tab(
-                        icon: const Icon(Icons.folder_copy_outlined, size: 18),
-                        text: context.tr('Project')),
+                      icon: const Icon(Icons.folder_copy_outlined, size: 18),
+                      text: context.tr('Project'),
+                    ),
                     Tab(
-                        icon: const Icon(Icons.widgets, size: 18),
-                        text: context.tr('Components')),
+                      icon: const Icon(Icons.widgets, size: 18),
+                      text: context.tr('Components'),
+                    ),
                     Tab(
-                        icon: const Icon(Icons.account_tree, size: 18),
-                        text: context.tr('Outline')),
+                      icon: const Icon(Icons.account_tree, size: 18),
+                      text: context.tr('Outline'),
+                    ),
                     Tab(
-                        icon: const Icon(Icons.tune, size: 18),
-                        text: context.tr('Inspector')),
+                      icon: const Icon(Icons.tune, size: 18),
+                      text: context.tr('Inspector'),
+                    ),
                   ],
                   labelStyle: const TextStyle(fontSize: 12),
                 ),
@@ -584,32 +608,29 @@ class _ShortcutScopeState extends State<_ShortcutScope> {
     final bindings = <ShortcutActivator, VoidCallback>{
       const SingleActivator(LogicalKeyboardKey.keyS, control: true):
           widget.onSave,
-      if (!controller.codeMode && !_editingText)
-        ...<ShortcutActivator, VoidCallback>{
-          const SingleActivator(LogicalKeyboardKey.keyZ, control: true):
-              controller.undo,
-          const SingleActivator(LogicalKeyboardKey.keyY, control: true):
-              controller.redo,
-          const SingleActivator(LogicalKeyboardKey.delete):
-              controller.deleteSelected,
-          const SingleActivator(LogicalKeyboardKey.backspace):
-              controller.deleteSelected,
-          const SingleActivator(LogicalKeyboardKey.arrowUp):
-              () => controller.moveSelected(0, 1),
-          const SingleActivator(LogicalKeyboardKey.arrowDown):
-              () => controller.moveSelected(1, 1),
-          const SingleActivator(LogicalKeyboardKey.arrowLeft):
-              () => controller.moveSelected(2, 1),
-          const SingleActivator(LogicalKeyboardKey.arrowRight):
-              () => controller.moveSelected(3, 1),
-        },
+      if (!controller.codeMode &&
+          !_editingText) ...<ShortcutActivator, VoidCallback>{
+        const SingleActivator(LogicalKeyboardKey.keyZ, control: true):
+            controller.undo,
+        const SingleActivator(LogicalKeyboardKey.keyY, control: true):
+            controller.redo,
+        const SingleActivator(LogicalKeyboardKey.delete):
+            controller.deleteSelected,
+        const SingleActivator(LogicalKeyboardKey.backspace):
+            controller.deleteSelected,
+        const SingleActivator(LogicalKeyboardKey.arrowUp): () =>
+            controller.moveSelected(0, 1),
+        const SingleActivator(LogicalKeyboardKey.arrowDown): () =>
+            controller.moveSelected(1, 1),
+        const SingleActivator(LogicalKeyboardKey.arrowLeft): () =>
+            controller.moveSelected(2, 1),
+        const SingleActivator(LogicalKeyboardKey.arrowRight): () =>
+            controller.moveSelected(3, 1),
+      },
     };
     return CallbackShortcuts(
       bindings: bindings,
-      child: Focus(
-        autofocus: true,
-        child: widget.child,
-      ),
+      child: Focus(autofocus: true, child: widget.child),
     );
   }
 }
