@@ -103,7 +103,12 @@ abstract class ApiClient {
   Future<ApiResult<void>> deleteSharedProject(String token, String projectId);
 
   /// Announces that the project is open and reads who else is in it.
-  Future<ApiResult<void>> heartbeatPresence(String token, String projectId);
+  Future<ApiResult<void>> heartbeatPresence(
+      String token, String projectId, {
+      double? cursorX,
+      double? cursorY,
+      String? selectedNodeId,
+  });
 
   Future<ApiResult<List<Map<String, dynamic>>>> listPresence(
       String token, String projectId);
@@ -448,9 +453,18 @@ class HttpApiClient implements ApiClient {
 
   // Presence: announce that the project is open and read who else is in it.
   Future<ApiResult<void>> heartbeatPresence(
-      String token, String projectId) async {
+      String token, String projectId, {
+      double? cursorX,
+      double? cursorY,
+      String? selectedNodeId,
+  }) async {
+    final body = <String, dynamic>{};
+    if (cursorX != null) body['cursorX'] = cursorX;
+    if (cursorY != null) body['cursorY'] = cursorY;
+    if (selectedNodeId != null) body['selectedNodeId'] = selectedNodeId;
     final result = await _projectRequest(
-        'POST', '/projects/$projectId/presence', token);
+        'POST', '/projects/$projectId/presence', token,
+        body: body.isEmpty ? null : body);
     if (!result.isOk) {
       return ApiResult<void>.failure(result.status, result.message);
     }

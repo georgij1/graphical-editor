@@ -261,7 +261,11 @@ class FakeApiClient implements ApiClient {
 
   @override
   Future<ApiResult<void>> heartbeatPresence(
-      String token, String projectId) async {
+      String token, String projectId, {
+      double? cursorX,
+      double? cursorY,
+      String? selectedNodeId,
+  }) async {
     if (offline) return _fail(ApiStatus.offline, null);
     final email = _emailFromToken(token);
     if (email == null) return _fail(ApiStatus.unauthorized, null);

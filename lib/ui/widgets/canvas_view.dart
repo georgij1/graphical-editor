@@ -68,7 +68,12 @@ class _CanvasViewState extends State<CanvasView> {
       child: SizedBox(
         width: infiniteSize.width,
         height: infiniteSize.height,
-        child: Stack(
+        child: MouseRegion(
+          onHover: (event) {
+            controller.setCursorPosition(event.localPosition.dx, event.localPosition.dy);
+          },
+          onExit: (_) => controller.clearCursorPosition(),
+          child: Stack(
           children: <Widget>[
             if (controller.showGrid)
               Positioned.fill(
@@ -77,7 +82,10 @@ class _CanvasViewState extends State<CanvasView> {
                 ),
               ),
             renderer.build(controller.root),
+            for (final p in controller.remoteCursors)
+              _RemoteCursor(participant: p),
           ],
+        ),
         ),
       ),
     );
@@ -131,6 +139,67 @@ class _CanvasViewState extends State<CanvasView> {
   }
 }
 
+class _RemoteCursor extends StatelessWidget {
+  const _RemoteCursor({required this.participant});
+
+  final Map<String, dynamic> participant;
+
+  @override
+  Widget build(BuildContext context) {
+    final email = (participant['email'] as String?) ?? '';
+    final cursorX = (participant['cursorX'] as num?)?.toDouble();
+    final cursorY = (participant['cursorY'] as num?)?.toDouble();
+    if (cursorX == null || cursorY == null) return const SizedBox.shrink();
+
+    final color = _colorFor(email);
+
+    return Positioned(
+      left: cursorX,
+      top: cursorY,
+      child: IgnorePointer(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            // Cursor arrow
+            Icon(Icons.navigation, size: 18, color: color),
+            // Name label
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+              decoration: BoxDecoration(
+                color: color,
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Text(
+                email.split('@').first,
+                style: const TextStyle(color: Colors.white, fontSize: 10),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  static Color _colorFor(String email) {
+    const colors = <Color>[
+      Colors.red,
+      Colors.blue,
+      Colors.green,
+      Colors.orange,
+      Colors.purple,
+      Colors.teal,
+      Colors.pink,
+      Colors.indigo,
+    ];
+    if (email.isEmpty) return colors.first;
+    var hash = 0;
+    for (final c in email.codeUnits) {
+      hash = (hash * 31 + c) & 0x7fffffff;
+    }
+    return colors[hash % colors.length];
+  }
+}
 class _GridPainter extends CustomPainter {
   _GridPainter(this.step);
   final double step;

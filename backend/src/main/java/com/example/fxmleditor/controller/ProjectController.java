@@ -191,7 +191,7 @@ public class ProjectController {
 
     @PostMapping("/projects/{id}/presence")
     @Operation(summary = "Heartbeat: announce that the project is open")
-    public ResponseEntity<?> heartbeat(@RequestHeader("Authorization") String auth, @PathVariable String id) {
+    public ResponseEntity<?> heartbeat(@RequestHeader("Authorization") String auth, @PathVariable String id, @RequestBody(required = false) Map<String, Object> body) {
         var claims = auth(auth);
         if (claims == null) return ResponseEntity.status(401).body(Map.of("error", "Not authenticated."));
         String uid = jwt.userId(claims);
@@ -206,6 +206,12 @@ public class ProjectController {
         entry.put("email", email);
         entry.put("avatar", user == null || user.avatar == null ? "" : user.avatar);
         entry.put("lastSeen", java.time.Instant.now().toString());
+        if (body != null) {
+            if (body.get("cursorX") instanceof Number) entry.put("cursorX", ((Number) body.get("cursorX")).doubleValue());
+            if (body.get("cursorY") instanceof Number) entry.put("cursorY", ((Number) body.get("cursorY")).doubleValue());
+            if (body.get("selectedNodeId") != null) entry.put("selectedNodeId", body.get("selectedNodeId").toString());
+            else entry.put("selectedNodeId", null);
+        }
         bucket.put(uid, entry);
         return ResponseEntity.ok(Map.of("ok", true));
     }

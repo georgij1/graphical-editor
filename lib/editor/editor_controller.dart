@@ -165,6 +165,25 @@ class EditorController extends ChangeNotifier {
   /// current user. Empty when no project is open or the user is offline.
   List<Map<String, dynamic>> get onlineParticipants => _onlineParticipants;
 
+  /// Remote participants excluding the current user, with their cursor positions.
+  List<Map<String, dynamic>> get remoteCursors => _onlineParticipants
+      .where((p) => p['id'] != _userId)
+      .toList();
+
+  double? _cursorX;
+  double? _cursorY;
+  bool _cursorVisible = false;
+
+  void setCursorPosition(double x, double y) {
+    _cursorX = x;
+    _cursorY = y;
+    _cursorVisible = true;
+  }
+
+  void clearCursorPosition() {
+    _cursorVisible = false;
+  }
+
   /// True when the main pane shows the text editor instead of the canvas.
   bool get codeMode => _codeMode;
 
@@ -1284,14 +1303,17 @@ class EditorController extends ChangeNotifier {
     if (token == null || project.id.isEmpty) return;
     // Heartbeat + refresh immediately, then repeat.
     _presenceTick(project.id, token);
-    _presenceTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+    _presenceTimer = Timer.periodic(const Duration(seconds: 2), (_) {
       _presenceTick(project.id, token);
     });
   }
 
   Future<void> _presenceTick(String projectId, String token) async {
     try {
-      await _api.heartbeatPresence(token, projectId);
+      await _api.heartbeatPresence(token, projectId,
+          cursorX: _cursorVisible ? _cursorX : null,
+          cursorY: _cursorVisible ? _cursorY : null,
+          selectedNodeId: _selected?.attributes['fx:id']);
       final result = await _api.listPresence(token, projectId);
       if (result.isOk && result.value != null) {
         _onlineParticipants = result.value!;
