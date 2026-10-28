@@ -44,6 +44,13 @@ class _ProjectTreePanelState extends State<ProjectTreePanel> {
     });
   }
 
+  void _collectDirs(_DirNode dir, Set<String> out) {
+    out.add(dir.path);
+    for (final child in dir.dirs.values) {
+      _collectDirs(child, out);
+    }
+  }
+
   void _collapseAll(_DirNode dir) {
     setState(() {
       _collectDirs(dir, _collapsed);
@@ -56,11 +63,12 @@ class _ProjectTreePanelState extends State<ProjectTreePanel> {
     });
   }
 
-  void _collectDirs(_DirNode dir, Set<String> out) {
-    out.add(dir.path);
+  bool _allCollapsed(_DirNode dir, {bool isRoot = false}) {
+    if (!isRoot && !_collapsed.contains(dir.path)) return false;
     for (final child in dir.dirs.values) {
-      _collectDirs(child, out);
+      if (!_allCollapsed(child)) return false;
     }
+    return true;
   }
 
   @override
@@ -80,16 +88,21 @@ class _ProjectTreePanelState extends State<ProjectTreePanel> {
             child: Row(
               children: <Widget>[
                 IconButton(
-                  tooltip: context.tr('Expand all'),
-                  icon: const Icon(Icons.unfold_more, size: 16),
+                  tooltip: _allCollapsed(root, isRoot: true)
+                      ? context.tr('Expand all')
+                      : context.tr('Collapse all'),
+                  icon: Icon(
+                    _allCollapsed(root, isRoot: true) ? Icons.unfold_more : Icons.unfold_less,
+                    size: 16,
+                  ),
                   visualDensity: VisualDensity.compact,
-                  onPressed: () => _expandAll(root),
-                ),
-                IconButton(
-                  tooltip: context.tr('Collapse all'),
-                  icon: const Icon(Icons.unfold_less, size: 16),
-                  visualDensity: VisualDensity.compact,
-                  onPressed: () => _collapseAll(root),
+                  onPressed: () {
+                    if (_allCollapsed(root)) {
+                      _expandAll(root);
+                    } else {
+                      _collapseAll(root);
+                    }
+                  },
                 ),
               ],
             ),
