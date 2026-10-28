@@ -254,7 +254,7 @@ class _ProjectSettingsDialogState extends State<ProjectSettingsDialog> {
   /// Publishes the project, so the participants see the current state.
   Future<void> _publish() async {
     await _run(() async {
-      final ok = await controller.publishSharedProject();
+      final ok = await controller.publishSharedProject(widget.project);
       _say(
         ok
             ? 'The project has been published for the participants.'
@@ -813,7 +813,7 @@ class _ProjectSettingsDialogState extends State<ProjectSettingsDialog> {
       return;
     }
     await _run(() async {
-      final ok = await controller.inviteCollaborator(address, _inviteRole);
+      final ok = await controller.inviteCollaborator(address, _inviteRole, widget.project);
       if (!ok) {
         _say(controller.collaborationNotice ?? 'Could not add the participant.',
             error: true);
@@ -826,7 +826,7 @@ class _ProjectSettingsDialogState extends State<ProjectSettingsDialog> {
   /// Changes the rights of a participant.
   Future<void> _changeRole(ProjectMember member, String role) async {
     await _run(() async {
-      final ok = await controller.changeCollaboratorRole(member.email, role);
+      final ok = await controller.changeCollaboratorRole(member.email, role, widget.project);
       if (!ok) {
         _say(controller.collaborationNotice ??
             'Could not change the rights.',
@@ -840,7 +840,7 @@ class _ProjectSettingsDialogState extends State<ProjectSettingsDialog> {
   /// Removes a participant from the project.
   Future<void> _removeParticipant(String email) async {
     await _run(() async {
-      final ok = await controller.removeCollaborator(email);
+      final ok = await controller.removeCollaborator(email, widget.project);
       if (!ok) {
         _say(controller.collaborationNotice ??
             'Could not remove the participant.',

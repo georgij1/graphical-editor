@@ -1399,9 +1399,9 @@ class EditorController extends ChangeNotifier {
   }
 
   /// Invites a person to the open project.
-  Future<bool> inviteCollaborator(String email, String role) async {
+  Future<bool> inviteCollaborator(String email, String role, [Project? target]) async {
     final token = _token;
-    final project = _currentProject;
+    final project = target ?? _currentProject;
     if (token == null) {
       collaborationNotice = 'Sign in to invite participants.';
       notifyListeners();
@@ -1433,9 +1433,9 @@ class EditorController extends ChangeNotifier {
   }
 
   /// Changes the rights of a participant: editor or viewer.
-  Future<bool> changeCollaboratorRole(String email, String role) async {
+  Future<bool> changeCollaboratorRole(String email, String role, [Project? target]) async {
     final token = _token;
-    final project = _currentProject;
+    final project = target ?? _currentProject;
     if (token == null || project == null) return false;
     final result = await _api.addProjectMember(token, project.id, email, role);
     if (!result.isOk || result.value == null) {
@@ -1524,9 +1524,9 @@ class EditorController extends ChangeNotifier {
   }
 
   /// Removes a participant from the open project.
-  Future<bool> removeCollaborator(String email) async {
+  Future<bool> removeCollaborator(String email, [Project? target]) async {
     final token = _token;
-    final project = _currentProject;
+    final project = target ?? _currentProject;
     if (token == null || project == null) return false;
     final result = await _api.removeProjectMember(token, project.id, email);
     if (!result.isOk || result.value == null) {
