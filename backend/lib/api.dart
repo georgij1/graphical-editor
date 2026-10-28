@@ -173,6 +173,10 @@ void _projectRoutes(
   required ProjectStore projects,
   required HistoryStore history,
 }) {
+  // In-memory presence: projectId -> { userId -> {id, email, avatar, lastSeen} }.
+  // Entries older than a minute are treated as offline.
+  final presence = <String, Map<String, Map<String, dynamic>>>{};
+
   router.get('/api/users', (Request request) async {
     final user = await _authenticate(request, store, secret);
     if (user == null) return _error(401, 'Not authenticated.');
@@ -289,7 +293,57 @@ void _projectRoutes(
       return _error(403, 'Only the owner can delete the project.');
     }
     await projects.delete(id);
+    presence.remove(id);
     return Response(204);
+  });
+
+  // Presence: a participant announces that they have the project open.
+  router.post('/api/projects/<id>/presence', (Request request, String id) async {
+    final user = await _authenticate(request, store, secret);
+    if (user == null) return _error(401, 'Not authenticated.');
+    final project = await projects.find(id);
+    if (project == null) return _error(404, 'Project not found.');
+    if (!project.canRead(user.id, user.email)) {
+      return _error(403, 'You cannot open this project.');
+    }
+    final bucket = presence.putIfAbsent(id, () => <String, Map<String, dynamic>>{});
+    bucket[user.id] = <String, dynamic>{
+      'id': user.id,
+      'email': user.email,
+      'avatar': user.avatar,
+      'lastSeen': DateTime.now().toUtc().toIso8601String(),
+    };
+    return _json(200, {'ok': true});
+  });
+
+  // Presence: who is currently in the project (seen within the last minute).
+  router.get('/api/projects/<id>/presence', (Request request, String id) async {
+    final user = await _authenticate(request, store, secret);
+    if (user == null) return _error(401, 'Not authenticated.');
+    final project = await projects.find(id);
+    if (project == null) return _error(404, 'Project not found.');
+    if (!project.canRead(user.id, user.email)) {
+      return _error(403, 'You cannot open this project.');
+    }
+    final now = DateTime.now().toUtc();
+    final cutoff = now.subtract(const Duration(seconds: 60));
+    final bucket = presence[id];
+    final result = <Map<String, dynamic>>[];
+    if (bucket != null) {
+      final stale = <String>[];
+      for (final entry in bucket.entries) {
+        final lastSeen = DateTime.tryParse(entry.value['lastSeen'] as String? ?? '');
+        if (lastSeen == null || lastSeen.isBefore(cutoff)) {
+          stale.add(entry.key);
+        } else {
+          result.add(entry.value);
+        }
+      }
+      for (final key in stale) {
+        bucket.remove(key);
+      }
+    }
+    return _json(200, {'participants': result});
   });
 
   // Issues an invitation link for the project.

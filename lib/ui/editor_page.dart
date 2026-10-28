@@ -240,6 +240,7 @@ class _EditorPageState extends State<EditorPage> {
                     // button moves to the far right instead of leading the
                     // actions. On the project list it stays on the left.
                     if (_controller.currentProject != null) ...<Widget>[
+                      _PresenceBar(controller: _controller),
                       EditorToolbar(
                         controller: _controller,
                         onShowCode: _showCode,
@@ -632,5 +633,92 @@ class _ShortcutScopeState extends State<_ShortcutScope> {
       bindings: bindings,
       child: Focus(autofocus: true, child: widget.child),
     );
+  }
+}
+
+/// Figma-like presence indicator: shows who is currently in the open project.
+class _PresenceBar extends StatelessWidget {
+  const _PresenceBar({required this.controller});
+
+  final EditorController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final participants = controller.onlineParticipants;
+    if (participants.isEmpty) return const SizedBox.shrink();
+
+    // Show at most four avatars, then a "+N" badge.
+    const maxShown = 4;
+    final shown = participants.take(maxShown).toList();
+    final overflow = participants.length - shown.length;
+
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          for (final p in shown)
+            Padding(
+              padding: const EdgeInsets.only(left: 2),
+              child: Tooltip(
+                message: (p['email'] as String?) ?? '',
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: <Widget>[
+                    CircleAvatar(
+                      radius: 12,
+                      backgroundColor: Theme.of(context).colorScheme.primary,
+                      child: Text(
+                        _initial(p['email'] as String?),
+                        style: const TextStyle(
+                          fontSize: 10,
+                          color: Colors.white,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                    Positioned(
+                      right: -1,
+                      bottom: -1,
+                      child: Container(
+                        width: 8,
+                        height: 8,
+                        decoration: BoxDecoration(
+                          color: Colors.green,
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: Theme.of(context).colorScheme.surface,
+                            width: 1.5,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          if (overflow > 0)
+            Padding(
+              padding: const EdgeInsets.only(left: 4),
+              child: Text(
+                '+$overflow',
+                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
+              ),
+            ),
+          Padding(
+            padding: const EdgeInsets.only(left: 6),
+            child: Text(
+              '${participants.length}',
+              style: const TextStyle(fontSize: 11),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _initial(String? email) {
+    if (email == null || email.isEmpty) return '?';
+    return email[0].toUpperCase();
   }
 }

@@ -141,6 +141,13 @@ class EditorController extends ChangeNotifier {
   /// editor shows build problems (missing imports, wrong controllers, invalid
   /// package…) as soon as they appear — not only when exporting.
   BuildReport? _validation;
+
+  /// Participants currently in the open project (presence). Refreshed by the
+  /// heartbeat timer; empty when no project is open or the user is offline.
+  List<Map<String, dynamic>> _onlineParticipants = const <Map<String, dynamic>>[];
+
+  /// Timer that announces our presence and refreshes the list of the others.
+  Timer? _presenceTimer;
   // ------------------------------------------------------------------ getters
 
   FxmlDocument get document => _document;
@@ -153,6 +160,10 @@ class EditorController extends ChangeNotifier {
   /// The up-to-date validation of the open project, or null when no project
   /// is open.
   BuildReport? get validation => _validation;
+
+  /// Participants currently in the open project (presence), including the
+  /// current user. Empty when no project is open or the user is offline.
+  List<Map<String, dynamic>> get onlineParticipants => _onlineParticipants;
 
   /// True when the main pane shows the text editor instead of the canvas.
   bool get codeMode => _codeMode;
@@ -301,6 +312,8 @@ class EditorController extends ChangeNotifier {
     _standaloneOpen = true;
     _dirty = false;
     _validation = null;
+    _onlineParticipants = const <Map<String, dynamic>>[];
+    _stopPresence();
     _endEditChain();
     notifyListeners();
   }
@@ -1131,6 +1144,7 @@ class EditorController extends ChangeNotifier {
     // A shared project keeps checking the server for the changes of the
     // other participants.
     _startCollaboration(project);
+    _startPresence(project);
   }
 
   void openScene(SceneFile scene) {
@@ -1257,6 +1271,44 @@ class EditorController extends ChangeNotifier {
     _collabTimer?.cancel();
     _collabTimer = null;
     _collabRevision = 0;
+  }
+
+  /// Announces our presence in the open project and refreshes the list of the
+  /// other participants. Only meaningful when signed in; silently no-ops
+  /// otherwise.
+  void _startPresence(Project project) {
+    _stopPresence();
+    final token = _token;
+    if (token == null || project.id.isEmpty) return;
+    // Heartbeat + refresh immediately, then repeat.
+    _presenceTick(project.id, token);
+    _presenceTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+      _presenceTick(project.id, token);
+    });
+  }
+
+  Future<void> _presenceTick(String projectId, String token) async {
+    try {
+      await _api.heartbeatPresence(token, projectId);
+      final result = await _api.listPresence(token, projectId);
+      if (result.isOk && result.value != null) {
+        _onlineParticipants = result.value!;
+        notifyListeners();
+      }
+    } catch (_) {}
+  }
+
+  void _stopPresence() {
+    _presenceTimer?.cancel();
+    _presenceTimer = null;
+    _onlineParticipants = const <Map<String, dynamic>>[];
+  }
+
+  @override
+  void dispose() {
+    _presenceTimer?.cancel();
+    _collabTimer?.cancel();
+    super.dispose();
   }
 
   /// Reads the shared project from the server and applies the changes of the
@@ -1732,6 +1784,8 @@ class EditorController extends ChangeNotifier {
     if (identical(_currentProject, project)) {
       _currentProject = null;
       _activeScene = null;
+      _onlineParticipants = const <Map<String, dynamic>>[];
+      _stopPresence();
     }
     notifyListeners();
     // A published project also lives on the server; remove it there too,

@@ -102,6 +102,12 @@ abstract class ApiClient {
   /// Removes the project for everybody.
   Future<ApiResult<void>> deleteSharedProject(String token, String projectId);
 
+  /// Announces that the project is open and reads who else is in it.
+  Future<ApiResult<void>> heartbeatPresence(String token, String projectId);
+
+  Future<ApiResult<List<Map<String, dynamic>>>> listPresence(
+      String token, String projectId);
+
   /// Invites a person to the project.
   Future<ApiResult<Project>> addProjectMember(
       String token, String projectId, String email, String role);
@@ -438,6 +444,31 @@ class HttpApiClient implements ApiClient {
       return ApiResult<void>.failure(result.status, result.message);
     }
     return ApiResult<void>.ok(null);
+  }
+
+  // Presence: announce that the project is open and read who else is in it.
+  Future<ApiResult<void>> heartbeatPresence(
+      String token, String projectId) async {
+    final result = await _projectRequest(
+        'POST', '/projects/$projectId/presence', token);
+    if (!result.isOk) {
+      return ApiResult<void>.failure(result.status, result.message);
+    }
+    return ApiResult<void>.ok(null);
+  }
+
+  Future<ApiResult<List<Map<String, dynamic>>>> listPresence(
+      String token, String projectId) async {
+    final result =
+        await _projectRequest('GET', '/projects/$projectId/presence', token);
+    if (!result.isOk || result.value == null) {
+      return ApiResult<List<Map<String, dynamic>>>.failure(
+          result.status, result.message);
+    }
+    final list = result.value!['participants'] as List? ?? const [];
+    return ApiResult<List<Map<String, dynamic>>>.ok([
+      for (final e in list) Map<String, dynamic>.from(e as Map),
+    ]);
   }
 
   @override

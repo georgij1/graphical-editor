@@ -260,6 +260,24 @@ class FakeApiClient implements ApiClient {
   }
 
   @override
+  Future<ApiResult<void>> heartbeatPresence(
+      String token, String projectId) async {
+    if (offline) return _fail(ApiStatus.offline, null);
+    final email = _emailFromToken(token);
+    if (email == null) return _fail(ApiStatus.unauthorized, null);
+    return ApiResult.ok(null);
+  }
+
+  @override
+  Future<ApiResult<List<Map<String, dynamic>>>> listPresence(
+      String token, String projectId) async {
+    if (offline) return _fail(ApiStatus.offline, null);
+    final email = _emailFromToken(token);
+    if (email == null) return _fail(ApiStatus.unauthorized, null);
+    return ApiResult.ok(const <Map<String, dynamic>>[]);
+  }
+
+  @override
   Future<ApiResult<Project>> addProjectMember(
       String token, String projectId, String email, String role) async {
     if (offline) return _fail(ApiStatus.offline, null);
