@@ -207,10 +207,21 @@ public class ProjectController {
         entry.put("avatar", user == null || user.avatar == null ? "" : user.avatar);
         entry.put("lastSeen", java.time.Instant.now().toString());
         if (body != null) {
-            if (body.get("cursorX") instanceof Number) entry.put("cursorX", ((Number) body.get("cursorX")).doubleValue());
-            if (body.get("cursorY") instanceof Number) entry.put("cursorY", ((Number) body.get("cursorY")).doubleValue());
-            if (body.get("selectedNodeId") != null) entry.put("selectedNodeId", body.get("selectedNodeId").toString());
-            else entry.put("selectedNodeId", null);
+            if (body.containsKey("cursorX")) {
+                Object v = body.get("cursorX");
+                if (v instanceof Number) entry.put("cursorX", ((Number) v).doubleValue());
+                else entry.remove("cursorX");
+            }
+            if (body.containsKey("cursorY")) {
+                Object v = body.get("cursorY");
+                if (v instanceof Number) entry.put("cursorY", ((Number) v).doubleValue());
+                else entry.remove("cursorY");
+            }
+            if (body.containsKey("selectedNodeId")) {
+                Object v = body.get("selectedNodeId");
+                if (v == null) entry.remove("selectedNodeId");
+                else entry.put("selectedNodeId", v.toString());
+            }
         }
         bucket.put(uid, entry);
         return ResponseEntity.ok(Map.of("ok", true));

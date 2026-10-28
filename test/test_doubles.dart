@@ -265,6 +265,7 @@ class FakeApiClient implements ApiClient {
       double? cursorX,
       double? cursorY,
       String? selectedNodeId,
+      bool sendCursor = false,
   }) async {
     if (offline) return _fail(ApiStatus.offline, null);
     final email = _emailFromToken(token);

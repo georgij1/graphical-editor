@@ -173,15 +173,18 @@ class EditorController extends ChangeNotifier {
   double? _cursorX;
   double? _cursorY;
   bool _cursorVisible = false;
+  DateTime? _cursorLastMoved;
 
   void setCursorPosition(double x, double y) {
     _cursorX = x;
     _cursorY = y;
     _cursorVisible = true;
+    _cursorLastMoved = DateTime.now();
   }
 
   void clearCursorPosition() {
-    _cursorVisible = false;
+    // Keep the last position visible for 5 minutes after the mouse leaves.
+    _cursorLastMoved = DateTime.now();
   }
 
   /// True when the main pane shows the text editor instead of the canvas.
@@ -1310,10 +1313,15 @@ class EditorController extends ChangeNotifier {
 
   Future<void> _presenceTick(String projectId, String token) async {
     try {
+      final now = DateTime.now();
+      final withinGrace = _cursorLastMoved != null &&
+          now.difference(_cursorLastMoved!).inMinutes < 5;
+      final sendCursor = _cursorVisible && _cursorX != null && _cursorY != null && withinGrace;
       await _api.heartbeatPresence(token, projectId,
-          cursorX: _cursorVisible ? _cursorX : null,
-          cursorY: _cursorVisible ? _cursorY : null,
-          selectedNodeId: _selected?.attributes['fx:id']);
+          cursorX: sendCursor ? _cursorX : null,
+          cursorY: sendCursor ? _cursorY : null,
+          selectedNodeId: _selected?.attributes['fx:id'],
+          sendCursor: true);
       final result = await _api.listPresence(token, projectId);
       if (result.isOk && result.value != null) {
         _onlineParticipants = result.value!;
@@ -1326,6 +1334,10 @@ class EditorController extends ChangeNotifier {
     _presenceTimer?.cancel();
     _presenceTimer = null;
     _onlineParticipants = const <Map<String, dynamic>>[];
+    _cursorX = null;
+    _cursorY = null;
+    _cursorVisible = false;
+    _cursorLastMoved = null;
   }
 
   @override

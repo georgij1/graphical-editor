@@ -108,6 +108,7 @@ abstract class ApiClient {
       double? cursorX,
       double? cursorY,
       String? selectedNodeId,
+      bool sendCursor = false,
   });
 
   Future<ApiResult<List<Map<String, dynamic>>>> listPresence(
@@ -457,14 +458,16 @@ class HttpApiClient implements ApiClient {
       double? cursorX,
       double? cursorY,
       String? selectedNodeId,
+      bool sendCursor = false,
   }) async {
-    final body = <String, dynamic>{};
-    if (cursorX != null) body['cursorX'] = cursorX;
-    if (cursorY != null) body['cursorY'] = cursorY;
-    if (selectedNodeId != null) body['selectedNodeId'] = selectedNodeId;
+    final body = <String, dynamic>{
+      'cursorX': sendCursor ? cursorX : null,
+      'cursorY': sendCursor ? cursorY : null,
+      'selectedNodeId': selectedNodeId,
+    };
     final result = await _projectRequest(
         'POST', '/projects/$projectId/presence', token,
-        body: body.isEmpty ? null : body);
+        body: body);
     if (!result.isOk) {
       return ApiResult<void>.failure(result.status, result.message);
     }
