@@ -1,0 +1,16 @@
+com\example\fxmleditor\model\ProjectMember.class
+com\example\fxmleditor\service\UserStore.class
+com\example\fxmleditor\model\UserRecord.class
+com\example\fxmleditor\security\JwtService.class
+com\example\fxmleditor\service\UserStore$EmailTakenException.class
+com\example\fxmleditor\FxmlEditorApplication.class
+com\example\fxmleditor\service\UserStore$WrongPasswordException.class
+com\example\fxmleditor\service\UserStore$AvatarTooLargeException.class
+com\example\fxmleditor\config\WebConfig.class
+com\example\fxmleditor\model\SharedProject.class
+com\example\fxmleditor\service\ProjectStore.class
+com\example\fxmleditor\controller\ProjectController.class
+com\example\fxmleditor\controller\AuthController.class
+com\example\fxmleditor\security\Security.class
+com\example\fxmleditor\service\HistoryStore.class
+com\example\fxmleditor\service\UserStore$1.class
