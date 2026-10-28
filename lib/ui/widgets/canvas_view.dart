@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 
 import '../../editor/editor_controller.dart';
+import '../../l10n/app_localizations.dart';
 import '../../render/fx_renderer.dart';
 
 /// The design surface where the JavaFX UI is rendered and edited.
@@ -48,7 +49,7 @@ class _CanvasViewState extends State<CanvasView> {
   @override
   Widget build(BuildContext context) {
     final controller = widget.controller;
-    final renderer = FxRenderer(controller.buildRenderContext());
+    final renderer = FxRenderer(controller.buildRenderContext(tr: context.tr));
 
     // The canvas surface is sized far beyond any realistic project so the user
     // can pan and zoom in any direction without hitting an edge.

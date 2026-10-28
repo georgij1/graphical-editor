@@ -17,6 +17,7 @@ class FxRenderContext {
     this.showGrid = false,
     this.gridSize = 10,
     this.canvasSize,
+    this.tr,
   });
 
   final FxmlNode? selected;
@@ -27,6 +28,7 @@ class FxRenderContext {
   final bool showGrid;
   final double gridSize;
   final Size? canvasSize;
+  final String Function(String)? tr;
 
   FxRenderContext copyWith({FxmlNode? selected, double? zoom, bool? showGrid}) {
     return FxRenderContext(
@@ -1255,8 +1257,9 @@ class FxRenderer {
         color: Colors.white,
         border: Border.all(color: _fxBorder, style: BorderStyle.solid),
       ),
-      child: const Center(
-        child: Text('Canvas', style: TextStyle(color: Color(0xFFBBBBBB))),
+      child: Center(
+        child: Text(context.tr?.call('Canvas') ?? 'Canvas',
+            style: TextStyle(color: Color(0xFFBBBBBB))),
       ),
     );
   }

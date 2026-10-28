@@ -224,7 +224,7 @@ class EditorController extends ChangeNotifier {
       _num(_document.root.attributes['height']) ??
       600;
 
-  FxRenderContext buildRenderContext() => FxRenderContext(
+  FxRenderContext buildRenderContext({String Function(String)? tr}) => FxRenderContext(
     selected: _selected,
     zoom: _zoom,
     showGrid: _showGrid,
@@ -233,6 +233,7 @@ class EditorController extends ChangeNotifier {
     onSelect: select,
     onBeginEdit: onBeginEdit,
     onModelChanged: onModelChanged,
+    tr: tr,
   );
 
   double? _num(String? value) => value == null ? null : double.tryParse(value);
