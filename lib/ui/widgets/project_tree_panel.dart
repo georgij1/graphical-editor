@@ -1,4 +1,6 @@
-﻿import 'package:flutter/material.dart';
+﻿import 'dart:convert';
+
+import 'package:flutter/material.dart';
 
 import '../../editor/editor_controller.dart';
 import '../../project/build_files.dart';
@@ -72,6 +74,7 @@ for (final source in JavaGenerator.generate(project)) {
     for (final file in const BuildFiles().generate(project, BuildTool.maven)) {
       addFile(file.path, content: file.content, isJava: false, isBuildFile: true);
     }
+    addFile('project.json', content: const JsonEncoder.withIndent('  ').convert(project.toJson()), isJava: false, isBuildFile: true);
     final pkgDir = JavaGenerator.packageDir(project);
     for (final scene in project.scenes) {
       addFile(
@@ -128,7 +131,13 @@ for (final source in JavaGenerator.generate(project)) {
           children: <Widget>[
             const Icon(Icons.folder_outlined, size: 16),
             const SizedBox(width: 6),
-            Text(dir.name, style: const TextStyle(fontSize: 12)),
+            Expanded(
+              child: Text(
+                dir.name,
+                style: const TextStyle(fontSize: 12),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
           ],
         ),
       );
@@ -145,6 +154,7 @@ for (final source in JavaGenerator.generate(project)) {
         title: Text(
           dir.name,
           style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w500),
+          overflow: TextOverflow.ellipsis,
         ),
         children: _renderChildren(context, project, dir, depth + 1),
       ),
