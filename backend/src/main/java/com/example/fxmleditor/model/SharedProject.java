@@ -14,6 +14,7 @@ public class SharedProject {
     @com.fasterxml.jackson.annotation.JsonProperty("package")
     public String packageName;
     public String mainClass = "MainApp";
+    public boolean shared = true;
     public String description = "";
     public String ownerId = "";
     public String ownerEmail = "";

@@ -636,6 +636,7 @@ class EditorController extends ChangeNotifier {
       if (fetch.isOk) _adoptServerWorkspace(fetch.value);
       _authStatus = AuthStatus.signedIn;
       unawaited(refreshProfile());
+      unawaited(loadSharedProjects());
     }
     notifyListeners();
   }
