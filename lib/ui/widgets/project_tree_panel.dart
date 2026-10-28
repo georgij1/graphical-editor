@@ -31,12 +31,17 @@ final root = _buildTree(project);
     // Not a lazy list: the pane measures its content so the divider can sit
     // right below the last row.
     return SingleChildScrollView(
-      padding: const EdgeInsets.only(bottom: 12),
-      physics: const ClampingScrollPhysics(),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: _renderChildren(context, project, root, 0),
+      scrollDirection: Axis.horizontal,
+      child: IntrinsicWidth(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.only(bottom: 12),
+          physics: const ClampingScrollPhysics(),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: _renderChildren(context, project, root, 0),
+          ),
+        ),
       ),
     );
   }
