@@ -8,7 +8,6 @@ import '../../l10n/app_localizations.dart';
 import '../../project/project.dart';
 import '../../project/project_history.dart';
 import 'user_avatar.dart';
-import 'build_dialog.dart';
 import 'export_dialog.dart';
 import 'project_dialogs.dart';
 
@@ -221,19 +220,6 @@ class _ProjectSettingsDialogState extends State<ProjectSettingsDialog> {
         );
       });
 
-  Future<void> _build() => _run(() async {
-        final ok = await showBuildDialog(
-          context,
-          controller: controller,
-          project: widget.project,
-        );
-        if (ok == null || !mounted) return;
-        _say(
-          ok ? 'Build finished.' : 'Build failed.',
-          error: !ok,
-        );
-      });
-
   Future<void> _delete() async {
     final ok = await confirmDialog(
       context,
@@ -432,11 +418,6 @@ class _ProjectSettingsDialogState extends State<ProjectSettingsDialog> {
                             icon: Icons.archive_outlined,
                             label: context.tr('Export'),
                             onPressed: _busy ? null : _export,
-                          ),
-                          _ActionButton(
-                            icon: Icons.download_outlined,
-                            label: context.tr('Download ready JAR'),
-                            onPressed: _busy ? null : _build,
                           ),
                           if (controller.userEmail == project.ownerEmail)
                             _ActionButton(
