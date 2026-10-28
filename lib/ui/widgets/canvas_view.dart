@@ -82,8 +82,7 @@ class _CanvasViewState extends State<CanvasView> {
                 ),
               ),
             renderer.build(controller.root),
-            for (final p in controller.remoteCursors)
-              _RemoteCursor(participant: p),
+            _RemoteCursorsOverlay(controller: controller),
           ],
         ),
         ),
@@ -135,6 +134,27 @@ class _CanvasViewState extends State<CanvasView> {
           },
         ),
       ),
+    );
+  }
+}
+
+class _RemoteCursorsOverlay extends StatelessWidget {
+  const _RemoteCursorsOverlay({required this.controller});
+
+  final EditorController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: controller,
+      builder: (context, _) {
+        return Stack(
+          children: <Widget>[
+            for (final p in controller.remoteCursors)
+              _RemoteCursor(participant: p),
+          ],
+        );
+      },
     );
   }
 }
