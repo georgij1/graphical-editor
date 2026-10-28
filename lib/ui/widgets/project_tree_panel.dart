@@ -97,12 +97,19 @@ class _ProjectTreePanelState extends State<ProjectTreePanel> {
                   ),
                   visualDensity: VisualDensity.compact,
                   onPressed: () {
-                    if (_allCollapsed(root)) {
+                    if (_allCollapsed(root, isRoot: true)) {
                       _expandAll(root);
                     } else {
                       _collapseAll(root);
                     }
                   },
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  _allCollapsed(root, isRoot: true)
+                      ? context.tr('Expand all')
+                      : context.tr('Collapse all'),
+                  style: const TextStyle(fontSize: 12),
                 ),
               ],
             ),
