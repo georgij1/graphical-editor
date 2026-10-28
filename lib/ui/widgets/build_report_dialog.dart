@@ -11,7 +11,7 @@ enum ReportDialogAction {
   /// Continue with the build/export.
   proceed,
 
-  /// Repair the scene controllers first, then continue.
+  /// Repair the scene controllers / imports first, then continue.
   fix,
 }
 
@@ -21,7 +21,7 @@ enum ReportDialogMode {
   build,
 
   /// Before an export: offers Export / Export anyway and, when the scene
-  /// controllers can be repaired, a Fix controllers button.
+  /// controllers or imports can be repaired, a Fix issues button.
   export,
 }
 
@@ -207,13 +207,13 @@ class BuildReportDialog extends StatelessWidget {
                           Navigator.of(context).pop(ReportDialogAction.close),
                       child: Text(context.tr('Cancel')),
                     ),
-                    if (report.hasControllerIssues) ...<Widget>[
+                    if (report.hasFixableIssues) ...<Widget>[
                       const SizedBox(width: 8),
                       FilledButton.tonalIcon(
                         onPressed: () =>
                             Navigator.of(context).pop(ReportDialogAction.fix),
                         icon: const Icon(Icons.build_outlined, size: 18),
-                        label: Text(context.tr('Fix controllers')),
+                        label: Text(context.tr('Fix issues')),
                       ),
                     ],
                     const SizedBox(width: 8),

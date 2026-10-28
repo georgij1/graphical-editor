@@ -244,7 +244,7 @@ class AppLocalizations {
     // ---- Export check / build analysis report ----
     'Export check': 'Проверка экспорта',
     'Export anyway': 'Всё равно экспортировать',
-    'Fix controllers': 'Исправить контроллеры',
+    'Fix issues': 'Исправить',
     'No scenes in the project.': 'В проекте нет сцен.',
     'Add at least one scene to the project.':
         'Добавьте в проект хотя бы одну сцену.',
@@ -272,6 +272,10 @@ class AppLocalizations {
         'Сцена «{0}»: FXML ссылается на контроллер, но у сцены нет класса контроллера.',
     'Scene "{0}": the controller "{1}" lies outside the project package "{2}".':
         'Сцена «{0}»: контроллер «{1}» находится вне пакета проекта «{2}».',
+    'Scene "{0}": the element "{1}" is used, but the import "{2}" is missing. The application will not start.':
+        'Сцена «{0}»: используется элемент «{1}», но импорт «{2}» отсутствует. Приложение не запустится.',
+    'Every element used in a scene needs its own <?import?> line in the FXML file. The automatic fix adds the missing imports.':
+        'Каждый элемент сцены должен иметь строку <?import?> в файле FXML. Автоисправление добавит недостающие импорты.',
     'Scene actions': 'Действия со сценой',
     'Project files': 'Файлы проекта',
     'Project actions': 'Действия с проектом',

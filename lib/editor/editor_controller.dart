@@ -18,6 +18,7 @@ import '../project/project_history.dart';
 import '../project/project_exporter.dart';
 import '../project/project_storage.dart';
 import '../render/fx_renderer.dart';
+import 'build_analyzer.dart';
 import 'fx_catalog.dart';
 
 enum AuthStatus { loading, signedOut, signedIn }
@@ -1503,7 +1504,12 @@ void renameProject(Project project, String newName) {
   /// both the declared `controllerClass` and the `fx:controller` attribute of
   /// the scene's FXML. Repairs the `ClassNotFoundException` that appears at
   /// launch when the project package was changed after the scenes were
-  /// created. Returns true when something was changed.
+  /// created.
+  ///
+  /// Also inserts the `<?import?>` statements missing from every scene's
+  /// FXML (e.g. `javafx.scene.text.Font` for a `<Font>` property element),
+  /// which otherwise make JavaFX fail with "… is not a valid type".
+  /// Returns true when something was changed.
   bool fixSceneControllers(Project project) {
     // Bring the active scene's FXML up to date from the editor buffer first,
     // so the fix is not overwritten by the next flush.
@@ -1511,31 +1517,52 @@ void renameProject(Project project, String newName) {
     final pkg = project.package;
     var changed = false;
     for (final scene in project.scenes) {
+      var fxml = scene.fxml;
       final declared = (scene.controllerClass ?? '').trim();
       final fxmlMatch =
-          RegExp(r'fx:controller\s*=\s*"([^"]+)"').firstMatch(scene.fxml);
+          RegExp(r'fx:controller\s*=\s*"([^"]+)"').firstMatch(fxml);
       final fxmlFqn = fxmlMatch?.group(1);
       final source = declared.isNotEmpty ? declared : (fxmlFqn ?? '');
-      if (source.isEmpty) continue;
-      final simple = source.contains('.')
-          ? source.substring(source.lastIndexOf('.') + 1)
-          : source;
-      final fqn = pkg.isEmpty ? simple : '$pkg.$simple';
+      if (source.isNotEmpty) {
+        final simple = source.contains('.')
+            ? source.substring(source.lastIndexOf('.') + 1)
+            : source;
+        final fqn = pkg.isEmpty ? simple : '$pkg.$simple';
 
-      if (scene.controllerClass != fqn) {
-        scene.controllerClass = fqn;
-        changed = true;
+        if (scene.controllerClass != fqn) {
+          scene.controllerClass = fqn;
+          changed = true;
+        }
+        if (fxmlFqn != null && fxmlFqn != fqn) {
+          fxml = fxml.replaceFirst(
+            RegExp(r'fx:controller\s*=\s*"[^"]*"'),
+            'fx:controller="$fqn"',
+          );
+          changed = true;
+        }
+        // Keep the in-memory editor document consistent with the active
+        // scene.
+        if (identical(_activeScene, scene) && fxmlFqn != fqn) {
+          _document.root.attributes['fx:controller'] = fqn;
+        }
       }
-      if (fxmlFqn != null && fxmlFqn != fqn) {
-        scene.fxml = scene.fxml.replaceFirst(
-          RegExp(r'fx:controller\s*=\s*"[^"]*"'),
-          'fx:controller="$fqn"',
-        );
+
+      // Insert the <?import?> statements the scene relies on but does not
+      // declare.
+      final missingImports =
+          BuildAnalyzer.missingImportStatements(fxml);
+      if (missingImports.isNotEmpty) {
+        fxml = _insertImports(fxml, missingImports);
         changed = true;
+        if (identical(_activeScene, scene)) {
+          for (final statement in missingImports) {
+            _ensureImport(statement);
+          }
+        }
       }
-      // Keep the in-memory editor document consistent with the active scene.
-      if (identical(_activeScene, scene) && fxmlFqn != fqn) {
-        _document.root.attributes['fx:controller'] = fqn;
+
+      if (!identical(scene.fxml, fxml)) {
+        scene.fxml = fxml;
       }
     }
     if (changed) {
@@ -1543,6 +1570,26 @@ void renameProject(Project project, String newName) {
       notifyListeners();
     }
     return changed;
+  }
+
+  /// Inserts `<?import?>` lines into [fxml] right after the last existing
+  /// import (or after the XML declaration when there are none).
+  static String _insertImports(String fxml, List<String> imports) {
+    final lines = fxml.split('\n');
+    var index = lines.indexWhere((line) => line.trimLeft().startsWith('<?xml'));
+    final lastImport = lines
+        .lastIndexWhere((line) => line.trimLeft().startsWith('<?import'));
+    if (lastImport >= 0) {
+      index = lastImport + 1;
+    } else if (index >= 0) {
+      // Insert right after the XML declaration line.
+      index += 1;
+    } else {
+      index = 0;
+    }
+    lines.insertAll(
+        index, imports.map((statement) => '<?import $statement?>'));
+    return lines.join('\n');
   }
 
   /// Changes the entry point class of the generated Java application.
@@ -1812,6 +1859,13 @@ void renameProject(Project project, String newName) {
   ) {
     beginEdit('prop:${identityHashCode(owner)}:$propertyTag:$attribute');
     final child = ensurePropertyChild(owner, propertyTag, valueTag);
+    // Property values such as `<Font>` or `<Cursor>` are real JavaFX classes
+    // and need their own `<?import?>` — without it the exported scene fails
+    // to load with "… is not a valid type".
+    final valueImport = FxCatalog.importFor(valueTag);
+    if (valueImport != null) {
+      _ensureImport(valueImport);
+    }
     if (value == null || value.isEmpty) {
       child.attributes.remove(attribute);
     } else {
@@ -2002,6 +2056,8 @@ class NodeGeometryOffset {
 const String exampleFxml = '''<?xml version="1.0" encoding="UTF-8"?>
 <?import javafx.scene.control.*?>
 <?import javafx.scene.layout.*?>
+<?import javafx.scene.text.Font?>
+<?import javafx.scene.Cursor?>
 <AnchorPane xmlns="http://javafx.com/javafx/17.0.2" xmlns:fx="http://javafx.com/fxml/1" prefWidth="800.0" prefHeight="600.0">
     <Label text="Login" AnchorPane.leftAnchor="60.0" AnchorPane.topAnchor="50.0">
         <font>

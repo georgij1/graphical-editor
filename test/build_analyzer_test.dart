@@ -8,6 +8,7 @@ import 'test_doubles.dart';
 /// A minimal FXML document whose root declares [controller].
 String fxmlWith(String controller) =>
     '<?xml version="1.0" encoding="UTF-8"?>\n'
+    '<?import javafx.scene.layout.AnchorPane?>\n'
     '<AnchorPane xmlns="http://javafx.com/javafx/17.0.2" '
     'xmlns:fx="http://javafx.com/fxml/1" fx:controller="$controller">'
     '</AnchorPane>';
@@ -104,6 +105,60 @@ void main() {
       );
       expect(report.score, lessThan(100));
     });
+
+    test('flags a Font element without its import', () {
+      // The exact MyApp1 case: a <Font> property element, but no
+      // javafx.scene.text.Font import — JavaFX fails with "Font is not a
+      // valid type" at launch.
+      final p = project();
+      p.scenes.first.fxml = p.scenes.first.fxml
+          .replaceFirst(
+            '<?import javafx.scene.layout.AnchorPane?>',
+            '<?import javafx.scene.layout.AnchorPane?>\n'
+                '<?import javafx.scene.control.Label?>',
+          )
+          .replaceFirst(
+            '</AnchorPane>',
+            '<children><Label text="L"><font><Font size="24.0"/></font>'
+            '</Label></children></AnchorPane>',
+          );
+
+      final report = BuildAnalyzer.validate(p);
+
+      expect(report.hasImportIssues, isTrue);
+      expect(report.importIssueCount, 1);
+      expect(
+        report.issues.map((i) => i.key),
+        contains('Scene "{0}": the element "{1}" is used, but the import '
+            '"{2}" is missing. The application will not start.'),
+      );
+      expect(report.score, lessThan(100));
+    });
+
+    test('a wildcard import satisfies the elements of its package', () {
+      final p = Project(
+        id: 'p1',
+        name: 'MyApp1',
+        package: 'com.example.myapp1',
+        mainClass: 'MainApp1',
+        description: 'Demo project',
+      );
+      p.scenes.add(SceneFile(
+        name: 'main',
+        fxml: '<?xml version="1.0" encoding="UTF-8"?>\n'
+            '<?import javafx.scene.control.*?>\n'
+            '<?import javafx.scene.layout.*?>\n'
+            '<AnchorPane xmlns="http://javafx.com/javafx/17.0.2" '
+            'xmlns:fx="http://javafx.com/fxml/1">'
+            '<children><Label text="L"/></children>'
+            '</AnchorPane>',
+      ));
+
+      final report = BuildAnalyzer.validate(p);
+
+      expect(report.hasImportIssues, isFalse);
+      expect(report.score, 100);
+    });
   });
 
   group('ReportLine', () {
@@ -182,6 +237,53 @@ void main() {
         contains('fx:controller="com.example.myapp1.MainAppController"'),
       );
       expect(BuildAnalyzer.validate(project).hasControllerIssues, isFalse);
+    });
+
+    test('adds the missing <?import?> lines to a scene', () async {
+      final controller = EditorController(
+        storage: InMemoryProjectStorage(),
+        tokenStore: InMemoryKeyValueStore(),
+        api: FakeApiClient(),
+      );
+      controller.createProject(
+        name: 'MyApp1',
+        package: 'com.example.myapp1',
+        mainClass: 'MainApp1',
+      );
+      final project = controller.currentProject!;
+      // A second active scene so the editor buffer does not overwrite the
+      // broken FXML of the first scene during the fix.
+      controller.newScene('second');
+      final scene = project.scenes.first;
+      // A scene whose FXML lost its imports (the "Font is not a valid type"
+      // case).
+      scene.controllerClass = 'com.example.myapp1.MainAppController';
+      scene.fxml = '<?xml version="1.0" encoding="UTF-8"?>\n'
+          '<AnchorPane xmlns="http://javafx.com/javafx/17.0.2" '
+          'xmlns:fx="http://javafx.com/fxml/1" '
+          'fx:controller="com.example.myapp1.MainAppController">'
+          '<children><Label text="L"><font><Font size="24.0"/></font>'
+          '</Label></children>'
+          '</AnchorPane>';
+
+      final report = BuildAnalyzer.validate(project);
+      expect(report.hasImportIssues, isTrue);
+
+      expect(controller.fixSceneControllers(project), isTrue);
+
+      expect(
+        scene.fxml,
+        contains('<?import javafx.scene.layout.AnchorPane?>'),
+      );
+      expect(
+        scene.fxml,
+        contains('<?import javafx.scene.control.Label?>'),
+      );
+      expect(
+        scene.fxml,
+        contains('<?import javafx.scene.text.Font?>'),
+      );
+      expect(BuildAnalyzer.validate(project).hasImportIssues, isFalse);
     });
   });
 }

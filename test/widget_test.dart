@@ -819,6 +819,21 @@ final controller = standaloneController();
       expect(node.attributes.containsKey('text'), isFalse);
     });
 
+    test('setting a font registers the javafx.scene.text.Font import', () {
+      final controller = standaloneController();
+      controller.addComponent(FxCatalog.lookup('Label')!);
+      final node = controller.selected!;
+      controller.setPropertyAttribute(node, 'font', 'Font', 'size', '24.0');
+
+      // Without the import the exported FXML fails to load in JavaFX with
+      // "Font is not a valid type".
+      expect(
+        controller.document.imports,
+        contains('javafx.scene.text.Font'),
+      );
+      expect(controller.serialize(), contains('<?import javafx.scene.text.Font?>'));
+    });
+
     test('delete removes the selected node', () {
       final controller = standaloneController();
       controller.addComponent(FxCatalog.lookup('Button')!);

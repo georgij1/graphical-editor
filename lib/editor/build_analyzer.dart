@@ -19,6 +19,7 @@ library;
 
 import '../project/project.dart';
 import '../project/project_history.dart';
+import 'fx_catalog.dart';
 
 /// What produced the report: a server build or a pre-export check.
 enum BuildReportKind {
@@ -65,6 +66,7 @@ class BuildReport {
     required this.buildDurationMs,
     this.kind = BuildReportKind.build,
     this.controllerIssueCount = 0,
+    this.importIssueCount = 0,
   });
 
   /// Overall health score in [0, 100]. Higher is better.
@@ -89,11 +91,21 @@ class BuildReport {
   /// package. These can be repaired automatically.
   final int controllerIssueCount;
 
+  /// Number of scene elements used without the required `<?import?>`
+  /// statement. These can also be repaired automatically.
+  final int importIssueCount;
+
   /// True when the report came from the pre-export validation.
   bool get isExport => kind == BuildReportKind.export;
 
   /// True when the controller mismatches can be fixed automatically.
   bool get hasControllerIssues => controllerIssueCount > 0;
+
+  /// True when missing imports can be fixed automatically.
+  bool get hasImportIssues => importIssueCount > 0;
+
+  /// True when the automatic fix has something to repair.
+  bool get hasFixableIssues => controllerIssueCount > 0 || importIssueCount > 0;
 
   /// True when the project looks healthy (score >= 80 and no critical issues).
   bool get isHealthy => score >= 80 && issues.isEmpty;
@@ -139,6 +151,7 @@ class BuildAnalyzer {
     BuildRecord? build,
   }) {
     final controllerIssues = BuildAnalyzer.controllerProblems(project);
+    final importIssues = BuildAnalyzer.importProblems(project);
     final hasBuild = build != null;
 
     final inputs = _Inputs(<String, double>{
@@ -148,6 +161,7 @@ class BuildAnalyzer {
       'mainClassValid': project.mainClass.isNotEmpty ? 1.0 : 0.0,
       'hasScenes': project.scenes.isNotEmpty ? 1.0 : 0.0,
       'controllersOk': controllerIssues.isEmpty ? 1.0 : 0.0,
+      'importsOk': importIssues.isEmpty ? 1.0 : 0.0,
       if (hasBuild) ...<String, double>{
         'buildSucceeded': build.succeeded ? 1.0 : 0.0,
         'buildDuration': (build.durationMs / 1000.0).clamp(0, 60).toDouble(),
@@ -167,6 +181,8 @@ class BuildAnalyzer {
       'descriptionCheck': (i) => i['hasDescription'],
       // Do the FXML controllers match the project package?
       'controllerCheck': (i) => i['controllersOk'],
+      // Does every FXML element have the <?import?> it needs?
+      'importCheck': (i) => i['importsOk'],
       if (hasBuild) ...<String, double Function(_Inputs)>{
         // Did the build succeed?
         'buildCheck': (i) => i['buildSucceeded'],
@@ -180,20 +196,22 @@ class BuildAnalyzer {
     // Each set sums to 1.0.
     final weights = hasBuild
         ? <String, double>{
-            'sceneCheck': 0.20,
-            'packageCheck': 0.15,
+            'sceneCheck': 0.15,
+            'packageCheck': 0.10,
             'mainClassCheck': 0.10,
             'descriptionCheck': 0.05,
             'buildCheck': 0.20,
             'speedCheck': 0.10,
             'controllerCheck': 0.20,
+            'importCheck': 0.10,
           }
         : <String, double>{
-            'sceneCheck': 0.25,
-            'packageCheck': 0.20,
-            'mainClassCheck': 0.15,
-            'descriptionCheck': 0.10,
-            'controllerCheck': 0.30,
+            'sceneCheck': 0.20,
+            'packageCheck': 0.15,
+            'mainClassCheck': 0.10,
+            'descriptionCheck': 0.05,
+            'controllerCheck': 0.25,
+            'importCheck': 0.25,
           };
 
     // ---------------------------------------------------------- forward pass
@@ -238,6 +256,12 @@ class BuildAnalyzer {
               'Update the scene controllers or the package in the settings.',
               <String>[project.package],
             ));
+          case 'importCheck':
+            issues.addAll(importIssues);
+            suggestions.add(const ReportLine(
+              'Every element used in a scene needs its own <?import?> line '
+              'in the FXML file. The automatic fix adds the missing imports.',
+            ));
         }
       }
     }
@@ -252,6 +276,7 @@ class BuildAnalyzer {
       buildDurationMs: build?.durationMs ?? 0,
       kind: kind,
       controllerIssueCount: controllerIssues.length,
+      importIssueCount: importIssues.length,
     );
   }
 
@@ -311,6 +336,70 @@ class BuildAnalyzer {
     }
     return problems;
   }
+
+  // -------------------------------------------------------- import checks
+
+  /// Detects scene elements whose class has no `<?import?>` statement in the
+  /// FXML — the classic "… is not a valid type" / "Class … not found" trap
+  /// (e.g. a `<Font>` property element without `javafx.scene.text.Font`).
+  ///
+  /// Only classes known to [FxCatalog] (palette components plus auxiliary
+  /// classes such as `Font` and `Cursor`) are checked; unknown tags are
+  /// ignored so that custom nodes never produce false positives.
+  static List<ReportLine> importProblems(Project project) {
+    final problems = <ReportLine>[];
+    for (final scene in project.scenes) {
+      final missing = _missingImports(scene.fxml);
+      missing.forEach((tag, importStatement) {
+        problems.add(ReportLine(
+          'Scene "{0}": the element "{1}" is used, but the import "{2}" is '
+          'missing. The application will not start.',
+          <String>[scene.name, tag, importStatement],
+        ));
+      });
+    }
+    return problems;
+  }
+
+  /// Distinct `<?import?>` statements that [fxml] needs but does not declare,
+  /// in the order the elements are first used. Used by the automatic fix.
+  static List<String> missingImportStatements(String fxml) =>
+      _missingImports(fxml).values.toSet().toList(growable: false);
+
+  /// Element tag -> missing import statement, for every element of [fxml]
+  /// whose class has no `<?import?>`.
+  static Map<String, String> _missingImports(String fxml) {
+    final declared = _declaredImports(fxml);
+    final missing = <String, String>{};
+    for (final tag in _usedTags(fxml)) {
+      final importStatement = FxCatalog.importFor(tag);
+      if (importStatement == null) continue;
+      final package =
+          importStatement.substring(0, importStatement.lastIndexOf('.'));
+      if (declared.contains(importStatement) ||
+          declared.contains('$package.*')) {
+        continue;
+      }
+      missing[tag] = importStatement;
+    }
+    return missing;
+  }
+
+  /// All `<?import …?>` statements of an FXML document.
+  static Set<String> _declaredImports(String fxml) =>
+      RegExp(r'<\?import\s+([^?\s]+)\s*\?>')
+          .allMatches(fxml)
+          .map((m) => m.group(1)!.trim())
+          .toSet();
+
+  /// Class-style element tags (`<Label…>`, `<Font…>`) used in an FXML
+  /// document. Lower-case property elements (`<font>`, `<children>`) and
+  /// closing tags are skipped.
+  static Set<String> _usedTags(String fxml) =>
+      RegExp(r'<([A-Z][A-Za-z0-9_]*)')
+          .allMatches(fxml)
+          .map((m) => m.group(1)!)
+          .toSet();
 
   /// The `fx:controller` value of an FXML document, or null when absent.
   static String? _fxmlController(String fxml) => RegExp(r'fx:controller\s*=\s*"([^"]+)"')

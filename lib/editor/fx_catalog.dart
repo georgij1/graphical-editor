@@ -456,10 +456,26 @@ class FxCatalog {
     for (final component in components) component.name: component,
   };
 
+  /// JavaFX helper classes that appear inside property elements
+  /// (`<font><Font .../></font>`, `<cursor><Cursor fx:constant=.../></cursor>`)
+  /// but are not palette components. Each one still requires its own
+  /// `<?import?>` statement in the FXML, otherwise JavaFX fails to load
+  /// the scene with "… is not a valid type".
+  static const Map<String, String> _auxiliaryImports = {
+    'Font': 'javafx.scene.text.Font',
+    'Cursor': 'javafx.scene.Cursor',
+    'Color': 'javafx.scene.paint.Color',
+    'Image': 'javafx.scene.image.Image',
+    'Duration': 'javafx.util.Duration',
+  };
+
   static FxComponent? lookup(String name) => _byName[name];
 
   /// Returns the import statement needed for [name], if known.
-  static String? importFor(String name) => _byName[name]?.importStatement;
+  ///
+  /// Covers both palette components and auxiliary classes such as `Font`.
+  static String? importFor(String name) =>
+      _byName[name]?.importStatement ?? _auxiliaryImports[name];
 
   static List<FxComponent> byCategory(FxCategory category) =>
       components.where((c) => c.category == category).toList();

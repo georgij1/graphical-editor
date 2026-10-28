@@ -6,6 +6,8 @@ const _sample = '''
 <?xml version="1.0" encoding="UTF-8"?>
 <?import javafx.scene.control.Button?>
 <?import javafx.scene.layout.AnchorPane?>
+<?import javafx.scene.text.Font?>
+<?import javafx.scene.Cursor?>
 <AnchorPane xmlns="http://javafx.com/javafx/17.0.2" xmlns:fx="http://javafx.com/fxml/1" prefWidth="800.0" prefHeight="600.0">
     <children>
         <Button fx:id="okButton" text="OK" layoutX="40.0" layoutY="30.0"/>
@@ -23,6 +25,8 @@ void main() {
     test('parses root, attributes and children', () {
       final doc = const FxmlParser().parse(_sample);
       expect(doc.imports, contains('javafx.scene.control.Button'));
+      expect(doc.imports, contains('javafx.scene.text.Font'));
+      expect(doc.imports, contains('javafx.scene.Cursor'));
       expect(doc.root.tag, 'AnchorPane');
       expect(doc.root.attributes['prefWidth'], '800.0');
       expect(doc.root.attributes['xmlns:fx'], 'http://javafx.com/fxml/1');
