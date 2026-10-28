@@ -1489,10 +1489,60 @@ void renameProject(Project project, String newName) {
   }
 
   /// Changes the Java package used for the generated sources.
+  /// Changes the Java package of the project and moves the controllers of all
+  /// scenes into the new package, so the exported FXML keeps matching the
+  /// generated classes.
   void setProjectPackage(Project project, String package) {
     project.package = package.trim();
+    fixSceneControllers(project);
     _persist();
     notifyListeners();
+  }
+
+  /// Rewrites the controller of every scene into the current project package:
+  /// both the declared `controllerClass` and the `fx:controller` attribute of
+  /// the scene's FXML. Repairs the `ClassNotFoundException` that appears at
+  /// launch when the project package was changed after the scenes were
+  /// created. Returns true when something was changed.
+  bool fixSceneControllers(Project project) {
+    // Bring the active scene's FXML up to date from the editor buffer first,
+    // so the fix is not overwritten by the next flush.
+    _flushToScene();
+    final pkg = project.package;
+    var changed = false;
+    for (final scene in project.scenes) {
+      final declared = (scene.controllerClass ?? '').trim();
+      final fxmlMatch =
+          RegExp(r'fx:controller\s*=\s*"([^"]+)"').firstMatch(scene.fxml);
+      final fxmlFqn = fxmlMatch?.group(1);
+      final source = declared.isNotEmpty ? declared : (fxmlFqn ?? '');
+      if (source.isEmpty) continue;
+      final simple = source.contains('.')
+          ? source.substring(source.lastIndexOf('.') + 1)
+          : source;
+      final fqn = pkg.isEmpty ? simple : '$pkg.$simple';
+
+      if (scene.controllerClass != fqn) {
+        scene.controllerClass = fqn;
+        changed = true;
+      }
+      if (fxmlFqn != null && fxmlFqn != fqn) {
+        scene.fxml = scene.fxml.replaceFirst(
+          RegExp(r'fx:controller\s*=\s*"[^"]*"'),
+          'fx:controller="$fqn"',
+        );
+        changed = true;
+      }
+      // Keep the in-memory editor document consistent with the active scene.
+      if (identical(_activeScene, scene) && fxmlFqn != fqn) {
+        _document.root.attributes['fx:controller'] = fqn;
+      }
+    }
+    if (changed) {
+      _persist();
+      notifyListeners();
+    }
+    return changed;
   }
 
   /// Changes the entry point class of the generated Java application.

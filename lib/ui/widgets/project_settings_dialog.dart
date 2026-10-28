@@ -3,10 +3,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../editor/editor_controller.dart';
+import '../../editor/build_analyzer.dart';
 import '../../auth/api_client.dart';
 import '../../l10n/app_localizations.dart';
 import '../../project/project.dart';
 import '../../project/project_history.dart';
+import 'build_report_dialog.dart';
 import 'user_avatar.dart';
 import 'export_dialog.dart';
 import 'project_dialogs.dart';
@@ -212,6 +214,24 @@ class _ProjectSettingsDialogState extends State<ProjectSettingsDialog> {
   Future<void> _export() => _run(() async {
         final options = await showExportDialog(context);
         if (options == null || !mounted) return;
+
+        // Pre-export check: the mini neural network looks for inconsistencies
+        // (for example an FXML controller outside the project package that
+        // would fail with ClassNotFoundException at launch).
+        final report = BuildAnalyzer.validate(widget.project);
+        if (!mounted) return;
+        final action = await showBuildReportDialog(
+          context,
+          report: report,
+          mode: ReportDialogMode.export,
+        );
+        if (!mounted) return;
+        if (action == ReportDialogAction.fix) {
+          controller.fixSceneControllers(widget.project);
+        } else if (action != ReportDialogAction.proceed) {
+          return;
+        }
+
         final ok = await controller.exportProject(widget.project, options);
         if (!mounted) return;
         _say(

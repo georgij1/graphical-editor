@@ -241,6 +241,37 @@ class AppLocalizations {
     'Kiosk mode': 'Режим киоска',
     'Start full-screen without a title bar. ESC is disabled.':
         'Запуск на весь экран без заголовка. ESC отключён.',
+    // ---- Export check / build analysis report ----
+    'Export check': 'Проверка экспорта',
+    'Export anyway': 'Всё равно экспортировать',
+    'Fix controllers': 'Исправить контроллеры',
+    'No scenes in the project.': 'В проекте нет сцен.',
+    'Add at least one scene to the project.':
+        'Добавьте в проект хотя бы одну сцену.',
+    'Java package is invalid.': 'Некорректный Java-пакет.',
+    'Fix the Java package in project settings (letters, digits, underscores, dots).':
+        'Исправьте Java-пакет в настройках проекта (буквы, цифры, подчёркивания, точки).',
+    'Main class is not set.': 'Не задан главный класс.',
+    'Set the main class in project settings.':
+        'Задайте главный класс в настройках проекта.',
+    'Project description is empty.': 'Описание проекта пустое.',
+    'Add a description — it will appear in the exported README.':
+        'Добавьте описание — оно попадёт в экспортируемый README.',
+    'Check the build log in the history window.':
+        'Посмотрите журнал сборки в окне истории.',
+    'Build took more than 10 seconds.': 'Сборка заняла более 10 секунд.',
+    'Consider simplifying the project or scenes.':
+        'Упростите проект или сцены.',
+    'The controller package must match the project package "{0}". Update the scene controllers or the package in the settings.':
+        'Пакет контроллера должен совпадать с пакетом проекта «{0}». Обновите контроллеры сцен или пакет в настройках.',
+    'Scene "{0}": the FXML refers to the controller "{1}", but the project package is "{2}". The application will not start.':
+        'Сцена «{0}»: FXML ссылается на контроллер «{1}», а пакет проекта — «{2}». Приложение не запустится.',
+    'Scene "{0}": the FXML controller "{1}" differs from the scene controller "{2}".':
+        'Сцена «{0}»: контроллер в FXML «{1}» отличается от контроллера сцены «{2}».',
+    'Scene "{0}": the FXML refers to a controller, but the scene has no controller class.':
+        'Сцена «{0}»: FXML ссылается на контроллер, но у сцены нет класса контроллера.',
+    'Scene "{0}": the controller "{1}" lies outside the project package "{2}".':
+        'Сцена «{0}»: контроллер «{1}» находится вне пакета проекта «{2}».',
     'Scene actions': 'Действия со сценой',
     'Project files': 'Файлы проекта',
     'Project actions': 'Действия с проектом',

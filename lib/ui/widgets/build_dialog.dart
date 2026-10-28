@@ -7,6 +7,7 @@ import '../../l10n/app_localizations.dart';
 import '../../project/project.dart';
 import '../../project/project_history.dart';
 import '../../project/project_exporter.dart';
+import 'build_report_dialog.dart';
 
 /// Shows a dialog that builds the project and downloads a ready-to-run JAR.
 Future<bool?> showBuildDialog(
@@ -177,9 +178,10 @@ class _BuildDialogState extends State<BuildDialog> {
         if (latest != null) {
           final report = BuildAnalyzer.analyze(widget.project, latest);
           if (!mounted) return;
-          await showDialog<bool>(
-            context: context,
-            builder: (_) => _BuildReportDialog(report: report),
+          await showBuildReportDialog(
+            context,
+            report: report,
+            mode: ReportDialogMode.build,
           );
         }
       }
@@ -293,168 +295,6 @@ class _BuildLine extends StatelessWidget {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-/// Modal dialog showing the mini neural network analysis report of the
-/// just-built project.
-class _BuildReportDialog extends StatelessWidget {
-  const _BuildReportDialog({required this.report});
-
-  final BuildReport report;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isOk = report.buildSucceeded;
-    final badgeColor = report.isHealthy
-        ? Colors.green
-        : report.score >= 50
-            ? theme.colorScheme.primary
-            : theme.colorScheme.error;
-
-    return Dialog(
-      insetPadding: const EdgeInsets.all(20),
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 420),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: badgeColor.withValues(alpha: 0.15),
-                borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(12),
-                  topRight: Radius.circular(12),
-                ),
-              ),
-              child: Row(
-                children: <Widget>[
-                  Icon(
-                    isOk ? Icons.build : Icons.error,
-                    color: badgeColor,
-                    size: 20,
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: <Widget>[
-                        Text(
-                          context.tr('Build analysis'),
-                          style: theme.textTheme.titleLarge?.copyWith(
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          '${context.tr('Score')}: ${report.score} / 100  ·  ${report.badge}',
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            fontWeight: FontWeight.w600,
-                            color: badgeColor,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const Divider(height: 1),
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: <Widget>[
-                  Text(
-                    '${context.tr('Build time')}: '
-                    '${(report.buildDurationMs / 1000).toStringAsFixed(1)} s',
-                    style: theme.textTheme.bodyMedium,
-                  ),
-                  const SizedBox(height: 12),
-                  if (report.issues.isNotEmpty) ...<Widget>[
-                    Text(
-                      context.tr('Issues found'),
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    for (final issue in report.issues)
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 4),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: <Widget>[
-                            const Icon(Icons.error_outline,
-                                size: 14, color: Colors.red),
-                            const SizedBox(width: 6),
-                            Expanded(child: Text(issue)),
-                          ],
-                        ),
-                      ),
-                    const SizedBox(height: 10),
-                  ],
-                  if (report.suggestions.isNotEmpty) ...<Widget>[
-                    Text(
-                      context.tr('Recommendations'),
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    for (final suggestion in report.suggestions)
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 4),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: <Widget>[
-                            const Icon(Icons.lightbulb_outline,
-                                size: 14, color: Colors.amber),
-                            const SizedBox(width: 6),
-                            Expanded(child: Text(suggestion)),
-                          ],
-                        ),
-                      ),
-                    const SizedBox(height: 10),
-                  ],
-                  if (report.issues.isEmpty && report.suggestions.isEmpty)
-                    Text(
-                      context.tr('No issues found. The project looks healthy.'),
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: Colors.green,
-                      ),
-                    ),
-                ],
-              ),
-            ),
-            const Divider(height: 1),
-            Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                borderRadius: const BorderRadius.only(
-                  bottomLeft: Radius.circular(12),
-                  bottomRight: Radius.circular(12),
-                ),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: <Widget>[
-                  FilledButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    child: Text(context.tr('Close')),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }
