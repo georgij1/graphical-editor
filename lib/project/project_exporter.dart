@@ -26,6 +26,7 @@ class ExportOptions {
     this.format = ExportArchiveFormat.zip,
     this.includeJavaSources = true,
     this.buildTool = BuildTool.maven,
+    this.kioskMode = false,
   });
 
   final ExportArchiveFormat format;
@@ -33,6 +34,10 @@ class ExportOptions {
 
   /// Build configuration written next to the sources (Maven/Gradle/none).
   final BuildTool buildTool;
+
+  /// When true the generated launcher starts the stage in full-screen
+  /// undecorated kiosk mode (no title bar, no taskbar, ESC disabled).
+  final bool kioskMode;
 }
 
 /// Packs a project into a downloadable archive laid out like the real
@@ -75,7 +80,8 @@ class ProjectExporter {
         const JsonEncoder.withIndent('  ').convert(project.toJson()));
 
     if (options.includeJavaSources) {
-      for (final source in JavaGenerator.generate(project)) {
+      for (final source in JavaGenerator.generate(project,
+          kioskMode: options.kioskMode)) {
         add('$root/${source.path}', source.content);
       }
     }

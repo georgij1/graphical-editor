@@ -238,6 +238,9 @@ class AppLocalizations {
     'No issues found. The project looks healthy.': 'Проблем не обнаружено. Проект выглядит здоровым.',
     'Add the generated Java files to the archive.':
         'Добавить сгенерированные Java-файлы в архив.',
+    'Kiosk mode': 'Режим киоска',
+    'Start full-screen without a title bar. ESC is disabled.':
+        'Запуск на весь экран без заголовка. ESC отключён.',
     'Scene actions': 'Действия со сценой',
     'Project files': 'Файлы проекта',
     'Project actions': 'Действия с проектом',

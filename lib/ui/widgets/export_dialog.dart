@@ -25,6 +25,7 @@ class _ExportDialogState extends State<ExportDialog> {
   ExportArchiveFormat _format = ExportArchiveFormat.zip;
   BuildTool _buildTool = BuildTool.maven;
   bool _includeJavaSources = true;
+  bool _kioskMode = false;
 
   @override
   Widget build(BuildContext context) {
@@ -106,6 +107,21 @@ class _ExportDialogState extends State<ExportDialog> {
                   style: theme.textTheme.bodySmall,
                 ),
               ),
+              const SizedBox(height: 4),
+              CheckboxListTile(
+                value: _kioskMode,
+                onChanged: (value) =>
+                    setState(() => _kioskMode = value ?? false),
+                contentPadding: EdgeInsets.zero,
+                controlAffinity: ListTileControlAffinity.leading,
+                dense: true,
+                title: Text(context.tr('Kiosk mode')),
+                subtitle: Text(
+                  context.tr(
+                      'Start full-screen without a title bar. ESC is disabled.'),
+                  style: theme.textTheme.bodySmall,
+                ),
+              ),
             ],
           ),
         ),
@@ -121,6 +137,7 @@ class _ExportDialogState extends State<ExportDialog> {
               format: _format,
               includeJavaSources: _includeJavaSources,
               buildTool: _buildTool,
+              kioskMode: _kioskMode,
             ),
           ),
           icon: const Icon(Icons.download_outlined, size: 18),

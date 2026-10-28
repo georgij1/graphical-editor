@@ -14,14 +14,19 @@ class JavaGenerator {
   ///
   /// When [applyOverrides] is true (the default), hand-edited sources stored on
   /// the project replace the generated ones.
-  static List<GeneratedFile> generate(Project p, {bool applyOverrides = true}) {
+  ///
+  /// When [kioskMode] is true the launcher starts the stage full-screen
+  /// undecorated with ESC disabled (kiosk / digital-signage mode).
+  static List<GeneratedFile> generate(Project p,
+      {bool applyOverrides = true, bool kioskMode = false}) {
     final files = <GeneratedFile>[];
     final scenes = p.scenes.isNotEmpty ? p.scenes : [SceneFile(name: 'main', fxml: '')];
     final mainScene = p.mainScene ?? scenes.first;
     final mainPath = 'src/main/java/${packageDir(p)}/${p.mainClass}.java';
     files.add(GeneratedFile(
       path: mainPath,
-      content: _resolve(p, mainPath, _mainClass(p, mainScene.name),
+      content: _resolve(p, mainPath, _mainClass(p, mainScene.name,
+          kioskMode: kioskMode),
           applyOverrides: applyOverrides),
     ));
     for (final scene in scenes) {
@@ -48,7 +53,45 @@ class JavaGenerator {
     return p.sourceOverrides[path] ?? generated;
   }
 
-  static String _mainClass(Project p, String sceneName) {
+  static String _mainClass(Project p, String sceneName,
+      {bool kioskMode = false}) {
+    if (kioskMode) {
+      return 'package ${p.package};\n'
+          '\n'
+          'import java.io.IOException;\n'
+          '\n'
+          'import javafx.application.Application;\n'
+          'import javafx.fxml.FXMLLoader;\n'
+          'import javafx.scene.Parent;\n'
+          'import javafx.scene.Scene;\n'
+          'import javafx.scene.input.KeyCombination;\n'
+          'import javafx.stage.Stage;\n'
+          'import javafx.stage.StageStyle;\n'
+          '\n'
+          'public class ${p.mainClass} extends Application {\n'
+          '\n'
+          '    @Override\n'
+          '    public void start(Stage stage) throws IOException {\n'
+          '        FXMLLoader loader = new FXMLLoader(getClass().getResource("$sceneName.fxml"));\n'
+          '        Parent root = loader.load();\n'
+          '        Scene scene = new Scene(root);\n'
+          '        stage.setTitle("${p.name}");\n'
+          '        stage.setScene(scene);\n'
+          '\n'
+          '        // --- Kiosk mode ---\n'
+          '        stage.initStyle(StageStyle.UNDECORATED);   // no title bar\n'
+          '        stage.setFullScreen(true);                  // cover the whole screen\n'
+          '        stage.setFullScreenExitHint("");            // suppress the default hint\n'
+          '        stage.setFullScreenExitKeyCombination(KeyCombination.NO_MATCH); // disable ESC\n'
+          '\n'
+          '        stage.show();\n'
+          '    }\n'
+          '\n'
+          '    public static void main(String[] args) {\n'
+          '        launch();\n'
+          '    }\n'
+          '}\n';
+    }
     return 'package ${p.package};\n'
         '\n'
         'import java.io.IOException;\n'

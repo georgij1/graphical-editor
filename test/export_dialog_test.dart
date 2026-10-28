@@ -87,7 +87,7 @@ void main() {
 
     await tester.tap(find.text('TAR + GZIP'));
     await tester.pumpAndSettle();
-    await tester.tap(find.byType(CheckboxListTile));
+    await tester.tap(find.byType(CheckboxListTile).first);
     await tester.pumpAndSettle();
 
     await tester.tap(find.widgetWithText(FilledButton, 'Export'));
