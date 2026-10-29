@@ -83,36 +83,41 @@ class _ProjectTreePanelState extends State<ProjectTreePanel> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
-          Padding(
-            padding: const EdgeInsets.fromLTRB(6, 4, 6, 2),
-            child: Row(
-              children: <Widget>[
-                IconButton(
-                  tooltip: _allCollapsed(root, isRoot: true)
-                      ? context.tr('Expand all')
-                      : context.tr('Collapse all'),
-                  icon: Icon(
-                    _allCollapsed(root, isRoot: true) ? Icons.unfold_more : Icons.unfold_less,
-                    size: 16,
-                  ),
-                  visualDensity: VisualDensity.compact,
-                  onPressed: () {
-                    if (_allCollapsed(root, isRoot: true)) {
-                      _expandAll(root);
-                    } else {
-                      _collapseAll(root);
-                    }
-                  },
+          ListenableBuilder(
+            listenable: controller,
+            builder: (context, _) {
+              final allCollapsed = _allCollapsed(root, isRoot: true);
+              final label = allCollapsed
+                  ? context.tr('Expand all')
+                  : context.tr('Collapse all');
+              return Padding(
+                padding: const EdgeInsets.fromLTRB(6, 4, 6, 2),
+                child: Row(
+                  children: <Widget>[
+                    IconButton(
+                      tooltip: label,
+                      icon: Icon(
+                        allCollapsed ? Icons.unfold_more : Icons.unfold_less,
+                        size: 16,
+                      ),
+                      visualDensity: VisualDensity.compact,
+                      onPressed: () {
+                        if (allCollapsed) {
+                          _expandAll(root);
+                        } else {
+                          _collapseAll(root);
+                        }
+                      },
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      label,
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 4),
-                Text(
-                  _allCollapsed(root, isRoot: true)
-                      ? context.tr('Expand all')
-                      : context.tr('Collapse all'),
-                  style: const TextStyle(fontSize: 12),
-                ),
-              ],
-            ),
+              );
+            },
           ),
           const Divider(height: 1),
           ..._renderChildren(context, project, root, 0),

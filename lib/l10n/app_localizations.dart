@@ -244,6 +244,8 @@ class AppLocalizations {
     'Details': 'Подробнее',
     'Export anyway': 'Всё равно экспортировать',
     'Fix issues': 'Исправить',
+    'Expand all': 'Развернуть всё',
+    'Collapse all': 'Свернуть всё',
     'No scenes in the project.': 'В проекте нет сцен.',
     'Add at least one scene to the project.':
         'Добавьте в проект хотя бы одну сцену.',
