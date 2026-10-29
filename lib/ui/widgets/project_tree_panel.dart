@@ -243,9 +243,60 @@ class _ProjectTreePanelState extends State<ProjectTreePanel> {
         child: Row(
           children: <Widget>[
             if (!empty)
-              Icon(
-                collapsed ? Icons.chevron_right : Icons.expand_more,
-                size: 16,
+              _contextMenu(
+                context,
+                Icon(
+                  collapsed ? Icons.chevron_right : Icons.expand_more,
+                  size: 16,
+                ),
+                <PopupMenuEntry<int>>[
+                  PopupMenuItem<int>(
+                    value: 1,
+                    child: Text(context.tr('New scene')),
+                  ),
+                  PopupMenuItem<int>(
+                    value: 2,
+                    child: Text(context.tr('New folder')),
+                  ),
+                  PopupMenuItem<int>(
+                    value: 3,
+                    child: Text(context.tr('New file')),
+                  ),
+                  const PopupMenuDivider(),
+                  PopupMenuItem<int>(
+                    value: 4,
+                    child: Text(context.tr('Rename')),
+                  ),
+                  PopupMenuItem<int>(
+                    value: 5,
+                    child: Text(context.tr('Delete')),
+                  ),
+                ],
+                (value) async {
+                  if (value == 1) {
+                    final name = await showPromptDialog(
+                      context,
+                      title: context.tr('New scene'),
+                      initial: 'scene',
+                    );
+                    if (!mounted) return;
+                    if (name != null && name.trim().isNotEmpty) {
+                      controller.newScene(name);
+                    }
+                  } else if (value == 2) {
+                    _say(context,
+                        context.tr('Folder creation is not supported yet.'));
+                  } else if (value == 3) {
+                    _say(context,
+                        context.tr('File creation is not supported yet.'));
+                  } else if (value == 4) {
+                    _say(context,
+                        context.tr('Folder rename is not supported yet.'));
+                  } else if (value == 5) {
+                    _say(context,
+                        context.tr('Folder deletion is not supported yet.'));
+                  }
+                },
               ),
             if (!empty) const SizedBox(width: 2),
             const Icon(Icons.folder_outlined, size: 16),
@@ -431,7 +482,35 @@ class _ProjectTreePanelState extends State<ProjectTreePanel> {
       selected: active,
       selectedTileColor:
           Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.4),
-      leading: const Icon(Icons.description_outlined, size: 16),
+      leading: _contextMenu(
+        context,
+        const Icon(Icons.description_outlined, size: 16),
+        <PopupMenuEntry<int>>[
+          PopupMenuItem<int>(
+            value: 1,
+            child: Text(context.tr('Open in editor')),
+          ),
+          const PopupMenuDivider(),
+          PopupMenuItem<int>(
+            value: 2,
+            child: Text(context.tr('Rename')),
+          ),
+          PopupMenuItem<int>(
+            value: 3,
+            child: Text(context.tr('Delete')),
+          ),
+        ],
+        (value) async {
+          if (value == 1) {
+            controller.openScene(scene);
+            controller.setCodeMode(false);
+          } else if (value == 2) {
+            widget.onRenameScene(scene);
+          } else if (value == 3) {
+            widget.onDeleteScene(scene);
+          }
+        },
+      ),
       title: Text(file.name, style: const TextStyle(fontSize: 12)),
       subtitle: controllerClass == null || controllerClass.isEmpty
           ? null
@@ -444,22 +523,6 @@ class _ProjectTreePanelState extends State<ProjectTreePanel> {
         controller.openScene(scene);
         controller.setCodeMode(false);
       },
-      trailing: PopupMenuButton<String>(
-        icon: const Icon(Icons.more_vert, size: 16),
-        tooltip: context.tr('Scene actions'),
-        onSelected: (value) {
-          switch (value) {
-            case 'rename':
-              widget.onRenameScene(scene);
-            case 'delete':
-              widget.onDeleteScene(scene);
-          }
-        },
-        itemBuilder: (context) => <PopupMenuEntry<String>>[
-          PopupMenuItem<String>(value: 'rename', child: Text(context.tr('Rename'))),
-          PopupMenuItem<String>(value: 'delete', child: Text(context.tr('Delete'))),
-        ],
-      ),
     );
     return tile;
   }
