@@ -207,7 +207,7 @@ class _ProjectTreePanelState extends State<ProjectTreePanel> {
     _DirNode dir,
     int depth,
   ) {
-    final padding = EdgeInsets.only(left: 6 + depth * 14.0, right: 8);
+    final padding = EdgeInsets.only(left: 6 + depth * 14.0, right: 6);
     final empty = dir.dirs.isEmpty && dir.files.isEmpty;
     final collapsed = _isCollapsed(dir.path);
     if (empty) {
@@ -240,15 +240,15 @@ class _ProjectTreePanelState extends State<ProjectTreePanel> {
               children: <Widget>[
                 Icon(
                   collapsed ? Icons.chevron_right : Icons.expand_more,
-                  size: 18,
+                  size: 16,
                 ),
                 const SizedBox(width: 2),
-                const Icon(Icons.folder_outlined, size: 17),
+                const Icon(Icons.folder_outlined, size: 16),
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text(
                     dir.name,
-                    style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w500),
+                    style: const TextStyle(fontSize: 12),
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
