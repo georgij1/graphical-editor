@@ -236,6 +236,13 @@
     <div class="subtitle" id="flutter-loading-subtitle">Загрузка редактора…</div>
   </div>
 
+  <script>
+    // Suppress the browser's default context menu so only the editor's custom
+    // context menu (right-click in the project tree) is shown.
+    window.addEventListener('contextmenu', function (event) {
+      event.preventDefault();
+    }, true);
+  </script>
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>
