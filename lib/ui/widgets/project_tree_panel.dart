@@ -43,10 +43,10 @@ class _ProjectTreePanelState extends State<ProjectTreePanel> {
       behavior: HitTestBehavior.translucent,
       onSecondaryTapDown: (details) {
         final position = RelativeRect.fromLTRB(
-          details.localPosition.dx,
-          details.localPosition.dy,
-          details.localPosition.dx,
-          details.localPosition.dy,
+          details.globalPosition.dx,
+          details.globalPosition.dy,
+          details.globalPosition.dx,
+          details.globalPosition.dy,
         );
         showMenu<int>(
           context: context,
