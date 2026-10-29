@@ -234,104 +234,67 @@ class _ProjectTreePanelState extends State<ProjectTreePanel> {
     _DirNode dir,
     int depth,
   ) {
-    final padding = EdgeInsets.only(left: 6 + depth * 14.0, right: 8);
+    final padding = EdgeInsets.only(left: 6 + depth * 14.0, right: 6);
     final empty = dir.dirs.isEmpty && dir.files.isEmpty;
     final collapsed = _isCollapsed(dir.path);
-    if (empty) {
-      return _contextMenu(
-        context,
-        Padding(
-          padding: padding,
-          child: Row(
-            children: <Widget>[
-              const Icon(Icons.folder_outlined, size: 16),
-              const SizedBox(width: 6),
-              Expanded(
-                child: Text(
-                  dir.name,
-                  style: const TextStyle(fontSize: 12),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            ],
-          ),
-        ),
-        <PopupMenuEntry<int>>[
-          PopupMenuItem<int>(
-            value: 1,
-            child: Text(context.tr('New scene')),
-          ),
+
+    final tile = ListTile(
+      dense: true,
+      visualDensity: VisualDensity.compact,
+      contentPadding: padding,
+      leading: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          if (!empty)
+            Icon(
+              collapsed ? Icons.chevron_right : Icons.expand_more,
+              size: 16,
+            ),
+          if (!empty) const SizedBox(width: 2),
+          const Icon(Icons.folder_outlined, size: 16),
+          const SizedBox(width: 6),
         ],
-        (value) async {
-          if (value == 1) {
-            final name = await showPromptDialog(
-              context,
-              title: context.tr('New scene'),
-              initial: 'scene',
-            );
-            if (!mounted) return;
-            if (name != null && name.trim().isNotEmpty) {
-              controller.newScene(name);
-            }
+      ),
+      title: Text(
+        dir.name,
+        style: const TextStyle(fontSize: 12),
+        overflow: TextOverflow.ellipsis,
+      ),
+      onTap: empty ? null : () => _toggle(dir.path),
+    );
+
+    final menuTile = _contextMenu(
+      context,
+      tile,
+      <PopupMenuEntry<int>>[
+        PopupMenuItem<int>(
+          value: 1,
+          child: Text(context.tr('New scene')),
+        ),
+      ],
+      (value) async {
+        if (value == 1) {
+          final name = await showPromptDialog(
+            context,
+            title: context.tr('New scene'),
+            initial: 'scene',
+          );
+          if (!mounted) return;
+          if (name != null && name.trim().isNotEmpty) {
+            controller.newScene(name);
           }
-        },
-      );
-    }
+        }
+      },
+    );
+
+    if (collapsed || empty) return menuTile;
+
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
-        _contextMenu(
-          context,
-          InkWell(
-            onTap: () => _toggle(dir.path),
-            child: Padding(
-              padding: padding,
-              child: Row(
-                children: <Widget>[
-                  Icon(
-                    collapsed ? Icons.chevron_right : Icons.expand_more,
-                    size: 18,
-                  ),
-                  const SizedBox(width: 2),
-                  const Icon(Icons.folder_outlined, size: 17),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: Text(
-                      dir.name,
-                      style: const TextStyle(
-                        fontSize: 12.5,
-                        fontWeight: FontWeight.w500,
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          <PopupMenuEntry<int>>[
-            PopupMenuItem<int>(
-              value: 1,
-              child: Text(context.tr('New scene')),
-            ),
-          ],
-          (value) async {
-            if (value == 1) {
-              final name = await showPromptDialog(
-                context,
-                title: context.tr('New scene'),
-                initial: 'scene',
-              );
-              if (!mounted) return;
-              if (name != null && name.trim().isNotEmpty) {
-                controller.newScene(name);
-              }
-            }
-          },
-        ),
-        if (!collapsed)
-          ..._renderChildren(context, project, dir, depth + 1),
+        menuTile,
+        ..._renderChildren(context, project, dir, depth + 1),
       ],
     );
   }
