@@ -40,7 +40,6 @@ class _ProjectTreePanelState extends State<ProjectTreePanel> {
   Widget _contextMenu(BuildContext context, Widget child,
       List<PopupMenuEntry<int>> items, void Function(int) onSelected) {
     return GestureDetector(
-      behavior: HitTestBehavior.translucent,
       onSecondaryTapDown: (details) {
         final position = RelativeRect.fromLTRB(
           details.globalPosition.dx,
@@ -234,58 +233,85 @@ class _ProjectTreePanelState extends State<ProjectTreePanel> {
     _DirNode dir,
     int depth,
   ) {
-    final padding = EdgeInsets.only(left: 6 + depth * 14.0, right: 6);
     final empty = dir.dirs.isEmpty && dir.files.isEmpty;
     final collapsed = _isCollapsed(dir.path);
 
-    final tile = ListTile(
-      dense: true,
-      visualDensity: VisualDensity.compact,
-      contentPadding: padding,
-      leading: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: <Widget>[
-          if (!empty)
-            Icon(
-              collapsed ? Icons.chevron_right : Icons.expand_more,
-              size: 16,
-            ),
-          if (!empty) const SizedBox(width: 2),
-          const Icon(Icons.folder_outlined, size: 16),
-          const SizedBox(width: 6),
-        ],
-      ),
-      title: Text(
-        dir.name,
-        style: const TextStyle(fontSize: 12),
-        overflow: TextOverflow.ellipsis,
-      ),
+    final tile = InkWell(
       onTap: empty ? null : () => _toggle(dir.path),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 6),
+        child: Row(
+          children: <Widget>[
+            if (!empty)
+              Icon(
+                collapsed ? Icons.chevron_right : Icons.expand_more,
+                size: 16,
+              ),
+            if (!empty) const SizedBox(width: 2),
+            const Icon(Icons.folder_outlined, size: 16),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Text(
+                dir.name,
+                style: const TextStyle(fontSize: 12),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
 
-    final menuTile = _contextMenu(
-      context,
-      tile,
-      <PopupMenuEntry<int>>[
-        PopupMenuItem<int>(
-          value: 1,
-          child: Text(context.tr('New scene')),
-        ),
-      ],
-      (value) async {
-        if (value == 1) {
-          final name = await showPromptDialog(
+    final menuTile = empty
+        ? tile
+        : _contextMenu(
             context,
-            title: context.tr('New scene'),
-            initial: 'scene',
+            tile,
+            <PopupMenuEntry<int>>[
+              PopupMenuItem<int>(
+                value: 1,
+                child: Text(context.tr('New scene')),
+              ),
+              PopupMenuItem<int>(
+                value: 2,
+                child: Text(context.tr('New folder')),
+              ),
+              PopupMenuItem<int>(
+                value: 3,
+                child: Text(context.tr('New file')),
+              ),
+              const PopupMenuDivider(),
+              PopupMenuItem<int>(
+                value: 4,
+                child: Text(context.tr('Rename')),
+              ),
+              PopupMenuItem<int>(
+                value: 5,
+                child: Text(context.tr('Delete')),
+              ),
+            ],
+            (value) async {
+              if (value == 1) {
+                final name = await showPromptDialog(
+                  context,
+                  title: context.tr('New scene'),
+                  initial: 'scene',
+                );
+                if (!mounted) return;
+                if (name != null && name.trim().isNotEmpty) {
+                  controller.newScene(name);
+                }
+              } else if (value == 2) {
+                _say(context, context.tr('Folder creation is not supported yet.'));
+              } else if (value == 3) {
+                _say(context, context.tr('File creation is not supported yet.'));
+              } else if (value == 4) {
+                _say(context, context.tr('Folder rename is not supported yet.'));
+              } else if (value == 5) {
+                _say(context, context.tr('Folder deletion is not supported yet.'));
+              }
+            },
           );
-          if (!mounted) return;
-          if (name != null && name.trim().isNotEmpty) {
-            controller.newScene(name);
-          }
-        }
-      },
-    );
 
     if (collapsed || empty) return menuTile;
 
@@ -312,7 +338,36 @@ class _ProjectTreePanelState extends State<ProjectTreePanel> {
         dense: true,
         visualDensity: VisualDensity.compact,
         contentPadding: padding,
-        leading: const Icon(Icons.description_outlined, size: 16),
+        leading: _contextMenu(
+          context,
+          const Icon(Icons.description_outlined, size: 16),
+          <PopupMenuEntry<int>>[
+            PopupMenuItem<int>(
+              value: 1,
+              child: Text(context.tr('Open source')),
+            ),
+            const PopupMenuDivider(),
+            PopupMenuItem<int>(
+              value: 2,
+              child: Text(context.tr('Rename')),
+            ),
+            PopupMenuItem<int>(
+              value: 3,
+              child: Text(context.tr('Delete')),
+            ),
+          ],
+          (value) async {
+            if (value == 1) {
+              controller.showSource(
+                GeneratedFile(path: file.path, content: file.content ?? ''),
+              );
+            } else if (value == 2) {
+              _say(context, context.tr('Build file rename is not supported yet.'));
+            } else if (value == 3) {
+              _say(context, context.tr('Build file deletion is not supported yet.'));
+            }
+          },
+        ),
         title: Text(file.name, style: const TextStyle(fontSize: 12)),
         subtitle: Text(
           context.tr('generated on export'),
@@ -320,23 +375,7 @@ class _ProjectTreePanelState extends State<ProjectTreePanel> {
           overflow: TextOverflow.ellipsis,
         ),
       );
-      return _contextMenu(
-        context,
-        tile,
-        <PopupMenuEntry<int>>[
-          PopupMenuItem<int>(
-            value: 1,
-            child: Text(context.tr('Open source')),
-          ),
-        ],
-        (value) {
-          if (value == 1) {
-            controller.showSource(
-              GeneratedFile(path: file.path, content: file.content ?? ''),
-            );
-          }
-        },
-      );
+      return tile;
     }
 
     if (file.isJava) {
@@ -344,29 +383,42 @@ class _ProjectTreePanelState extends State<ProjectTreePanel> {
         dense: true,
         visualDensity: VisualDensity.compact,
         contentPadding: padding,
-        leading: const Icon(Icons.data_object, size: 16),
+        leading: _contextMenu(
+          context,
+          const Icon(Icons.data_object, size: 16),
+          <PopupMenuEntry<int>>[
+            PopupMenuItem<int>(
+              value: 1,
+              child: Text(context.tr('Open source')),
+            ),
+            const PopupMenuDivider(),
+            PopupMenuItem<int>(
+              value: 2,
+              child: Text(context.tr('Rename')),
+            ),
+            PopupMenuItem<int>(
+              value: 3,
+              child: Text(context.tr('Delete')),
+            ),
+          ],
+          (value) async {
+            if (value == 1) {
+              controller.showSource(
+                GeneratedFile(path: file.path, content: file.content ?? ''),
+              );
+            } else if (value == 2) {
+              _say(context, context.tr('Java file rename is not supported yet.'));
+            } else if (value == 3) {
+              _say(context, context.tr('Java file deletion is not supported yet.'));
+            }
+          },
+        ),
         title: Text(file.name, style: const TextStyle(fontSize: 12)),
         onTap: () => controller.showSource(
           GeneratedFile(path: file.path, content: file.content ?? ''),
         ),
       );
-      return _contextMenu(
-        context,
-        tile,
-        <PopupMenuEntry<int>>[
-          PopupMenuItem<int>(
-            value: 1,
-            child: Text(context.tr('Open source')),
-          ),
-        ],
-        (value) {
-          if (value == 1) {
-            controller.showSource(
-              GeneratedFile(path: file.path, content: file.content ?? ''),
-            );
-          }
-        },
-      );
+      return tile;
     }
 
     final scene = file.scene!;
@@ -410,6 +462,12 @@ class _ProjectTreePanelState extends State<ProjectTreePanel> {
       ),
     );
     return tile;
+  }
+
+  void _say(BuildContext context, String text) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(text), duration: const Duration(seconds: 2)),
+    );
   }
 }
 
