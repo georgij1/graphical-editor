@@ -3,10 +3,11 @@
 import 'package:flutter/material.dart';
 
 import '../../editor/editor_controller.dart';
+import '../../l10n/app_localizations.dart';
 import '../../project/build_files.dart';
 import '../../project/java_generator.dart';
 import '../../project/project.dart';
-import '../../l10n/app_localizations.dart';
+import 'project_dialogs.dart';
 
 /// Full project tree: the JavaFX application laid out like a real source tree
 /// (`src/main/java/...` for the launcher + controllers and
@@ -33,6 +34,32 @@ class _ProjectTreePanelState extends State<ProjectTreePanel> {
   EditorController get controller => widget.controller;
 
   bool _isCollapsed(String path) => _collapsed.contains(path);
+
+  /// Wraps [child] so a right mouse click shows [items] as a Flutter context
+  /// menu instead of the browser's default one.
+  Widget _contextMenu(BuildContext context, Widget child,
+      List<PopupMenuEntry<int>> items, void Function(int) onSelected) {
+    return GestureDetector(
+      behavior: HitTestBehavior.translucent,
+      onSecondaryTapDown: (details) {
+        final position = RelativeRect.fromLTRB(
+          details.localPosition.dx,
+          details.localPosition.dy,
+          details.localPosition.dx,
+          details.localPosition.dy,
+        );
+        showMenu<int>(
+          context: context,
+          position: position,
+          items: items,
+        ).then((value) {
+          if (!mounted) return;
+          if (value != null) onSelected(value);
+        });
+      },
+      child: child,
+    );
+  }
 
   void _toggle(String path) {
     setState(() {
@@ -207,43 +234,104 @@ class _ProjectTreePanelState extends State<ProjectTreePanel> {
     _DirNode dir,
     int depth,
   ) {
-    final padding = EdgeInsets.only(left: 6 + depth * 14.0, right: 6);
+    final padding = EdgeInsets.only(left: 6 + depth * 14.0, right: 8);
     final empty = dir.dirs.isEmpty && dir.files.isEmpty;
     final collapsed = _isCollapsed(dir.path);
-
-    final tile = ListTile(
-      dense: true,
-      visualDensity: VisualDensity.compact,
-      contentPadding: padding,
-      leading: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: <Widget>[
-          if (!empty)
-            Icon(
-              collapsed ? Icons.chevron_right : Icons.expand_more,
-              size: 16,
-            ),
-          if (!empty) const SizedBox(width: 2),
-          const Icon(Icons.folder_outlined, size: 16),
-          const SizedBox(width: 6),
+    if (empty) {
+      return _contextMenu(
+        context,
+        Padding(
+          padding: padding,
+          child: Row(
+            children: <Widget>[
+              const Icon(Icons.folder_outlined, size: 16),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  dir.name,
+                  style: const TextStyle(fontSize: 12),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+        ),
+        <PopupMenuEntry<int>>[
+          PopupMenuItem<int>(
+            value: 1,
+            child: Text(context.tr('New scene')),
+          ),
         ],
-      ),
-      title: Text(
-        dir.name,
-        style: const TextStyle(fontSize: 12),
-        overflow: TextOverflow.ellipsis,
-      ),
-      onTap: empty ? null : () => _toggle(dir.path),
-    );
-
-    if (collapsed || empty) return tile;
-
+        (value) async {
+          if (value == 1) {
+            final name = await showPromptDialog(
+              context,
+              title: context.tr('New scene'),
+              initial: 'scene',
+            );
+            if (!mounted) return;
+            if (name != null && name.trim().isNotEmpty) {
+              controller.newScene(name);
+            }
+          }
+        },
+      );
+    }
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
-        tile,
-        ..._renderChildren(context, project, dir, depth + 1),
+        _contextMenu(
+          context,
+          InkWell(
+            onTap: () => _toggle(dir.path),
+            child: Padding(
+              padding: padding,
+              child: Row(
+                children: <Widget>[
+                  Icon(
+                    collapsed ? Icons.chevron_right : Icons.expand_more,
+                    size: 18,
+                  ),
+                  const SizedBox(width: 2),
+                  const Icon(Icons.folder_outlined, size: 17),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      dir.name,
+                      style: const TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w500,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          <PopupMenuEntry<int>>[
+            PopupMenuItem<int>(
+              value: 1,
+              child: Text(context.tr('New scene')),
+            ),
+          ],
+          (value) async {
+            if (value == 1) {
+              final name = await showPromptDialog(
+                context,
+                title: context.tr('New scene'),
+                initial: 'scene',
+              );
+              if (!mounted) return;
+              if (name != null && name.trim().isNotEmpty) {
+                controller.newScene(name);
+              }
+            }
+          },
+        ),
+        if (!collapsed)
+          ..._renderChildren(context, project, dir, depth + 1),
       ],
     );
   }
@@ -255,8 +343,9 @@ class _ProjectTreePanelState extends State<ProjectTreePanel> {
     int depth,
   ) {
     final padding = EdgeInsets.only(left: 6 + depth * 14.0, right: 6);
+
     if (file.isBuildFile) {
-      return ListTile(
+      final tile = ListTile(
         dense: true,
         visualDensity: VisualDensity.compact,
         contentPadding: padding,
@@ -268,9 +357,27 @@ class _ProjectTreePanelState extends State<ProjectTreePanel> {
           overflow: TextOverflow.ellipsis,
         ),
       );
+      return _contextMenu(
+        context,
+        tile,
+        <PopupMenuEntry<int>>[
+          PopupMenuItem<int>(
+            value: 1,
+            child: Text(context.tr('Open source')),
+          ),
+        ],
+        (value) {
+          if (value == 1) {
+            controller.showSource(
+              GeneratedFile(path: file.path, content: file.content ?? ''),
+            );
+          }
+        },
+      );
     }
+
     if (file.isJava) {
-      return ListTile(
+      final tile = ListTile(
         dense: true,
         visualDensity: VisualDensity.compact,
         contentPadding: padding,
@@ -280,12 +387,29 @@ class _ProjectTreePanelState extends State<ProjectTreePanel> {
           GeneratedFile(path: file.path, content: file.content ?? ''),
         ),
       );
+      return _contextMenu(
+        context,
+        tile,
+        <PopupMenuEntry<int>>[
+          PopupMenuItem<int>(
+            value: 1,
+            child: Text(context.tr('Open source')),
+          ),
+        ],
+        (value) {
+          if (value == 1) {
+            controller.showSource(
+              GeneratedFile(path: file.path, content: file.content ?? ''),
+            );
+          }
+        },
+      );
     }
 
     final scene = file.scene!;
     final active = identical(controller.activeScene, scene);
     final controllerClass = scene.controllerClass;
-    return ListTile(
+    final tile = ListTile(
       dense: true,
       visualDensity: VisualDensity.compact,
       contentPadding: padding,
@@ -322,6 +446,7 @@ class _ProjectTreePanelState extends State<ProjectTreePanel> {
         ],
       ),
     );
+    return tile;
   }
 }
 
