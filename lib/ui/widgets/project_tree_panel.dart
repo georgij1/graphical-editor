@@ -210,54 +210,40 @@ class _ProjectTreePanelState extends State<ProjectTreePanel> {
     final padding = EdgeInsets.only(left: 6 + depth * 14.0, right: 6);
     final empty = dir.dirs.isEmpty && dir.files.isEmpty;
     final collapsed = _isCollapsed(dir.path);
-    if (empty) {
-      return Padding(
-        padding: padding,
-        child: Row(
-          children: <Widget>[
-            const Icon(Icons.folder_outlined, size: 16),
-            const SizedBox(width: 6),
-            Expanded(
-              child: Text(
-                dir.name,
-                style: const TextStyle(fontSize: 12),
-                overflow: TextOverflow.ellipsis,
-              ),
+
+    final tile = ListTile(
+      dense: true,
+      visualDensity: VisualDensity.compact,
+      contentPadding: padding,
+      leading: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          if (!empty)
+            Icon(
+              collapsed ? Icons.chevron_right : Icons.expand_more,
+              size: 16,
             ),
-          ],
-        ),
-      );
-    }
+          if (!empty) const SizedBox(width: 2),
+          const Icon(Icons.folder_outlined, size: 16),
+          const SizedBox(width: 6),
+        ],
+      ),
+      title: Text(
+        dir.name,
+        style: const TextStyle(fontSize: 12),
+        overflow: TextOverflow.ellipsis,
+      ),
+      onTap: empty ? null : () => _toggle(dir.path),
+    );
+
+    if (collapsed || empty) return tile;
+
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
-        InkWell(
-          onTap: () => _toggle(dir.path),
-          child: Padding(
-            padding: padding,
-            child: Row(
-              children: <Widget>[
-                Icon(
-                  collapsed ? Icons.chevron_right : Icons.expand_more,
-                  size: 16,
-                ),
-                const SizedBox(width: 2),
-                const Icon(Icons.folder_outlined, size: 16),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Text(
-                    dir.name,
-                    style: const TextStyle(fontSize: 12),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-        if (!collapsed)
-          ..._renderChildren(context, project, dir, depth + 1),
+        tile,
+        ..._renderChildren(context, project, dir, depth + 1),
       ],
     );
   }
