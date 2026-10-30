@@ -54,6 +54,24 @@ class AppLocalizations {
   String issuesFound(int n) =>
       isRussian ? 'Найдено проблем: $n' : '$n issue${n == 1 ? '' : 's'} found';
 
+  /// "2 errors, 1 warning" / «2 ошибки, 1 предупреждение» — the summary line
+  /// of the code editor's validation bar (IntelliJ shows the same counts).
+  String validationSummary(int errors, int warnings) =>
+      '$errors ${_plural(errors, enOne: 'error', enMany: 'errors', ruOne: 'ошибка', ruFew: 'ошибки', ruMany: 'ошибок')}, '
+      '$warnings ${_plural(warnings, enOne: 'warning', enMany: 'warnings', ruOne: 'предупреждение', ruFew: 'предупреждения', ruMany: 'предупреждений')}';
+
+  /// Position prefix of a validation issue: "Line 3, column 14: " /
+  /// «Строка 3, столбец 14: ». Empty when the position is unknown.
+  String issueLocation(int? line, int? column) {
+    if (line == null) return '';
+    if (isRussian) {
+      return column == null
+          ? 'Строка $line: '
+          : 'Строка $line, столбец $column: ';
+    }
+    return column == null ? 'Line $line: ' : 'Line $line, column $column: ';
+  }
+
   String selected(String name) =>
       isRussian ? 'Выбрано: $name' : 'Selected: $name';
 
@@ -349,8 +367,7 @@ class AppLocalizations {
     'Main class': 'Главный класс',
     'Invalid Java package': 'Недопустимый Java-пакет',
     'Java file': 'Java-файл',
-    'Invalid Java class name.':
-        'Недопустимое имя Java-класса: допустимы только идентификаторы, не являющиеся зарезервированными словами.',
+    'Invalid Java class name.': 'Недопустимое имя Java-класса: допустимы только идентификаторы, не являющиеся зарезервированными словами.',
     'Class name already in use.': 'Имя класса уже занято другим классом.',
     'Java file not found.': 'Java-файл не найден.',
     'Package cannot be empty.': 'Пакет не может быть пустым.',
@@ -400,6 +417,34 @@ class AppLocalizations {
     'AI suggestion loaded. Review and Apply.':
         'Предложение ИИ загружено. Проверьте и нажмите «Применить».',
     'No issues found.': 'Ошибок нет.',
+    // Java/FXML checker messages (keys keep {0}… slots for the arguments).
+    "';' expected": "Ожидается ';'.",
+    "')' expected": "Ожидается ')'.",
+    "'}' expected": "Ожидается '}'.",
+    'Unclosed "{0}".': 'Незакрытый символ "{0}".',
+    'Unexpected "{0}".': 'Лишний символ "{0}".',
+    'Identifier expected.': 'Ожидается идентификатор.',
+    'Statement expected.': 'Ожидается оператор.',
+    'Class, interface, enum, or record expected.':
+        'Ожидается class, interface, enum или record.',
+    'Unclosed comment.': 'Незакрытый комментарий.',
+    'Unclosed string literal.': 'Незакрытая строковая константа.',
+    'Unclosed character literal.': 'Незакрытая символьная константа.',
+    'Unclosed text block literal.': 'Незакрытый текстовый блок.',
+    'Invalid number literal.': 'Некорректная числовая константа.',
+    "Illegal character '{0}'.": "Недопустимый символ '{0}'.",
+    "'while' expected.": "Ожидается 'while'.",
+    "'try' without 'catch', 'finally' or resource declarations.":
+        "'try' без 'catch', 'finally' или описания ресурсов.",
+    'No "class" declaration found.': 'Объявление класса не найдено.',
+    'Java source is empty.': 'Исходный код Java пуст.',
+    'FXML source is empty.': 'Исходный код FXML пуст.',
+    "Unused import '{0}'.": "Неиспользуемый импорт '{0}'.",
+    "Package name '{0}' does not correspond to the file location '{1}'.":
+        "Имя пакета '{0}' не соответствует расположению файла '{1}'.",
+    'Package declaration is missing.': 'Отсутствует объявление пакета.',
+    "Class '{0}' is public, should be declared in a file named {0}.java.":
+        "Публичный класс '{0}' должен быть объявлен в файле {0}.java.",
     'Cannot apply invalid source.': 'Нельзя применить некорректный исходник.',
     'Java source applied.': 'Java-код применён.',
     'FXML applied.': 'FXML применён.',

@@ -8,10 +8,10 @@ import 'package:graphical_editor/ui/widgets/source_view.dart';
 import 'test_doubles.dart';
 
 EditorController standaloneController() => EditorController(
-      storage: InMemoryProjectStorage(),
-      tokenStore: InMemoryKeyValueStore(),
-      api: FakeApiClient(),
-    );
+  storage: InMemoryProjectStorage(),
+  tokenStore: InMemoryKeyValueStore(),
+  api: FakeApiClient(),
+);
 
 Future<void> _pressCtrlS(WidgetTester tester) async {
   await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
@@ -27,9 +27,11 @@ void main() {
       ..createProject(name: 'P', package: 'com.example', mainClass: 'MainApp')
       ..editSceneSource();
 
-    await tester.pumpWidget(MaterialApp(
-      home: Scaffold(body: CodeView(controller: controller)),
-    ));
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(body: CodeView(controller: controller)),
+      ),
+    );
     await tester.pump();
 
     await tester.enterText(
@@ -52,27 +54,38 @@ void main() {
       GeneratedFile(path: path, content: controller.codeContent),
     );
 
-    await tester.pumpWidget(MaterialApp(
-      home: Scaffold(body: CodeView(controller: controller)),
-    ));
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(body: CodeView(controller: controller)),
+      ),
+    );
     await tester.pump();
 
-    await tester.enterText(find.byType(TextField), 'class MainApp { /* edited */ }');
+    await tester.enterText(
+      find.byType(TextField),
+      'class MainApp { /* edited */ }',
+    );
     await tester.pump();
     await _pressCtrlS(tester);
 
-    expect(controller.currentProject!.sourceOverrides[path], contains('edited'));
+    expect(
+      controller.currentProject!.sourceOverrides[path],
+      contains('edited'),
+    );
   });
 
-  testWidgets('invalid FXML shows a validation error and blocks Apply',
-      (tester) async {
+  testWidgets('invalid FXML shows a validation error and blocks Apply', (
+    tester,
+  ) async {
     final controller = standaloneController()
       ..createProject(name: 'P', package: 'com.example', mainClass: 'MainApp')
       ..editSceneSource();
 
-    await tester.pumpWidget(MaterialApp(
-      home: Scaffold(body: CodeView(controller: controller)),
-    ));
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(body: CodeView(controller: controller)),
+      ),
+    );
     await tester.pump();
 
     await tester.enterText(find.byType(TextField), '<VBox><children>');
@@ -83,5 +96,76 @@ void main() {
       find.widgetWithText(FilledButton, 'Apply'),
     );
     expect(applyButton.onPressed, isNull);
+  });
+
+  testWidgets(
+    'a Java syntax error shows its line and column and blocks Apply',
+    (tester) async {
+      final controller = standaloneController()
+        ..createProject(
+          name: 'P',
+          package: 'com.example',
+          mainClass: 'MainApp',
+        );
+      const path = 'src/main/java/com/example/MainApp.java';
+      controller.showSource(
+        GeneratedFile(path: path, content: controller.codeContent),
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(body: CodeView(controller: controller)),
+        ),
+      );
+      await tester.pump();
+
+      await tester.enterText(
+        find.byType(TextField),
+        'class MainApp {\n  void run() {\n    int x = 1\n  }\n}',
+      );
+      await tester.pump();
+
+      expect(find.text("Line 3, column 14: ';' expected"), findsOneWidget);
+      expect(
+        tester
+            .widget<FilledButton>(find.widgetWithText(FilledButton, 'Apply'))
+            .onPressed,
+        isNull,
+      );
+    },
+  );
+
+  testWidgets('a warning is shown but does not block Apply', (tester) async {
+    final controller = standaloneController()
+      ..createProject(name: 'P', package: 'com.example', mainClass: 'MainApp');
+    const path = 'src/main/java/com/example/MainApp.java';
+    controller.showSource(
+      GeneratedFile(path: path, content: controller.codeContent),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(body: CodeView(controller: controller)),
+      ),
+    );
+    await tester.pump();
+
+    await tester.enterText(
+      find.byType(TextField),
+      'package com.example;\nimport java.util.List;\nclass MainApp {}\n',
+    );
+    await tester.pump();
+
+    expect(find.text('0 errors, 1 warning'), findsOneWidget);
+    expect(
+      find.text("Line 2, column 1: Unused import 'List'."),
+      findsOneWidget,
+    );
+    expect(
+      tester
+          .widget<FilledButton>(find.widgetWithText(FilledButton, 'Apply'))
+          .onPressed,
+      isNotNull,
+    );
   });
 }

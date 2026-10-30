@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../editor/code_validator.dart';
@@ -19,15 +19,19 @@ class CodeView extends StatefulWidget {
 }
 
 class _CodeViewState extends State<CodeView> {
-  late final TextEditingController _text =
-      TextEditingController(text: widget.controller.codeContent);
+  late final TextEditingController _text = TextEditingController(
+    text: widget.controller.codeContent,
+  );
   late ValidationResult _validation = _validate(_text.text);
   bool _dirty = false;
 
   bool get _isJava => widget.controller.codeIsJava;
 
-  ValidationResult _validate(String source) =>
-      CodeValidator.validate(isJava: _isJava, source: source);
+  ValidationResult _validate(String source) => CodeValidator.validate(
+    isJava: _isJava,
+    source: source,
+    path: _isJava ? widget.controller.codePath : null,
+  );
 
   @override
   void initState() {
@@ -60,7 +64,11 @@ class _CodeViewState extends State<CodeView> {
   bool _apply() {
     final controller = widget.controller;
     if (!_validation.isValid) {
-      _showMessage(_validation.firstError ?? context.tr('Cannot apply invalid source.'));
+      final error = _validation.errors.first;
+      _showMessage(
+        context.l10n.issueLocation(error.line, error.column) +
+            error.render(context.tr),
+      );
       return false;
     }
     final isJava = controller.codeIsJava;
@@ -69,22 +77,26 @@ class _CodeViewState extends State<CodeView> {
       _dirty = !ok;
       _validation = _validate(_text.text);
     });
-_showMessage(ok
-        ? (isJava
-            ? context.tr('Java source applied.')
-            : context.tr('FXML applied.'))
-        : context.tr('Invalid FXML — not applied.'));
+    _showMessage(
+      ok
+          ? (isJava
+                ? context.tr('Java source applied.')
+                : context.tr('FXML applied.'))
+          : context.tr('Invalid FXML — not applied.'),
+    );
     return ok;
   }
 
   void _showMessage(String message) {
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(
-        content: Text(message),
-        behavior: SnackBarBehavior.floating,
-        duration: const Duration(seconds: 2),
-      ));
+      ..showSnackBar(
+        SnackBar(
+          content: Text(message),
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 2),
+        ),
+      );
   }
 
   Future<void> _fixWithAi() async {
@@ -123,8 +135,10 @@ _showMessage(ok
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             child: Row(
               children: <Widget>[
-                Icon(isJava ? Icons.data_object : Icons.description_outlined,
-                    size: 16),
+                Icon(
+                  isJava ? Icons.data_object : Icons.description_outlined,
+                  size: 16,
+                ),
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text(
@@ -187,8 +201,9 @@ _showMessage(ok
                   fontFamily: 'monospace',
                   fontSize: 12.5,
                   height: 1.45,
-                  color:
-                      dark ? const Color(0xFFE6E6E6) : const Color(0xFF1F1F1F),
+                  color: dark
+                      ? const Color(0xFFE6E6E6)
+                      : const Color(0xFF1F1F1F),
                 ),
                 decoration: const InputDecoration(
                   border: InputBorder.none,
@@ -211,56 +226,101 @@ class _ValidationBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final valid = validation.isValid;
-    final color = valid ? theme.colorScheme.primary : theme.colorScheme.error;
     final issues = validation.issues;
+
+    // Nothing to complain about: a calm "all clear" row.
+    if (issues.isEmpty) {
+      final color = theme.colorScheme.primary;
+      return Container(
+        width: double.infinity,
+        color: color.withValues(alpha: 0.08),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+        child: Row(
+          children: <Widget>[
+            Icon(Icons.check_circle_outline, size: 14, color: color),
+            const SizedBox(width: 6),
+            Text(
+              context.tr('No issues found.'),
+              style: TextStyle(fontSize: 11.5, color: color),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // Red for errors (they block Apply), amber for warnings only — the same
+    // split IntelliJ IDEA makes in its editor.
+    final hasErrors = validation.hasErrors;
+    final warnColor = Colors.amber.shade800;
+    final color = hasErrors ? theme.colorScheme.error : warnColor;
     return Container(
       width: double.infinity,
       color: color.withValues(alpha: 0.08),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-      child: valid
-          ? Row(
-              children: <Widget>[
-                Icon(Icons.check_circle_outline, size: 14, color: color),
-                const SizedBox(width: 6),
-                Text(context.tr('No issues found.'),
-                    style: TextStyle(fontSize: 11.5, color: color)),
-              ],
-            )
-          : Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Row(
-                  children: <Widget>[
-                    Icon(Icons.error_outline, size: 14, color: color),
-                    const SizedBox(width: 6),
-Text(
-                      context.l10n.issuesFound(issues.length),
-                      style: TextStyle(
-                          fontSize: 11.5,
-                          fontWeight: FontWeight.w600,
-                          color: color),
-                    ),
-                  ],
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Row(
+            children: <Widget>[
+              Icon(
+                hasErrors ? Icons.error_outline : Icons.warning_amber_outlined,
+                size: 14,
+                color: color,
+              ),
+              const SizedBox(width: 6),
+              Text(
+                context.l10n.validationSummary(
+                  validation.errorCount,
+                  validation.warningCount,
                 ),
-                const SizedBox(height: 2),
-                ConstrainedBox(
-                  constraints: const BoxConstraints(maxHeight: 120),
-                  child: ListView.builder(
-                    shrinkWrap: true,
-                    padding: EdgeInsets.zero,
-                    itemCount: issues.length,
-                    itemBuilder: (context, index) => Padding(
-                      padding: const EdgeInsets.only(left: 20, bottom: 2),
-                      child: Text(
-                        issues[index].toString(),
-                        style: TextStyle(fontSize: 11.5, color: color),
+                style: TextStyle(
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w600,
+                  color: color,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 2),
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxHeight: 120),
+            child: ListView.builder(
+              shrinkWrap: true,
+              padding: EdgeInsets.zero,
+              itemCount: issues.length,
+              itemBuilder: (context, index) {
+                final issue = issues[index];
+                final issueColor = issue.isError
+                    ? theme.colorScheme.error
+                    : warnColor;
+                return Padding(
+                  padding: const EdgeInsets.only(left: 20, bottom: 2),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      Icon(
+                        issue.isError
+                            ? Icons.error_outline
+                            : Icons.warning_amber_outlined,
+                        size: 12,
+                        color: issueColor,
                       ),
-                    ),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: Text(
+                          context.l10n.issueLocation(issue.line, issue.column) +
+                              issue.render(context.tr),
+                          style: TextStyle(fontSize: 11.5, color: issueColor),
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-              ],
+                );
+              },
             ),
+          ),
+        ],
+      ),
     );
   }
 }

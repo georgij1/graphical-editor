@@ -1,18 +1,69 @@
+import 'package:xml/xml.dart';
+
 import '../fxml/fxml_parser.dart';
+import 'java_linter.dart';
+
+/// How serious a [ValidationIssue] is. Errors block applying the source in
+/// the editor; warnings are informational — the same split IntelliJ IDEA
+/// makes between red errors and yellow warnings.
+enum ValidationSeverity { error, warning }
 
 /// A single validation problem found in an edited source file.
+///
+/// [message] is an English key that may contain `{0}`, `{1}`… placeholders
+/// filled from [args]; [render] resolves it through the localization table.
 class ValidationIssue {
-  const ValidationIssue(this.message, {this.line});
+  const ValidationIssue(
+    this.message, {
+    this.args = const <String>[],
+    this.line,
+    this.column,
+    this.severity = ValidationSeverity.error,
+  });
 
+  /// Localization key of the problem (English text with `{0}`… placeholders).
   final String message;
+
+  /// Values substituted into [message].
+  final List<String> args;
+
+  /// 1-based line of the problem, or `null` when unknown.
   final int? line;
 
+  /// 1-based column of the problem, or `null` when unknown.
+  final int? column;
+
+  final ValidationSeverity severity;
+
+  bool get isError => severity == ValidationSeverity.error;
+
+  /// English text with [args] substituted.
+  String get text => _fill(message, args);
+
+  /// Localized text: [tr] resolves the key, then the arguments are filled in.
+  String render(String Function(String) tr) => _fill(tr(message), args);
+
+  /// `Line 3, column 12: ` prefix (IntelliJ style); empty without a position.
+  String get _position {
+    if (line == null) return '';
+    if (column == null) return 'Line $line: ';
+    return 'Line $line, column $column: ';
+  }
+
   @override
-  String toString() => line == null ? message : 'Line $line: $message';
+  String toString() => '$_position$text';
+
+  static String _fill(String template, List<String> args) {
+    var out = template;
+    for (var i = 0; i < args.length; i++) {
+      out = out.replaceAll('{$i}', args[i]);
+    }
+    return out;
+  }
 }
 
-/// Result of validating an edited source file. Reports every issue found rather
-/// than stopping at the first one.
+/// Result of validating an edited source file. Reports every issue found
+/// rather than stopping at the first one.
 class ValidationResult {
   const ValidationResult(this.issues);
 
@@ -20,20 +71,29 @@ class ValidationResult {
 
   final List<ValidationIssue> issues;
 
-  bool get isValid => issues.isEmpty;
+  List<ValidationIssue> get errors =>
+      issues.where((i) => i.isError).toList(growable: false);
+  List<ValidationIssue> get warnings =>
+      issues.where((i) => !i.isError).toList(growable: false);
+
+  int get errorCount => issues.where((i) => i.isError).length;
+  int get warningCount => issues.where((i) => !i.isError).length;
+
+  /// True when the source contains at least one error. Warnings do not block
+  /// applying — IntelliJ never blocks saving a file for a warning either.
+  bool get hasErrors => issues.any((i) => i.isError);
+  bool get isValid => !hasErrors;
+
   ValidationIssue? get firstIssue => issues.isEmpty ? null : issues.first;
-  String? get firstError => firstIssue?.toString();
+  String? get firstError => hasErrors ? errors.first.toString() : null;
 }
 
-class _Open {
-  const _Open(this.ch, this.line);
-  final String ch;
-  final int line;
-}
-
-/// Lightweight validators for the code editor. FXML is validated by actually
-/// parsing it (the XML parser reports the first structural problem it hits);
-/// Java is scanned for all bracket problems plus a class declaration.
+/// Validators for the code editor.
+///
+/// FXML is validated by actually parsing it (the XML parser reports the
+/// structural problem with line and column). Java goes through [JavaLinter]:
+/// a real tokenizer plus a parser with error recovery, which reports every
+/// syntax problem with its exact position, IntelliJ-IDEA style.
 class CodeValidator {
   const CodeValidator._();
 
@@ -42,149 +102,48 @@ class CodeValidator {
   static ValidationResult validate({
     required bool isJava,
     required String source,
+    String? path,
   }) {
-    return isJava ? validateJava(source) : validateFxml(source);
+    return isJava ? validateJava(source, path: path) : validateFxml(source);
   }
 
   static ValidationResult validateFxml(String source) {
     if (source.trim().isEmpty) {
-      return const ValidationResult(
-          <ValidationIssue>[ValidationIssue('FXML source is empty.')]);
+      return const ValidationResult(<ValidationIssue>[
+        ValidationIssue('FXML source is empty.'),
+      ]);
     }
     try {
       _parser.parse(source);
       return ValidationResult.valid;
     } catch (error) {
+      int? line;
+      int? column;
+      if (error is XmlFormatException) {
+        if (error.line > 0) line = error.line;
+        if (error.column > 0) column = error.column;
+      }
       return ValidationResult(<ValidationIssue>[
-        ValidationIssue(_shorten(error)),
+        ValidationIssue(_shorten(error), line: line, column: column),
       ]);
     }
   }
 
-  static ValidationResult validateJava(String source) {
+  static ValidationResult validateJava(String source, {String? path}) {
     if (source.trim().isEmpty) {
-      return const ValidationResult(
-          <ValidationIssue>[ValidationIssue('Java source is empty.')]);
+      return const ValidationResult(<ValidationIssue>[
+        ValidationIssue('Java source is empty.'),
+      ]);
     }
     final issues = <ValidationIssue>[];
-    _scanBrackets(source, issues);
-    if (!RegExp(r'\bclass\b').hasMatch(_stripLiteralsAndComments(source))) {
-      issues.add(const ValidationIssue('No "class" declaration found.'));
-    }
+    JavaLinter(path: path).lint(source, issues);
     return ValidationResult(issues);
   }
 
-  /// Walks the source once, tracking strings/comments (so their brackets are
-  /// ignored) and reporting every unmatched bracket with its line number.
-  static void _scanBrackets(String source, List<ValidationIssue> issues) {
-    const pairs = <String, String>{'}': '{', ')': '(', ']': '['};
-    final stack = <_Open>[];
-    var line = 1;
-    var i = 0;
-    final n = source.length;
-    while (i < n) {
-      final c = source[i];
-      if (c == '\n') {
-        line++;
-        i++;
-        continue;
-      }
-      if (c == '/' && i + 1 < n && source[i + 1] == '/') {
-        i += 2;
-        while (i < n && source[i] != '\n') {
-          i++;
-        }
-        continue;
-      }
-      if (c == '/' && i + 1 < n && source[i + 1] == '*') {
-        i += 2;
-        while (i + 1 < n && !(source[i] == '*' && source[i + 1] == '/')) {
-          if (source[i] == '\n') line++;
-          i++;
-        }
-        i = i + 2 <= n ? i + 2 : n;
-        continue;
-      }
-      if (c == '"' || c == "'") {
-        final quote = c;
-        i++;
-        while (i < n) {
-          if (source[i] == '\\') {
-            i += 2;
-            continue;
-          }
-          if (source[i] == '\n') line++;
-          if (source[i] == quote) {
-            i++;
-            break;
-          }
-          i++;
-        }
-        continue;
-      }
-      if (c == '{' || c == '(' || c == '[') {
-        stack.add(_Open(c, line));
-        i++;
-        continue;
-      }
-      if (pairs.containsKey(c)) {
-        final expected = pairs[c];
-        if (stack.isEmpty || stack.last.ch != expected) {
-          issues.add(ValidationIssue('Unexpected "$c".', line: line));
-        } else {
-          stack.removeLast();
-        }
-        i++;
-        continue;
-      }
-      i++;
-    }
-    for (final open in stack) {
-      issues.add(ValidationIssue('Unclosed "${open.ch}".', line: open.line));
-    }
-  }
-
-  static String _stripLiteralsAndComments(String source) {
-    final buffer = StringBuffer();
-    var i = 0;
-    final n = source.length;
-    while (i < n) {
-      final c = source[i];
-      if (c == '/' && i + 1 < n && source[i + 1] == '/') {
-        i += 2;
-        while (i < n && source[i] != '\n') {
-          i++;
-        }
-      } else if (c == '/' && i + 1 < n && source[i + 1] == '*') {
-        i += 2;
-        while (i + 1 < n && !(source[i] == '*' && source[i + 1] == '/')) {
-          i++;
-        }
-        i = i + 2 <= n ? i + 2 : n;
-      } else if (c == '"' || c == "'") {
-        final quote = c;
-        i++;
-        while (i < n) {
-          if (source[i] == '\\') {
-            i += 2;
-            continue;
-          }
-          if (source[i] == quote) {
-            i++;
-            break;
-          }
-          i++;
-        }
-      } else {
-        buffer.write(c);
-        i++;
-      }
-    }
-    return buffer.toString();
-  }
-
   static String _shorten(Object error) {
-    final text = error.toString().replaceFirst('XmlParserException: ', '');
+    var text = error.toString();
+    text = text.replaceFirst(RegExp(r'^Xml\w*Exception: '), '');
+    text = text.replaceFirst(RegExp(r' at \d+:\d+$'), '');
     final firstLine = text.split('\n').first.trim();
     return firstLine.isEmpty ? 'Invalid FXML.' : firstLine;
   }
