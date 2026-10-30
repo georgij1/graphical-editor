@@ -396,36 +396,7 @@ class _ProjectTreePanelState extends State<ProjectTreePanel> {
         dense: true,
         visualDensity: VisualDensity.compact,
         contentPadding: padding,
-        leading: _contextMenu(
-          context,
-          const Icon(Icons.description_outlined, size: 16),
-          <PopupMenuEntry<int>>[
-            PopupMenuItem<int>(
-              value: 1,
-              child: Text(context.tr('Open source')),
-            ),
-            const PopupMenuDivider(),
-            PopupMenuItem<int>(
-              value: 2,
-              child: Text(context.tr('Rename')),
-            ),
-            PopupMenuItem<int>(
-              value: 3,
-              child: Text(context.tr('Delete')),
-            ),
-          ],
-          (value) async {
-            if (value == 1) {
-              controller.showSource(
-                GeneratedFile(path: file.path, content: file.content ?? ''),
-              );
-            } else if (value == 2) {
-              _say(context, context.tr('Build file rename is not supported yet.'));
-            } else if (value == 3) {
-              _say(context, context.tr('Build file deletion is not supported yet.'));
-            }
-          },
-        ),
+        leading: const Icon(Icons.description_outlined, size: 16),
         title: Text(file.name, style: const TextStyle(fontSize: 12)),
         subtitle: Text(
           context.tr('generated on export'),
@@ -433,69 +404,13 @@ class _ProjectTreePanelState extends State<ProjectTreePanel> {
           overflow: TextOverflow.ellipsis,
         ),
       );
-      return tile;
-    }
-
-    if (file.isJava) {
-      final tile = ListTile(
-        dense: true,
-        visualDensity: VisualDensity.compact,
-        contentPadding: padding,
-        leading: _contextMenu(
-          context,
-          const Icon(Icons.data_object, size: 16),
-          <PopupMenuEntry<int>>[
-            PopupMenuItem<int>(
-              value: 1,
-              child: Text(context.tr('Open source')),
-            ),
-            const PopupMenuDivider(),
-            PopupMenuItem<int>(
-              value: 2,
-              child: Text(context.tr('Rename')),
-            ),
-            PopupMenuItem<int>(
-              value: 3,
-              child: Text(context.tr('Delete')),
-            ),
-          ],
-          (value) async {
-            if (value == 1) {
-              controller.showSource(
-                GeneratedFile(path: file.path, content: file.content ?? ''),
-              );
-            } else if (value == 2) {
-              _say(context, context.tr('Java file rename is not supported yet.'));
-            } else if (value == 3) {
-              _say(context, context.tr('Java file deletion is not supported yet.'));
-            }
-          },
-        ),
-        title: Text(file.name, style: const TextStyle(fontSize: 12)),
-        onTap: () => controller.showSource(
-          GeneratedFile(path: file.path, content: file.content ?? ''),
-        ),
-      );
-      return tile;
-    }
-
-    final scene = file.scene!;
-    final active = identical(controller.activeScene, scene);
-    final controllerClass = scene.controllerClass;
-    final tile = ListTile(
-      dense: true,
-      visualDensity: VisualDensity.compact,
-      contentPadding: padding,
-      selected: active,
-      selectedTileColor:
-          Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.4),
-      leading: _contextMenu(
+      return _contextMenu(
         context,
-        const Icon(Icons.description_outlined, size: 16),
+        tile,
         <PopupMenuEntry<int>>[
           PopupMenuItem<int>(
             value: 1,
-            child: Text(context.tr('Open in editor')),
+            child: Text(context.tr('Open source')),
           ),
           const PopupMenuDivider(),
           PopupMenuItem<int>(
@@ -509,15 +424,72 @@ class _ProjectTreePanelState extends State<ProjectTreePanel> {
         ],
         (value) async {
           if (value == 1) {
-            controller.openScene(scene);
-            controller.setCodeMode(false);
+            controller.showSource(
+              GeneratedFile(path: file.path, content: file.content ?? ''),
+            );
           } else if (value == 2) {
-            widget.onRenameScene(scene);
+            _say(context, context.tr('Build file rename is not supported yet.'));
           } else if (value == 3) {
-            widget.onDeleteScene(scene);
+            _say(context, context.tr('Build file deletion is not supported yet.'));
           }
         },
-      ),
+      );
+    }
+
+    if (file.isJava) {
+      final tile = ListTile(
+        dense: true,
+        visualDensity: VisualDensity.compact,
+        contentPadding: padding,
+        leading: const Icon(Icons.data_object, size: 16),
+        title: Text(file.name, style: const TextStyle(fontSize: 12)),
+        onTap: () => controller.showSource(
+          GeneratedFile(path: file.path, content: file.content ?? ''),
+        ),
+      );
+      return _contextMenu(
+        context,
+        tile,
+        <PopupMenuEntry<int>>[
+          PopupMenuItem<int>(
+            value: 1,
+            child: Text(context.tr('Open source')),
+          ),
+          const PopupMenuDivider(),
+          PopupMenuItem<int>(
+            value: 2,
+            child: Text(context.tr('Rename')),
+          ),
+          PopupMenuItem<int>(
+            value: 3,
+            child: Text(context.tr('Delete')),
+          ),
+        ],
+        (value) async {
+          if (value == 1) {
+            controller.showSource(
+              GeneratedFile(path: file.path, content: file.content ?? ''),
+            );
+          } else if (value == 2) {
+            _say(context, context.tr('Java file rename is not supported yet.'));
+          } else if (value == 3) {
+            _say(context, context.tr('Java file deletion is not supported yet.'));
+          }
+        },
+      );
+    }
+
+    final scene = file.scene!;
+    final active = identical(controller.activeScene, scene);
+    final controllerClass = scene.controllerClass;
+    final tile = ListTile(
+      dense: true,
+      visualDensity: VisualDensity.compact,
+      contentPadding: padding,
+      selected: active,
+      selectedTileColor:
+          Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.4),
+      leading: const Icon(Icons.description_outlined, size: 16),
       title: Text(file.name, style: const TextStyle(fontSize: 12)),
       subtitle: controllerClass == null || controllerClass.isEmpty
           ? null
@@ -531,7 +503,35 @@ class _ProjectTreePanelState extends State<ProjectTreePanel> {
         controller.setCodeMode(false);
       },
     );
-    return tile;
+    return _contextMenu(
+      context,
+      tile,
+      <PopupMenuEntry<int>>[
+        PopupMenuItem<int>(
+          value: 1,
+          child: Text(context.tr('Open in editor')),
+        ),
+        const PopupMenuDivider(),
+        PopupMenuItem<int>(
+          value: 2,
+          child: Text(context.tr('Rename')),
+        ),
+        PopupMenuItem<int>(
+          value: 3,
+          child: Text(context.tr('Delete')),
+        ),
+      ],
+      (value) async {
+        if (value == 1) {
+          controller.openScene(scene);
+          controller.setCodeMode(false);
+        } else if (value == 2) {
+          widget.onRenameScene(scene);
+        } else if (value == 3) {
+          widget.onDeleteScene(scene);
+        }
+      },
+    );
   }
 
   void _say(BuildContext context, String text) {
