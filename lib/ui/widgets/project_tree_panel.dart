@@ -209,8 +209,10 @@ class _ProjectTreePanelState extends State<ProjectTreePanel> {
     final widgets = <Widget>[
       for (final child in _sortedDirs(dir))
         _directoryTile(context, project, child, depth),
+      // Файлы отображаются на один уровень глубже родительской папки,
+      // как в обычном IDE: папка «содержит» файлы, поэтому они сдвинуты вправо.
       for (final file in _sortedFiles(dir))
-        _fileTile(context, project, file, depth),
+        _fileTile(context, project, file, depth + 1),
     ];
     return widgets;
   }
@@ -239,7 +241,12 @@ class _ProjectTreePanelState extends State<ProjectTreePanel> {
     final tile = InkWell(
       onTap: empty ? null : () => _toggle(dir.path),
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 6),
+        padding: EdgeInsets.only(
+          left: 6 + depth * 14.0,
+          right: 6,
+          top: 6,
+          bottom: 6,
+        ),
         child: Row(
           children: <Widget>[
             if (!empty)
