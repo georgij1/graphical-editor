@@ -100,8 +100,8 @@ class EditorToolbar extends StatelessWidget {
 
         // Scrolling is only a safety net for very narrow windows: on a normal
         // one the groups above already fit.
-        return SizedBox(
-          width: budget,
+        return ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: budget),
           child: ClipRect(
             child: SingleChildScrollView(
               scrollDirection: Axis.horizontal,
