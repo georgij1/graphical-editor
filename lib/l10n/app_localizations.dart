@@ -348,6 +348,11 @@ class AppLocalizations {
     'Java package': 'Java-пакет',
     'Main class': 'Главный класс',
     'Invalid Java package': 'Недопустимый Java-пакет',
+    'Java file': 'Java-файл',
+    'Invalid Java class name.':
+        'Недопустимое имя Java-класса: допустимы только идентификаторы, не являющиеся зарезервированными словами.',
+    'Class name already in use.': 'Имя класса уже занято другим классом.',
+    'Java file not found.': 'Java-файл не найден.',
     'Package cannot be empty.': 'Пакет не может быть пустым.',
     'Package must not start or end with a dot.':
         'Пакет не может начинаться или заканчиваться точкой.',

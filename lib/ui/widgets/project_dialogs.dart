@@ -95,35 +95,57 @@ Future<String?> showPromptDialog(
   required String title,
   required String initial,
 }) {
-  final textController = TextEditingController(text: initial);
   return showDialog<String>(
     context: context,
-    builder: (context) {
-      return AlertDialog(
-        title: Text(title),
-        content: TextField(
-          controller: textController,
-          autofocus: true,
-          decoration: InputDecoration(
-            border: OutlineInputBorder(),
-            isDense: true,
-          ),
-          onSubmitted: (value) =>
-              Navigator.of(context).pop(textController.text),
+    builder: (context) => _PromptDialog(title: title, initial: initial),
+  );
+}
+
+class _PromptDialog extends StatefulWidget {
+  const _PromptDialog({required this.title, required this.initial});
+
+  final String title;
+  final String initial;
+
+  @override
+  State<_PromptDialog> createState() => _PromptDialogState();
+}
+
+class _PromptDialogState extends State<_PromptDialog> {
+  late final TextEditingController _text =
+      TextEditingController(text: widget.initial);
+
+  @override
+  void dispose() {
+    _text.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text(widget.title),
+      content: TextField(
+        controller: _text,
+        autofocus: true,
+        decoration: InputDecoration(
+          border: OutlineInputBorder(),
+          isDense: true,
         ),
-        actions: <Widget>[
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: Text(context.tr('Cancel')),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(textController.text),
-            child: Text(context.tr('OK')),
-          ),
-        ],
-      );
-    },
-  ).whenComplete(textController.dispose);
+        onSubmitted: (value) => Navigator.of(context).pop(_text.text),
+      ),
+      actions: <Widget>[
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: Text(context.tr('Cancel')),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.of(context).pop(_text.text),
+          child: Text(context.tr('OK')),
+        ),
+      ],
+    );
+  }
 }
 
 /// Yes/no confirmation dialog. Returns false when dismissed.

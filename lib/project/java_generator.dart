@@ -9,6 +9,27 @@ class GeneratedFile {
 class JavaGenerator {
   static String packageDir(Project p) => p.package.replaceAll('.', '/');
 
+  /// Java reserved words that cannot be used as a class name.
+  static const Set<String> _keywords = {
+    'abstract', 'assert', 'boolean', 'break', 'byte', 'case', 'catch',
+    'char', 'class', 'const', 'continue', 'default', 'do', 'double', 'else',
+    'enum', 'extends', 'final', 'finally', 'float', 'for', 'goto', 'if',
+    'implements', 'import', 'instanceof', 'int', 'interface', 'long',
+    'native', 'new', 'package', 'private', 'protected', 'public', 'return',
+    'short', 'static', 'strictfp', 'super', 'switch', 'synchronized', 'this',
+    'throw', 'throws', 'transient', 'try', 'void', 'volatile', 'while',
+    'true', 'false', 'null', 'var', 'record', 'yield', 'sealed',
+    'permits', 'non-sealed',
+  };
+
+  /// True when [name] is a legal Java class name: a plain identifier that is
+  /// not a reserved word. Used before renaming generated sources so the
+  /// exported project always compiles.
+  static bool isValidClassName(String name) {
+    if (!RegExp(r'^[A-Za-z_$][A-Za-z0-9_$]*$').hasMatch(name)) return false;
+    return !_keywords.contains(name);
+  }
+
   /// Generates the Java sources of a runnable JavaFX application:
   /// an [Application] launcher plus one controller per scene.
   ///

@@ -1784,6 +1784,121 @@ class EditorController extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Renames a generated Java source: the launcher (`project.mainClass`) or
+  /// a scene controller (`scene.controllerClass` plus the `fx:controller`
+  /// attribute of the scene's FXML).
+  ///
+  /// Returns null on success, otherwise a localization key describing the
+  /// problem (invalid name, collision, unknown file).
+  String? renameJavaFile(String path, String newName) {
+    final project = _currentProject;
+    if (project == null) return 'Java file not found.';
+
+    final name = newName.trim();
+    if (!JavaGenerator.isValidClassName(name)) {
+      return 'Invalid Java class name.';
+    }
+
+    final simple = path.endsWith('.java')
+        ? path.substring(path.lastIndexOf('/') + 1, path.length - 5)
+        : '';
+    if (simple.isEmpty) return 'Java file not found.';
+
+    // Collect the simple names already taken by other generated classes.
+    final controllers = <SceneFile, String>{};
+    for (final scene in project.scenes) {
+      final c = (scene.controllerClass ?? '').trim();
+      if (c.isEmpty) continue;
+      controllers[scene] = c.contains('.') ? c.substring(c.lastIndexOf('.') + 1) : c;
+    }
+
+    final isLauncher = simple == project.mainClass &&
+        path.endsWith('/${project.mainClass}.java');
+
+    SceneFile? scene;
+    if (!isLauncher) {
+      for (final entry in controllers.entries) {
+        if (entry.value == simple &&
+            path.endsWith('/$simple.java')) {
+          scene = entry.key;
+          break;
+        }
+      }
+      if (scene == null) return 'Java file not found.';
+    }
+
+    if (name == simple) return null; // nothing to do
+
+    // Collision with any other generated class.
+    final taken = controllers.values.toSet()..add(project.mainClass);
+    if (name == project.mainClass && !isLauncher) {
+      return 'Class name already in use.';
+    }
+    if (name != project.mainClass && taken.contains(name)) {
+      return 'Class name already in use.';
+    }
+    final simpleNames = controllers.entries
+        .where((e) => !identical(e.key, scene))
+        .map((e) => e.value)
+        .toSet();
+    if (simpleNames.contains(name)) return 'Class name already in use.';
+
+    final pkg = project.package;
+    final newFqn = pkg.isEmpty ? name : '$pkg.$name';
+    final oldPath = path;
+    final newPath = '${path.substring(0, path.lastIndexOf('/') + 1)}$name.java';
+
+    if (isLauncher) {
+      project.mainClass = name;
+      // Carry over a hand-edited source, fixing the class name inside it.
+      final override = project.sourceOverrides.remove(oldPath);
+      if (override != null) {
+        project.sourceOverrides[newPath] = override.replaceAll(
+          RegExp(r'\b' + RegExp.escape(simple) + r'\b'),
+          name,
+        );
+      }
+    } else {
+      final target = scene!;
+      final oldFqn = (target.controllerClass ?? '').trim();
+      target.controllerClass = newFqn;
+      if (target.fxml.contains('fx:controller')) {
+        target.fxml = target.fxml.replaceFirst(
+          RegExp(r'fx:controller\s*=\s*"[^"]*"'),
+          'fx:controller="$newFqn"',
+        );
+      }
+      // Keep the in-memory document of the active scene in sync.
+      if (identical(_activeScene, target)) {
+        _document.root.attributes['fx:controller'] = newFqn;
+      }
+      // Carry over a hand-edited source, fixing the class name inside it.
+      final override = project.sourceOverrides.remove(oldPath);
+      if (override != null) {
+        project.sourceOverrides[newPath] = oldFqn.isEmpty
+            ? override
+            : override.replaceAll(
+                RegExp(r'\b' + RegExp.escape(oldFqn.split('.').last) + r'\b'),
+                name,
+              );
+      }
+    }
+
+    // Keep the open code editor pointed at the renamed file.
+    final open = _openSource;
+    if (open != null && open.path == oldPath) {
+      _openSource = GeneratedFile(
+        path: newPath,
+        content: project.sourceOverrides[newPath] ?? open.content,
+      );
+      _codeEpoch++;
+    }
+
+    _persist();
+    notifyListeners();
+    return null;
+  }
+
   /// Transfers project ownership to another participant. Only the current
   /// owner may do this, and the new owner must already take part in the
   /// project.

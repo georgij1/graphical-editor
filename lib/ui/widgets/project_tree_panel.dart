@@ -101,53 +101,59 @@ class _ProjectTreePanelState extends State<ProjectTreePanel> {
   Widget build(BuildContext context) {
     final project = controller.currentProject;
     if (project == null) return const SizedBox.shrink();
-    final root = _buildTree(project);
     return SingleChildScrollView(
       padding: const EdgeInsets.only(bottom: 12),
       physics: const ClampingScrollPhysics(),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: <Widget>[
-          ListenableBuilder(
-            listenable: controller,
-            builder: (context, _) {
-              final allCollapsed = _allCollapsed(root, isRoot: true);
-              final label = allCollapsed
-                  ? context.tr('Expand all')
-                  : context.tr('Collapse all');
-              return Padding(
-                padding: const EdgeInsets.fromLTRB(6, 4, 6, 2),
-                child: Row(
-                  children: <Widget>[
-                    IconButton(
-                      tooltip: label,
-                      icon: Icon(
-                        allCollapsed ? Icons.unfold_more : Icons.unfold_less,
-                        size: 16,
+      child: ListenableBuilder(
+        // The tree content (folders, Java sources, scenes) is derived from
+        // the model, so it must rebuild with every controller change —
+        // renaming a class, a scene, adding files and so on.
+        listenable: controller,
+        builder: (context, _) {
+          final projectNow = controller.currentProject ?? project;
+          final root = _buildTree(projectNow);
+          return Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: <Widget>[
+              Builder(builder: (context) {
+                final allCollapsed = _allCollapsed(root, isRoot: true);
+                final label = allCollapsed
+                    ? context.tr('Expand all')
+                    : context.tr('Collapse all');
+                return Padding(
+                  padding: const EdgeInsets.fromLTRB(6, 4, 6, 2),
+                  child: Row(
+                    children: <Widget>[
+                      IconButton(
+                        tooltip: label,
+                        icon: Icon(
+                          allCollapsed ? Icons.unfold_more : Icons.unfold_less,
+                          size: 16,
+                        ),
+                        visualDensity: VisualDensity.compact,
+                        onPressed: () {
+                          if (allCollapsed) {
+                            _expandAll(root);
+                          } else {
+                            _collapseAll(root);
+                          }
+                        },
                       ),
-                      visualDensity: VisualDensity.compact,
-                      onPressed: () {
-                        if (allCollapsed) {
-                          _expandAll(root);
-                        } else {
-                          _collapseAll(root);
-                        }
-                      },
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      label,
-                      style: const TextStyle(fontSize: 12),
-                    ),
-                  ],
-                ),
-              );
-            },
-          ),
-          const Divider(height: 1),
-          ..._renderChildren(context, project, root, 0),
-        ],
+                      const SizedBox(width: 4),
+                      Text(
+                        label,
+                        style: const TextStyle(fontSize: 12),
+                      ),
+                    ],
+                  ),
+                );
+              }),
+              const Divider(height: 1),
+              ..._renderChildren(context, projectNow, root, 0),
+            ],
+          );
+        },
       ),
     );
   }
@@ -471,7 +477,19 @@ class _ProjectTreePanelState extends State<ProjectTreePanel> {
               GeneratedFile(path: file.path, content: file.content ?? ''),
             );
           } else if (value == 2) {
-            _say(context, context.tr('Java file rename is not supported yet.'));
+            final current = file.name.endsWith('.java')
+                ? file.name.substring(0, file.name.length - 5)
+                : file.name;
+            final newName = await showPromptDialog(
+              context,
+              title: '${context.tr('Rename')} — ${context.tr('Java file')}',
+              initial: current,
+            );
+            if (newName == null || !context.mounted) return;
+            final error = controller.renameJavaFile(file.path, newName);
+            if (error != null && context.mounted) {
+              _say(context, context.tr(error));
+            }
           } else if (value == 3) {
             _say(context, context.tr('Java file deletion is not supported yet.'));
           }

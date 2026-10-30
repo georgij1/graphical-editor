@@ -1,3 +1,4 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:graphical_editor/editor/editor_controller.dart';
@@ -102,6 +103,55 @@ void main() {
     expect(controller.codeMode, isTrue);
     expect(controller.openSource!.path, endsWith('MainApp.java'));
     expect(controller.openSource!.content, contains('class MainApp'));
+    expect(find.byType(AlertDialog), findsNothing);
+  });
+
+  testWidgets('right-click on a Java file and rename it through the dialog',
+      (tester) async {
+    final controller = standaloneController()
+      ..createProject(
+        name: 'TreeApp',
+        package: 'com.example.tree',
+        mainClass: 'MainApp',
+      );
+
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: ProjectTreePanel(
+          controller: controller,
+          onRenameScene: (_) {},
+          onDeleteScene: (_) {},
+        ),
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    // Right-click anywhere on the Java file row (not only the icon).
+    final row = tester.getRect(find.text('MainApp.java'));
+    await tester.tapAt(
+      row.center,
+      buttons: kSecondaryMouseButton,
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Rename'), findsOneWidget);
+
+    await tester.tap(find.text('Rename'));
+    await tester.pumpAndSettle();
+    expect(find.byType(AlertDialog), findsOneWidget);
+
+    await tester.enterText(
+      find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.byType(TextField),
+      ),
+      'Launcher',
+    );
+    await tester.tap(find.widgetWithText(FilledButton, 'OK'));
+    await tester.pumpAndSettle();
+
+    expect(controller.currentProject!.mainClass, 'Launcher');
+    expect(find.text('Launcher.java'), findsOneWidget);
+    expect(find.text('MainApp.java'), findsNothing);
     expect(find.byType(AlertDialog), findsNothing);
   });
 

@@ -105,6 +105,104 @@ void main() {
       expect(project.scenes.single.name, 'main');
     });
 
+    group('renameJavaFile', () {
+      test('renames the launcher class and regenerates its path', () {
+        controller.createProject(name: 'P', mainClass: 'MainApp');
+        final project = controller.projects.single;
+        final error = controller.renameJavaFile(
+          'src/main/java/com/example/MainApp.java',
+          'Launcher',
+        );
+        expect(error, isNull);
+        expect(project.mainClass, 'Launcher');
+        final paths =
+            JavaGenerator.generate(project).map((f) => f.path).toList();
+        expect(paths, contains('src/main/java/com/example/Launcher.java'));
+        expect(paths, isNot(contains('src/main/java/com/example/MainApp.java')));
+      });
+
+      test('renames a scene controller and fixes fx:controller', () {
+        controller.createProject(name: 'P', mainClass: 'MainApp');
+        final project = controller.projects.single;
+        final scene = project.scenes.first;
+        expect(scene.controllerClass, 'com.example.MainAppController');
+
+        final error = controller.renameJavaFile(
+          'src/main/java/com/example/MainAppController.java',
+          'DashboardController',
+        );
+        expect(error, isNull);
+        expect(scene.controllerClass, 'com.example.DashboardController');
+        expect(
+          scene.fxml,
+          contains('fx:controller="com.example.DashboardController"'),
+        );
+        final paths =
+            JavaGenerator.generate(project).map((f) => f.path).toList();
+        expect(
+          paths,
+          contains('src/main/java/com/example/DashboardController.java'),
+        );
+      });
+
+      test('moves a hand-edited source to the new class name', () {
+        controller.createProject(name: 'P', mainClass: 'MainApp');
+        final project = controller.projects.single;
+        const oldPath = 'src/main/java/com/example/MainAppController.java';
+        controller.applyJavaSource(
+          oldPath,
+          'package com.example;\n\npublic class MainAppController {}\n',
+        );
+        expect(project.sourceOverrides.containsKey(oldPath), isTrue);
+
+        final error =
+            controller.renameJavaFile(oldPath, 'DashboardController');
+        expect(error, isNull);
+        expect(project.sourceOverrides.containsKey(oldPath), isFalse);
+        final moved = project.sourceOverrides[
+            'src/main/java/com/example/DashboardController.java'];
+        expect(moved, isNotNull);
+        expect(moved, contains('class DashboardController'));
+        expect(moved, isNot(contains('class MainAppController')));
+      });
+
+      test('rejects invalid names, keywords and collisions', () {
+        controller.createProject(name: 'P', mainClass: 'MainApp');
+        final project = controller.projects.single;
+        final launcher = 'src/main/java/com/example/MainApp.java';
+
+        expect(
+          controller.renameJavaFile(launcher, '1Bad'),
+          'Invalid Java class name.',
+        );
+        expect(
+          controller.renameJavaFile(launcher, 'class'),
+          'Invalid Java class name.',
+        );
+        expect(
+          controller.renameJavaFile(launcher, 'main app'),
+          'Invalid Java class name.',
+        );
+        // Collides with the main class of another generated file.
+        expect(
+          controller.renameJavaFile(
+            'src/main/java/com/example/MainAppController.java',
+            'MainApp',
+          ),
+          'Class name already in use.',
+        );
+        // Unknown file.
+        expect(
+          controller.renameJavaFile('src/main/java/com/example/Ghost.java', 'X'),
+          'Java file not found.',
+        );
+        // Nothing changed by the failed attempts.
+        expect(project.mainClass, 'MainApp');
+        expect(project.scenes.first.controllerClass,
+            'com.example.MainAppController');
+      });
+    });
+
     test('workspace round-trips through storage', () async {
       controller.createProject(name: 'Persist', mainClass: 'App');
       controller.newScene('two');
