@@ -202,9 +202,17 @@ class EditorController extends ChangeNotifier {
   int get nodeCount => _document.allNodes.length;
 
   String get displayTitle {
-    if (_codeMode) return codePath;
-    final scene = _activeScene;
     final project = _currentProject;
+    if (_codeMode) {
+      if (project != null) {
+        return project.name;
+      }
+      if (_standaloneOpen) {
+        return '${_fileName ?? "Untitled"}.fxml${_dirty ? " •" : ""}';
+      }
+      return codePath;
+    }
+    final scene = _activeScene;
     if (project != null && scene != null) {
       return '${project.name}/${scene.name}.fxml${_dirty ? " •" : ""}';
     }
