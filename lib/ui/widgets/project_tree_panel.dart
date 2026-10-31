@@ -172,6 +172,7 @@ class _ProjectTreePanelState extends State<ProjectTreePanel> {
       SceneFile? scene,
       required bool isJava,
       bool isBuildFile = false,
+      bool isXml = false,
     }) {
       final parts = path.split('/');
       var dir = root;
@@ -189,6 +190,7 @@ class _ProjectTreePanelState extends State<ProjectTreePanel> {
           scene: scene,
           isJava: isJava,
           isBuildFile: isBuildFile,
+          isXml: isXml,
         ),
       );
     }
@@ -202,6 +204,7 @@ class _ProjectTreePanelState extends State<ProjectTreePanel> {
         content: project.sourceOverrides[file.path] ?? file.content,
         isJava: false,
         isBuildFile: true,
+        isXml: file.path.endsWith('.xml'),
       );
     }
     addFile(
@@ -217,6 +220,7 @@ class _ProjectTreePanelState extends State<ProjectTreePanel> {
         content: scene.fxml,
         scene: scene,
         isJava: false,
+        isXml: true,
       );
     }
     return root;
@@ -433,7 +437,11 @@ class _ProjectTreePanelState extends State<ProjectTreePanel> {
         leading: const Icon(Icons.description_outlined, size: 16),
         title: Text(file.name, style: const TextStyle(fontSize: 12)),
         onTap: () => controller.showSource(
-          GeneratedFile(path: file.path, content: file.content ?? ''),
+          GeneratedFile(
+            path: file.path,
+            content: file.content ?? '',
+            isXml: file.path.endsWith('.xml'),
+          ),
         ),
       );
       return _contextMenu(
@@ -445,7 +453,11 @@ class _ProjectTreePanelState extends State<ProjectTreePanel> {
         (value) async {
           if (value == 1) {
             controller.showSource(
-              GeneratedFile(path: file.path, content: file.content ?? ''),
+              GeneratedFile(
+                path: file.path,
+                content: file.content ?? '',
+                isXml: file.path.endsWith('.xml'),
+              ),
             );
           }
         },
@@ -460,7 +472,11 @@ class _ProjectTreePanelState extends State<ProjectTreePanel> {
         leading: const Icon(Icons.data_object, size: 16),
         title: Text(file.name, style: const TextStyle(fontSize: 12)),
         onTap: () => controller.showSource(
-          GeneratedFile(path: file.path, content: file.content ?? ''),
+          GeneratedFile(
+            path: file.path,
+            content: file.content ?? '',
+            isJava: true,
+          ),
         ),
       );
       return _contextMenu(
@@ -475,7 +491,11 @@ class _ProjectTreePanelState extends State<ProjectTreePanel> {
         (value) async {
           if (value == 1) {
             controller.showSource(
-              GeneratedFile(path: file.path, content: file.content ?? ''),
+              GeneratedFile(
+                path: file.path,
+                content: file.content ?? '',
+                isJava: true,
+              ),
             );
           } else if (value == 2) {
             final current = file.name.endsWith('.java')
@@ -571,6 +591,7 @@ class _FileNode {
     this.content,
     this.scene,
     this.isBuildFile = false,
+    this.isXml = false,
   });
 
   final String name;
@@ -582,4 +603,7 @@ class _FileNode {
   /// Generated project files (build configuration, README) that are written on
   /// export rather than edited on the canvas.
   final bool isBuildFile;
+
+  /// True for XML files (FXML scenes, pom.xml) validated as XML.
+  final bool isXml;
 }

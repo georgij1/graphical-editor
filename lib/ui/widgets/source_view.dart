@@ -25,13 +25,19 @@ class _CodeViewState extends State<CodeView> {
   late ValidationResult _validation = _validate(_text.text);
   bool _dirty = false;
 
-  bool get _isJava => widget.controller.codeIsJava;
+  bool get _isJava => widget.controller.codeIsJavaSource;
+  bool get _isXml =>
+      widget.controller.codeIsXmlSource || widget.controller.openSource == null;
 
-  ValidationResult _validate(String source) => CodeValidator.validate(
-    isJava: _isJava,
-    source: source,
-    path: _isJava ? widget.controller.codePath : null,
-  );
+  ValidationResult _validate(String source) {
+    if (_isJava) {
+      return CodeValidator.validateJava(source, path: widget.controller.codePath);
+    }
+    if (_isXml) {
+      return CodeValidator.validateFxml(source);
+    }
+    return ValidationResult.valid;
+  }
 
   @override
   void initState() {
@@ -71,7 +77,6 @@ class _CodeViewState extends State<CodeView> {
       );
       return false;
     }
-    final isJava = controller.codeIsJava;
     final ok = controller.applyCode(_text.text);
     setState(() {
       _dirty = !ok;
@@ -79,9 +84,11 @@ class _CodeViewState extends State<CodeView> {
     });
     _showMessage(
       ok
-          ? (isJava
+          ? (_isJava
                 ? context.tr('Java source applied.')
-                : context.tr('FXML applied.'))
+                : (_isXml
+                      ? context.tr('FXML applied.')
+                      : context.tr('Source applied.')))
           : context.tr('Invalid FXML — not applied.'),
     );
     return ok;

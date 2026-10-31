@@ -231,6 +231,12 @@ class EditorController extends ChangeNotifier {
   /// True when the editor shows a generated Java source (read from the tree).
   bool get codeIsJava => _openSource != null;
 
+  /// True when the opened source is a Java file (validated as Java).
+  bool get codeIsJavaSource => _openSource?.isJava ?? false;
+
+  /// True when the opened source is an XML file (validated as XML).
+  bool get codeIsXmlSource => _openSource?.isXml ?? false;
+
   /// The current text of the file shown by the code editor. For FXML this is
   /// derived from the live document; for Java it is the (possibly overridden)
   /// generated source.

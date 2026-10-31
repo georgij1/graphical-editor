@@ -1,9 +1,21 @@
 import 'project.dart';
 
 class GeneratedFile {
-  GeneratedFile({required this.path, required this.content});
+  GeneratedFile({
+    required this.path,
+    required this.content,
+    bool? isJava,
+    bool? isXml,
+  })  : isJava = isJava ?? path.endsWith('.java'),
+        isXml = isXml ?? (path.endsWith('.xml') || path.endsWith('.fxml'));
   final String path;
   final String content;
+
+  /// True for generated Java sources that should be validated as Java.
+  final bool isJava;
+
+  /// True for XML files (FXML, pom.xml, ...) that should be validated as XML.
+  final bool isXml;
 }
 
 class JavaGenerator {
@@ -49,6 +61,7 @@ class JavaGenerator {
       content: _resolve(p, mainPath, _mainClass(p, mainScene.name,
           kioskMode: kioskMode),
           applyOverrides: applyOverrides),
+      isJava: true,
     ));
     for (final scene in scenes) {
       final c = scene.controllerClass;
@@ -59,6 +72,7 @@ class JavaGenerator {
         path: path,
         content: _resolve(p, path, _controller(p.package, simple),
             applyOverrides: applyOverrides),
+        isJava: true,
       ));
     }
     return files;
