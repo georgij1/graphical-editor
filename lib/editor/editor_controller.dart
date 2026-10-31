@@ -422,7 +422,25 @@ class EditorController extends ChangeNotifier {
   void setCodeMode(bool value) {
     if (_codeMode == value) return;
     _codeMode = value;
-    if (value) _codeEpoch++;
+    if (value) {
+      // Opening code mode for a scene creates a tab for its FXML, just like
+      // opening a Java/build file from the tree.
+      if (_openSource == null && _currentProject != null && _activeScene != null) {
+        final path = codePath;
+        final content = serialize();
+        final file = GeneratedFile(path: path, content: content, isXml: true, isFxml: true);
+        final idx = _openTabs.indexWhere((f) => f.path == path);
+        if (idx >= 0) {
+          _openTabs[idx] = file;
+          _activeTabIndex = idx;
+        } else {
+          _openTabs.add(file);
+          _activeTabIndex = _openTabs.length - 1;
+        }
+        _openSource = _openTabs[_activeTabIndex];
+      }
+      _codeEpoch++;
+    }
     notifyListeners();
   }
 
@@ -443,23 +461,7 @@ class EditorController extends ChangeNotifier {
   }
 
   /// Opens the active scene's FXML source for editing in the code editor.
-  void editSceneSource() {
-    final path = codePath;
-    final content = serialize();
-    final file = GeneratedFile(path: path, content: content, isXml: true, isFxml: true);
-    final idx = _openTabs.indexWhere((f) => f.path == path);
-    if (idx >= 0) {
-      _openTabs[idx] = file;
-      _activeTabIndex = idx;
-    } else {
-      _openTabs.add(file);
-      _activeTabIndex = _openTabs.length - 1;
-    }
-    _openSource = _openTabs[_activeTabIndex];
-    _codeMode = true;
-    _codeEpoch++;
-    notifyListeners();
-  }
+  void editSceneSource() => setCodeMode(true);
 
   /// Stops showing a generated Java file (the code editor falls back to the
   /// active scene's FXML).

@@ -214,12 +214,11 @@ class _CodeViewState extends State<CodeView> {
                     style: const TextStyle(fontSize: 12),
                   ),
                 ),
-                if (isJava)
+                if (controller.codeIsJava || controller.codeMode)
                   IconButton(
                     tooltip: context.tr('Back to canvas'),
                     onPressed: () {
                       controller.closeSource();
-                      controller.setCodeMode(false);
                     },
                     icon: const Icon(Icons.close, size: 18),
                     visualDensity: VisualDensity.compact,
