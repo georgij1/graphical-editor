@@ -6,8 +6,10 @@ class GeneratedFile {
     required this.content,
     bool? isJava,
     bool? isXml,
+    bool? isFxml,
   })  : isJava = isJava ?? path.endsWith('.java'),
-        isXml = isXml ?? (path.endsWith('.xml') || path.endsWith('.fxml'));
+        isXml = isXml ?? (path.endsWith('.xml') || path.endsWith('.fxml')),
+        isFxml = isFxml ?? path.endsWith('.fxml');
   final String path;
   final String content;
 
@@ -16,6 +18,9 @@ class GeneratedFile {
 
   /// True for XML files (FXML, pom.xml, ...) that should be validated as XML.
   final bool isXml;
+
+  /// True for FXML scene files edited via the code editor.
+  final bool isFxml;
 }
 
 class JavaGenerator {
