@@ -132,6 +132,8 @@ class EditorController extends ChangeNotifier {
   String? _looseDocumentName;
   bool _dirty = false;
   GeneratedFile? _openSource;
+  final List<GeneratedFile> _openTabs = <GeneratedFile>[];
+  int _activeTabIndex = -1;
   bool _codeMode = false;
   int _codeEpoch = 0;
   double _zoom = 1.0;
@@ -158,6 +160,12 @@ class EditorController extends ChangeNotifier {
   String? get fileName => _fileName;
   bool get dirty => _dirty;
   GeneratedFile? get openSource => _openSource;
+
+  /// Files currently open in tabs in the code editor.
+  List<GeneratedFile> get openTabs => List<GeneratedFile>.unmodifiable(_openTabs);
+
+  /// Index of the active tab, or -1 when editing a scene's FXML directly.
+  int get activeTabIndex => _activeTabIndex;
 
   /// The up-to-date validation of the open project, or null when no project
   /// is open.
@@ -236,8 +244,10 @@ class EditorController extends ChangeNotifier {
     return '${_fileName ?? "untitled"}.fxml';
   }
 
-  /// True when the editor shows a generated Java source (read from the tree).
-  bool get codeIsJava => _openSource != null;
+  /// True when the editor shows a generated source (read from the tree) that
+  /// has no visual canvas form (Java or build files). FXML scenes keep their
+  /// Canvas/Code switch even in code mode.
+  bool get codeIsJava => _openSource != null && !(_openSource!.isFxml);
 
   /// True when the opened source is a Java file (validated as Java).
   bool get codeIsJavaSource => _openSource?.isJava ?? false;
@@ -418,7 +428,15 @@ class EditorController extends ChangeNotifier {
 
   /// Opens a generated Java file for editing in the code editor.
   void showSource(GeneratedFile file) {
-    _openSource = file;
+    final idx = _openTabs.indexWhere((f) => f.path == file.path);
+    if (idx >= 0) {
+      _openTabs[idx] = file;
+      _activeTabIndex = idx;
+    } else {
+      _openTabs.add(file);
+      _activeTabIndex = _openTabs.length - 1;
+    }
+    _openSource = _openTabs[_activeTabIndex];
     _codeMode = true;
     _codeEpoch++;
     notifyListeners();
@@ -426,7 +444,18 @@ class EditorController extends ChangeNotifier {
 
   /// Opens the active scene's FXML source for editing in the code editor.
   void editSceneSource() {
-    _openSource = null;
+    final path = codePath;
+    final content = serialize();
+    final file = GeneratedFile(path: path, content: content, isXml: true, isFxml: true);
+    final idx = _openTabs.indexWhere((f) => f.path == path);
+    if (idx >= 0) {
+      _openTabs[idx] = file;
+      _activeTabIndex = idx;
+    } else {
+      _openTabs.add(file);
+      _activeTabIndex = _openTabs.length - 1;
+    }
+    _openSource = _openTabs[_activeTabIndex];
     _codeMode = true;
     _codeEpoch++;
     notifyListeners();
@@ -435,8 +464,56 @@ class EditorController extends ChangeNotifier {
   /// Stops showing a generated Java file (the code editor falls back to the
   /// active scene's FXML).
   void closeSource() {
-    if (_openSource == null) return;
+    if (_activeTabIndex >= 0 && _activeTabIndex < _openTabs.length) {
+      closeTab(_activeTabIndex);
+      return;
+    }
     _openSource = null;
+    _activeTabIndex = -1;
+    _codeMode = false;
+    _codeEpoch++;
+    notifyListeners();
+  }
+
+  /// Closes the tab at [index].
+  void closeTab(int index) {
+    if (index < 0 || index >= _openTabs.length) return;
+    _openTabs.removeAt(index);
+    if (_openTabs.isEmpty) {
+      _openSource = null;
+      _activeTabIndex = -1;
+      _codeMode = false;
+    } else {
+      if (_activeTabIndex >= _openTabs.length) {
+        _activeTabIndex = _openTabs.length - 1;
+      }
+      if (_activeTabIndex < 0) _activeTabIndex = 0;
+      _openSource = _openTabs[_activeTabIndex];
+    }
+    _codeEpoch++;
+    notifyListeners();
+  }
+
+  /// Activates the tab at [index].
+  void activateTab(int index) {
+    if (index < 0 || index >= _openTabs.length) return;
+    _activeTabIndex = index;
+    final tab = _openTabs[index];
+    // Refresh FXML tab content from the live document.
+    if (tab.isFxml) {
+      final refreshed = GeneratedFile(
+        path: tab.path,
+        content: serialize(),
+        isXml: true,
+        isFxml: true,
+      );
+      _openTabs[index] = refreshed;
+      _openSource = refreshed;
+    } else {
+      _openSource = tab;
+    }
+    _codeMode = true;
+    _codeEpoch++;
     notifyListeners();
   }
 
@@ -444,8 +521,9 @@ class EditorController extends ChangeNotifier {
   /// Returns false when the FXML source could not be parsed.
   bool applyCode(String text) {
     final source = _openSource;
-    if (source != null) return applyJavaSource(source.path, text);
-    return applyFxmlSource(text);
+    if (source == null) return applyFxmlSource(text);
+    if (source.isFxml) return applyFxmlSource(text);
+    return applyJavaSource(source.path, text);
   }
 
   /// Stores a hand-edited Java source on the project. Editing it back to the
@@ -476,7 +554,17 @@ class EditorController extends ChangeNotifier {
     } else {
       project.sourceOverrides[path] = content;
     }
-    _openSource = GeneratedFile(path: path, content: content);
+    final old = _openSource;
+    _openSource = GeneratedFile(
+      path: path,
+      content: content,
+      isJava: old?.isJava ?? path.endsWith('.java'),
+      isXml: old?.isXml ?? (path.endsWith('.xml') || path.endsWith('.fxml')),
+      isFxml: old?.isFxml ?? path.endsWith('.fxml'),
+    );
+    if (_activeTabIndex >= 0 && _activeTabIndex < _openTabs.length) {
+      _openTabs[_activeTabIndex] = _openSource!;
+    }
     _persist();
     notifyListeners();
     return true;
@@ -486,7 +574,18 @@ class EditorController extends ChangeNotifier {
   bool applyFxmlSource(String source) {
     final ok = loadFromString(source, fileName: _fileName);
     if (ok) {
-      _openSource = null;
+      if (_openSource != null) {
+        _openSource = GeneratedFile(
+          path: _openSource!.path,
+          content: source,
+          isJava: _openSource!.isJava,
+          isXml: _openSource!.isXml,
+          isFxml: _openSource!.isFxml,
+        );
+        if (_activeTabIndex >= 0 && _activeTabIndex < _openTabs.length) {
+          _openTabs[_activeTabIndex] = _openSource!;
+        }
+      }
       notifyListeners();
     }
     return ok;

@@ -24,6 +24,7 @@ class _CodeViewState extends State<CodeView> {
   );
   late ValidationResult _validation = _validate(_text.text);
   bool _dirty = false;
+  int _lastEpoch = 0;
 
   bool get _isJava => widget.controller.codeIsJavaSource;
   bool get _isXml =>
@@ -42,14 +43,29 @@ class _CodeViewState extends State<CodeView> {
   @override
   void initState() {
     super.initState();
+    _lastEpoch = widget.controller.codeEpoch;
     _text.addListener(_onChanged);
+    widget.controller.addListener(_onControllerChanged);
   }
 
   @override
   void dispose() {
+    widget.controller.removeListener(_onControllerChanged);
     _text.removeListener(_onChanged);
     _text.dispose();
     super.dispose();
+  }
+
+  void _onControllerChanged() {
+    if (!mounted) return;
+    final epoch = widget.controller.codeEpoch;
+    if (epoch != _lastEpoch) {
+      _lastEpoch = epoch;
+      _text.text = widget.controller.codeContent;
+      _dirty = false;
+      _validation = _validate(_text.text);
+      setState(() {});
+    }
   }
 
   void _onChanged() {
@@ -137,6 +153,50 @@ class _CodeViewState extends State<CodeView> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
+          if (controller.openTabs.isNotEmpty)
+            Container(
+              height: 32,
+              color: theme.colorScheme.surfaceContainerHighest,
+              child: ListView.builder(
+                scrollDirection: Axis.horizontal,
+                itemCount: controller.openTabs.length,
+                itemBuilder: (context, index) {
+                  final tab = controller.openTabs[index];
+                  final active = index == controller.activeTabIndex;
+                  final name = tab.path.split('/').last;
+                  return GestureDetector(
+                    onTap: () => controller.activateTab(index),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                      decoration: BoxDecoration(
+                        color: active
+                            ? theme.colorScheme.surface
+                            : Colors.transparent,
+                        border: Border(
+                          bottom: BorderSide(
+                            color: active
+                                ? theme.colorScheme.primary
+                                : Colors.transparent,
+                            width: 2,
+                          ),
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: <Widget>[
+                          Text(name, style: const TextStyle(fontSize: 12)),
+                          const SizedBox(width: 6),
+                          InkWell(
+                            onTap: () => controller.closeTab(index),
+                            child: const Icon(Icons.close, size: 14),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
           Container(
             color: theme.colorScheme.surfaceContainerHighest,
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
