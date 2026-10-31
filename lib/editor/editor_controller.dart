@@ -214,7 +214,7 @@ class EditorController extends ChangeNotifier {
     }
     final scene = _activeScene;
     if (project != null && scene != null) {
-      return '${project.name}/${scene.name}.fxml${_dirty ? " •" : ""}';
+      return '${project.name}${_dirty ? " •" : ""}';
     }
     if (project != null) return project.name;
     if (!_projectsLoaded) return 'Loading…';
