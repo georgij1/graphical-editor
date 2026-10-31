@@ -369,6 +369,65 @@ class _Title extends StatelessWidget {
   }
 }
 
+class _OpenTabsBar extends StatelessWidget {
+  const _OpenTabsBar({required this.controller});
+
+  final EditorController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      height: 32,
+      color: theme.colorScheme.surfaceContainerHighest,
+      child: ListenableBuilder(
+        listenable: controller,
+        builder: (context, _) {
+          final tabs = controller.openTabs;
+          return ListView.builder(
+            scrollDirection: Axis.horizontal,
+            itemCount: tabs.length,
+            itemBuilder: (context, index) {
+              final tab = tabs[index];
+              final active = index == controller.activeTabIndex;
+              final name = tab.path.split('/').last;
+              return GestureDetector(
+                onTap: () => controller.activateTab(index),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  decoration: BoxDecoration(
+                    color: active ? theme.colorScheme.surface : Colors.transparent,
+                    border: Border(
+                      bottom: BorderSide(
+                        color: active
+                            ? theme.colorScheme.primary
+                            : Colors.transparent,
+                        width: 2,
+                      ),
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: <Widget>[
+                      Text(name, style: const TextStyle(fontSize: 12)),
+                      const SizedBox(width: 6),
+                      InkWell(
+                        onTap: () => controller.closeTab(index),
+                        child: const Icon(Icons.close, size: 14),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
+}
+
+
 class _WideLayout extends StatelessWidget {
   const _WideLayout({
     required this.controller,
@@ -426,7 +485,20 @@ class _WideLayout extends StatelessWidget {
         ),
         const VerticalDivider(width: 1),
         Expanded(
-          child: CanvasArea(controller: controller, onShowCode: onShowCode),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: <Widget>[
+              ListenableBuilder(
+                listenable: controller,
+                builder: (context, _) => controller.openTabs.isNotEmpty
+                    ? _OpenTabsBar(controller: controller)
+                    : const SizedBox.shrink(),
+              ),
+              Expanded(
+                child: CanvasArea(controller: controller, onShowCode: onShowCode),
+              ),
+            ],
+          ),
         ),
         const VerticalDivider(width: 1),
         SizedBox(
@@ -483,6 +555,12 @@ class _NarrowLayoutState extends State<_NarrowLayout> {
     }
     return Column(
       children: <Widget>[
+        ListenableBuilder(
+          listenable: widget.controller,
+          builder: (context, _) => widget.controller.openTabs.isNotEmpty
+              ? _OpenTabsBar(controller: widget.controller)
+              : const SizedBox.shrink(),
+        ),
         Expanded(
           child: CanvasArea(
             controller: widget.controller,
