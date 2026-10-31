@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 
 import '../../editor/editor_controller.dart';
 import '../../l10n/app_localizations.dart';
@@ -36,8 +36,11 @@ class EditorToolbar extends StatelessWidget {
         // the header.
         final budget = constraints.maxWidth.isFinite
             ? constraints.maxWidth
-            : (MediaQuery.sizeOf(context).width - _reservedSpace)
-                .clamp(240.0, double.infinity);
+            : (MediaQuery.sizeOf(context).width - _reservedSpace).clamp(
+                240.0,
+                double.infinity,
+              );
+
         final showZoom = budget >= _dropZoomAt;
         final showCanvasTools = budget >= _dropCanvasToolsAt;
         final showHistory = budget >= _dropHistoryAt;
@@ -69,8 +72,8 @@ class EditorToolbar extends StatelessWidget {
           ],
           if (showCanvasTools) ...<Widget>[
             const _Bar(),
-          IconButton(
-            tooltip: context.tr('Toggle grid'),
+            IconButton(
+              tooltip: context.tr('Toggle grid'),
               isSelected: controller.showGrid,
               icon: const Icon(Icons.grid_4x4),
               onPressed: controller.toggleGrid,
@@ -115,7 +118,6 @@ class EditorToolbar extends StatelessWidget {
     );
   }
 }
-
 
 /// The Canvas/Code switch, the main mode of the editor.
 class _ModeSwitch extends StatelessWidget {
