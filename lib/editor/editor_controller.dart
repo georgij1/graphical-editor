@@ -1266,10 +1266,21 @@ class EditorController extends ChangeNotifier {
     );
     _projects.add(project);
     _currentProject = project;
+    _openTabs.clear();
+    _activeTabIndex = -1;
     _activeScene = project.scenes.first;
     _standaloneOpen = false;
     _document = _parser.parse(project.scenes.first.fxml);
     _fileName = 'main';
+    // Register an FXML tab for the initial scene.
+    final initialPath = 'src/main/resources/${JavaGenerator.packageDir(project)}/main.fxml';
+    final initialFile = GeneratedFile(
+      path: initialPath,
+      content: project.scenes.first.fxml,
+      isXml: true,
+      isFxml: true,
+    );
+    _openTabs.add(initialFile);
     _openSource = null;
     _selected = null;
     _dirty = false;
@@ -1284,6 +1295,8 @@ class EditorController extends ChangeNotifier {
     _flushToScene();
     _currentProject = project;
     _standaloneOpen = false;
+    _openTabs.clear();
+    _activeTabIndex = -1;
     final scene = project.mainScene;
     if (scene != null) {
       openScene(scene);
@@ -1306,7 +1319,23 @@ class EditorController extends ChangeNotifier {
     _document = _parser.parse(scene.fxml);
     _activeScene = scene;
     _fileName = scene.name;
-    _openSource = null;
+    // Register an FXML tab for this scene so it is visible from the start,
+    // even before switching to code mode.
+    final path = codePath;
+    final content = scene.fxml;
+    final file = GeneratedFile(path: path, content: content, isXml: true, isFxml: true);
+    final idx = _openTabs.indexWhere((f) => f.path == path);
+    if (idx >= 0) {
+      _openTabs[idx] = file;
+    } else {
+      _openTabs.add(file);
+    }
+    // Keep _openSource in sync only while in code mode.
+    final i = _openTabs.indexWhere((f) => f.path == path);
+    _activeTabIndex = i >= 0 ? i : _openTabs.length - 1;
+    if (_codeMode) {
+      _openSource = _openTabs[_activeTabIndex];
+    }
     _selected = null;
     _dirty = false;
     _endEditChain();
