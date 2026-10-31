@@ -1,4 +1,4 @@
-﻿import 'dart:convert';
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
 
@@ -37,8 +37,12 @@ class _ProjectTreePanelState extends State<ProjectTreePanel> {
 
   /// Wraps [child] so a right mouse click shows [items] as a Flutter context
   /// menu instead of the browser's default one.
-  Widget _contextMenu(BuildContext context, Widget child,
-      List<PopupMenuEntry<int>> items, void Function(int) onSelected) {
+  Widget _contextMenu(
+    BuildContext context,
+    Widget child,
+    List<PopupMenuEntry<int>> items,
+    void Function(int) onSelected,
+  ) {
     return GestureDetector(
       onSecondaryTapDown: (details) {
         final position = RelativeRect.fromLTRB(
@@ -47,11 +51,9 @@ class _ProjectTreePanelState extends State<ProjectTreePanel> {
           details.globalPosition.dx,
           details.globalPosition.dy,
         );
-        showMenu<int>(
-          context: context,
-          position: position,
-          items: items,
-        ).then((value) {
+        showMenu<int>(context: context, position: position, items: items).then((
+          value,
+        ) {
           if (!mounted) return;
           if (value != null) onSelected(value);
         });
@@ -116,39 +118,40 @@ class _ProjectTreePanelState extends State<ProjectTreePanel> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
-              Builder(builder: (context) {
-                final allCollapsed = _allCollapsed(root, isRoot: true);
-                final label = allCollapsed
-                    ? context.tr('Expand all')
-                    : context.tr('Collapse all');
-                return Padding(
-                  padding: const EdgeInsets.fromLTRB(6, 4, 6, 2),
-                  child: Row(
-                    children: <Widget>[
-                      IconButton(
-                        tooltip: label,
-                        icon: Icon(
-                          allCollapsed ? Icons.unfold_more : Icons.unfold_less,
-                          size: 16,
+              Builder(
+                builder: (context) {
+                  final allCollapsed = _allCollapsed(root, isRoot: true);
+                  final label = allCollapsed
+                      ? context.tr('Expand all')
+                      : context.tr('Collapse all');
+                  return Padding(
+                    padding: const EdgeInsets.fromLTRB(6, 4, 6, 2),
+                    child: Row(
+                      children: <Widget>[
+                        IconButton(
+                          tooltip: label,
+                          icon: Icon(
+                            allCollapsed
+                                ? Icons.unfold_more
+                                : Icons.unfold_less,
+                            size: 16,
+                          ),
+                          visualDensity: VisualDensity.compact,
+                          onPressed: () {
+                            if (allCollapsed) {
+                              _expandAll(root);
+                            } else {
+                              _collapseAll(root);
+                            }
+                          },
                         ),
-                        visualDensity: VisualDensity.compact,
-                        onPressed: () {
-                          if (allCollapsed) {
-                            _expandAll(root);
-                          } else {
-                            _collapseAll(root);
-                          }
-                        },
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        label,
-                        style: const TextStyle(fontSize: 12),
-                      ),
-                    ],
-                  ),
-                );
-              }),
+                        const SizedBox(width: 4),
+                        Text(label, style: const TextStyle(fontSize: 12)),
+                      ],
+                    ),
+                  );
+                },
+              ),
               const Divider(height: 1),
               ..._renderChildren(context, projectNow, root, 0),
             ],
@@ -173,25 +176,40 @@ class _ProjectTreePanelState extends State<ProjectTreePanel> {
       final parts = path.split('/');
       var dir = root;
       for (final part in parts.sublist(0, parts.length - 1)) {
-        dir = dir.dirs.putIfAbsent(part, () => _DirNode(part, '${dir.path}/$part'));
+        dir = dir.dirs.putIfAbsent(
+          part,
+          () => _DirNode(part, '${dir.path}/$part'),
+        );
       }
-      dir.files.add(_FileNode(
-        name: parts.last,
-        path: path,
-        content: content,
-        scene: scene,
-        isJava: isJava,
-        isBuildFile: isBuildFile,
-      ));
+      dir.files.add(
+        _FileNode(
+          name: parts.last,
+          path: path,
+          content: content,
+          scene: scene,
+          isJava: isJava,
+          isBuildFile: isBuildFile,
+        ),
+      );
     }
 
     for (final source in JavaGenerator.generate(project)) {
       addFile(source.path, content: source.content, isJava: true);
     }
     for (final file in const BuildFiles().generate(project, BuildTool.maven)) {
-      addFile(file.path, content: file.content, isJava: false, isBuildFile: true);
+      addFile(
+        file.path,
+        content: project.sourceOverrides[file.path] ?? file.content,
+        isJava: false,
+        isBuildFile: true,
+      );
     }
-    addFile('project.json', content: const JsonEncoder.withIndent('  ').convert(project.toJson()), isJava: false, isBuildFile: true);
+    addFile(
+      'project.json',
+      content: const JsonEncoder.withIndent('  ').convert(project.toJson()),
+      isJava: false,
+      isBuildFile: true,
+    );
     final pkgDir = JavaGenerator.packageDir(project);
     for (final scene in project.scenes) {
       addFile(
@@ -230,8 +248,7 @@ class _ProjectTreePanelState extends State<ProjectTreePanel> {
   }
 
   List<_FileNode> _sortedFiles(_DirNode dir) {
-    final files = dir.files.toList()
-      ..sort((a, b) => a.name.compareTo(b.name));
+    final files = dir.files.toList()..sort((a, b) => a.name.compareTo(b.name));
     return files;
   }
 
@@ -297,17 +314,25 @@ class _ProjectTreePanelState extends State<ProjectTreePanel> {
                       controller.newScene(name);
                     }
                   } else if (value == 2) {
-                    _say(context,
-                        context.tr('Folder creation is not supported yet.'));
+                    _say(
+                      context,
+                      context.tr('Folder creation is not supported yet.'),
+                    );
                   } else if (value == 3) {
-                    _say(context,
-                        context.tr('File creation is not supported yet.'));
+                    _say(
+                      context,
+                      context.tr('File creation is not supported yet.'),
+                    );
                   } else if (value == 4) {
-                    _say(context,
-                        context.tr('Folder rename is not supported yet.'));
+                    _say(
+                      context,
+                      context.tr('Folder rename is not supported yet.'),
+                    );
                   } else if (value == 5) {
-                    _say(context,
-                        context.tr('Folder deletion is not supported yet.'));
+                    _say(
+                      context,
+                      context.tr('Folder deletion is not supported yet.'),
+                    );
                   }
                 },
               ),
@@ -340,19 +365,10 @@ class _ProjectTreePanelState extends State<ProjectTreePanel> {
                 value: 2,
                 child: Text(context.tr('New folder')),
               ),
-              PopupMenuItem<int>(
-                value: 3,
-                child: Text(context.tr('New file')),
-              ),
+              PopupMenuItem<int>(value: 3, child: Text(context.tr('New file'))),
               const PopupMenuDivider(),
-              PopupMenuItem<int>(
-                value: 4,
-                child: Text(context.tr('Rename')),
-              ),
-              PopupMenuItem<int>(
-                value: 5,
-                child: Text(context.tr('Delete')),
-              ),
+              PopupMenuItem<int>(value: 4, child: Text(context.tr('Rename'))),
+              PopupMenuItem<int>(value: 5, child: Text(context.tr('Delete'))),
             ],
             (value) async {
               if (value == 1) {
@@ -366,13 +382,25 @@ class _ProjectTreePanelState extends State<ProjectTreePanel> {
                   controller.newScene(name);
                 }
               } else if (value == 2) {
-                _say(context, context.tr('Folder creation is not supported yet.'));
+                _say(
+                  context,
+                  context.tr('Folder creation is not supported yet.'),
+                );
               } else if (value == 3) {
-                _say(context, context.tr('File creation is not supported yet.'));
+                _say(
+                  context,
+                  context.tr('File creation is not supported yet.'),
+                );
               } else if (value == 4) {
-                _say(context, context.tr('Folder rename is not supported yet.'));
+                _say(
+                  context,
+                  context.tr('Folder rename is not supported yet.'),
+                );
               } else if (value == 5) {
-                _say(context, context.tr('Folder deletion is not supported yet.'));
+                _say(
+                  context,
+                  context.tr('Folder deletion is not supported yet.'),
+                );
               }
             },
           );
@@ -404,39 +432,18 @@ class _ProjectTreePanelState extends State<ProjectTreePanel> {
         contentPadding: padding,
         leading: const Icon(Icons.description_outlined, size: 16),
         title: Text(file.name, style: const TextStyle(fontSize: 12)),
-        subtitle: Text(
-          context.tr('generated on export'),
-          style: const TextStyle(fontSize: 10),
-          overflow: TextOverflow.ellipsis,
-        ),
       );
       return _contextMenu(
         context,
         tile,
         <PopupMenuEntry<int>>[
-          PopupMenuItem<int>(
-            value: 1,
-            child: Text(context.tr('Open source')),
-          ),
-          const PopupMenuDivider(),
-          PopupMenuItem<int>(
-            value: 2,
-            child: Text(context.tr('Rename')),
-          ),
-          PopupMenuItem<int>(
-            value: 3,
-            child: Text(context.tr('Delete')),
-          ),
+          PopupMenuItem<int>(value: 1, child: Text(context.tr('Open source'))),
         ],
         (value) async {
           if (value == 1) {
             controller.showSource(
               GeneratedFile(path: file.path, content: file.content ?? ''),
             );
-          } else if (value == 2) {
-            _say(context, context.tr('Build file rename is not supported yet.'));
-          } else if (value == 3) {
-            _say(context, context.tr('Build file deletion is not supported yet.'));
           }
         },
       );
@@ -457,19 +464,10 @@ class _ProjectTreePanelState extends State<ProjectTreePanel> {
         context,
         tile,
         <PopupMenuEntry<int>>[
-          PopupMenuItem<int>(
-            value: 1,
-            child: Text(context.tr('Open source')),
-          ),
+          PopupMenuItem<int>(value: 1, child: Text(context.tr('Open source'))),
           const PopupMenuDivider(),
-          PopupMenuItem<int>(
-            value: 2,
-            child: Text(context.tr('Rename')),
-          ),
-          PopupMenuItem<int>(
-            value: 3,
-            child: Text(context.tr('Delete')),
-          ),
+          PopupMenuItem<int>(value: 2, child: Text(context.tr('Rename'))),
+          PopupMenuItem<int>(value: 3, child: Text(context.tr('Delete'))),
         ],
         (value) async {
           if (value == 1) {
@@ -491,7 +489,10 @@ class _ProjectTreePanelState extends State<ProjectTreePanel> {
               _say(context, context.tr(error));
             }
           } else if (value == 3) {
-            _say(context, context.tr('Java file deletion is not supported yet.'));
+            _say(
+              context,
+              context.tr('Java file deletion is not supported yet.'),
+            );
           }
         },
       );
@@ -505,8 +506,8 @@ class _ProjectTreePanelState extends State<ProjectTreePanel> {
       visualDensity: VisualDensity.compact,
       contentPadding: padding,
       selected: active,
-      selectedTileColor:
-          Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.4),
+      selectedTileColor: Theme.of(context).colorScheme.primaryContainer
+          .withValues(alpha: 0.4),
       leading: const Icon(Icons.description_outlined, size: 16),
       title: Text(file.name, style: const TextStyle(fontSize: 12)),
       subtitle: controllerClass == null || controllerClass.isEmpty
@@ -525,19 +526,10 @@ class _ProjectTreePanelState extends State<ProjectTreePanel> {
       context,
       tile,
       <PopupMenuEntry<int>>[
-        PopupMenuItem<int>(
-          value: 1,
-          child: Text(context.tr('Open in editor')),
-        ),
+        PopupMenuItem<int>(value: 1, child: Text(context.tr('Open in editor'))),
         const PopupMenuDivider(),
-        PopupMenuItem<int>(
-          value: 2,
-          child: Text(context.tr('Rename')),
-        ),
-        PopupMenuItem<int>(
-          value: 3,
-          child: Text(context.tr('Delete')),
-        ),
+        PopupMenuItem<int>(value: 2, child: Text(context.tr('Rename'))),
+        PopupMenuItem<int>(value: 3, child: Text(context.tr('Delete'))),
       ],
       (value) async {
         if (value == 1) {

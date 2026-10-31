@@ -12,6 +12,7 @@ import '../io/file_service.dart';
 import '../io/local_store.dart';
 import '../model/fxml_node.dart';
 import '../project/java_generator.dart';
+import '../project/build_files.dart';
 import '../project/invite_link.dart';
 import '../project/project.dart';
 import '../project/project_history.dart';
@@ -144,7 +145,8 @@ class EditorController extends ChangeNotifier {
 
   /// Participants currently in the open project (presence). Refreshed by the
   /// heartbeat timer; empty when no project is open or the user is offline.
-  List<Map<String, dynamic>> _onlineParticipants = const <Map<String, dynamic>>[];
+  List<Map<String, dynamic>> _onlineParticipants =
+      const <Map<String, dynamic>>[];
 
   /// Timer that announces our presence and refreshes the list of the others.
   Timer? _presenceTimer;
@@ -166,9 +168,8 @@ class EditorController extends ChangeNotifier {
   List<Map<String, dynamic>> get onlineParticipants => _onlineParticipants;
 
   /// Remote participants excluding the current user, with their cursor positions.
-  List<Map<String, dynamic>> get remoteCursors => _onlineParticipants
-      .where((p) => p['id'] != _userId)
-      .toList();
+  List<Map<String, dynamic>> get remoteCursors =>
+      _onlineParticipants.where((p) => p['id'] != _userId).toList();
 
   double? _cursorX;
   double? _cursorY;
@@ -246,17 +247,18 @@ class EditorController extends ChangeNotifier {
       _num(_document.root.attributes['height']) ??
       600;
 
-  FxRenderContext buildRenderContext({String Function(String)? tr}) => FxRenderContext(
-    selected: _selected,
-    zoom: _zoom,
-    showGrid: _showGrid,
-    gridSize: _gridSize,
-    canvasSize: Size(canvasWidth, canvasHeight),
-    onSelect: select,
-    onBeginEdit: onBeginEdit,
-    onModelChanged: onModelChanged,
-    tr: tr,
-  );
+  FxRenderContext buildRenderContext({String Function(String)? tr}) =>
+      FxRenderContext(
+        selected: _selected,
+        zoom: _zoom,
+        showGrid: _showGrid,
+        gridSize: _gridSize,
+        canvasSize: Size(canvasWidth, canvasHeight),
+        onSelect: select,
+        onBeginEdit: onBeginEdit,
+        onModelChanged: onModelChanged,
+        tr: tr,
+      );
 
   double? _num(String? value) => value == null ? null : double.tryParse(value);
 
@@ -442,6 +444,17 @@ class EditorController extends ChangeNotifier {
       if (file.path == path) {
         fallback = file.content;
         break;
+      }
+    }
+    if (fallback == null) {
+      for (final file in const BuildFiles().generate(
+        project,
+        BuildTool.maven,
+      )) {
+        if (file.path == path) {
+          fallback = file.content;
+          break;
+        }
       }
     }
     if (fallback != null && fallback == content) {
@@ -1314,14 +1327,19 @@ class EditorController extends ChangeNotifier {
   Future<void> _presenceTick(String projectId, String token) async {
     try {
       final now = DateTime.now();
-      final withinGrace = _cursorLastMoved != null &&
+      final withinGrace =
+          _cursorLastMoved != null &&
           now.difference(_cursorLastMoved!).inMinutes < 5;
-      final sendCursor = _cursorVisible && _cursorX != null && _cursorY != null && withinGrace;
-      await _api.heartbeatPresence(token, projectId,
-          cursorX: sendCursor ? _cursorX : null,
-          cursorY: sendCursor ? _cursorY : null,
-          selectedNodeId: _selected?.attributes['fx:id'],
-          sendCursor: true);
+      final sendCursor =
+          _cursorVisible && _cursorX != null && _cursorY != null && withinGrace;
+      await _api.heartbeatPresence(
+        token,
+        projectId,
+        cursorX: sendCursor ? _cursorX : null,
+        cursorY: sendCursor ? _cursorY : null,
+        selectedNodeId: _selected?.attributes['fx:id'],
+        sendCursor: true,
+      );
       final result = await _api.listPresence(token, projectId);
       if (result.isOk && result.value != null) {
         _onlineParticipants = result.value!;
@@ -1436,7 +1454,11 @@ class EditorController extends ChangeNotifier {
   }
 
   /// Invites a person to the open project.
-  Future<bool> inviteCollaborator(String email, String role, [Project? target]) async {
+  Future<bool> inviteCollaborator(
+    String email,
+    String role, [
+    Project? target,
+  ]) async {
     final token = _token;
     final project = target ?? _currentProject;
     if (token == null) {
@@ -1472,7 +1494,11 @@ class EditorController extends ChangeNotifier {
   }
 
   /// Changes the rights of a participant: editor or viewer.
-  Future<bool> changeCollaboratorRole(String email, String role, [Project? target]) async {
+  Future<bool> changeCollaboratorRole(
+    String email,
+    String role, [
+    Project? target,
+  ]) async {
     final token = _token;
     final project = target ?? _currentProject;
     if (token == null || project == null) return false;
@@ -1809,17 +1835,19 @@ class EditorController extends ChangeNotifier {
     for (final scene in project.scenes) {
       final c = (scene.controllerClass ?? '').trim();
       if (c.isEmpty) continue;
-      controllers[scene] = c.contains('.') ? c.substring(c.lastIndexOf('.') + 1) : c;
+      controllers[scene] = c.contains('.')
+          ? c.substring(c.lastIndexOf('.') + 1)
+          : c;
     }
 
-    final isLauncher = simple == project.mainClass &&
+    final isLauncher =
+        simple == project.mainClass &&
         path.endsWith('/${project.mainClass}.java');
 
     SceneFile? scene;
     if (!isLauncher) {
       for (final entry in controllers.entries) {
-        if (entry.value == simple &&
-            path.endsWith('/$simple.java')) {
+        if (entry.value == simple && path.endsWith('/$simple.java')) {
           scene = entry.key;
           break;
         }
