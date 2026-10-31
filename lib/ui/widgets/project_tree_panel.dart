@@ -432,6 +432,9 @@ class _ProjectTreePanelState extends State<ProjectTreePanel> {
         contentPadding: padding,
         leading: const Icon(Icons.description_outlined, size: 16),
         title: Text(file.name, style: const TextStyle(fontSize: 12)),
+        onTap: () => controller.showSource(
+          GeneratedFile(path: file.path, content: file.content ?? ''),
+        ),
       );
       return _contextMenu(
         context,
