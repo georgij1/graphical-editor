@@ -1,4 +1,6 @@
-﻿import 'package:flutter/material.dart';
+﻿import 'dart:async';
+
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../ai/ollama_client.dart';
@@ -54,6 +56,9 @@ class _AiFixDialogState extends State<_AiFixDialog> {
   String? _selectedModel;
   bool _loadingModels = true;
   bool _busy = false;
+  bool _cancelled = false;
+  int _elapsedSeconds = 0;
+  Timer? _timer;
   String? _error;
   String? _resultText;
 
@@ -65,6 +70,7 @@ class _AiFixDialogState extends State<_AiFixDialog> {
 
   @override
   void dispose() {
+    _timer?.cancel();
     _instruction.dispose();
     _result.dispose();
     super.dispose();
@@ -77,7 +83,9 @@ class _AiFixDialogState extends State<_AiFixDialog> {
       if (!mounted) return;
       setState(() {
         _models = models;
-        _selectedModel = models.contains(saved) ? saved : (models.isNotEmpty ? models.first : null);
+        _selectedModel = models.contains(saved)
+            ? saved
+            : (models.isNotEmpty ? models.first : null);
         _loadingModels = false;
       });
     } on AiException catch (error) {
@@ -94,7 +102,13 @@ class _AiFixDialogState extends State<_AiFixDialog> {
     if (model == null) return;
     setState(() {
       _busy = true;
+      _cancelled = false;
       _error = null;
+      _elapsedSeconds = 0;
+    });
+    _timer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!mounted) return;
+      setState(() => _elapsedSeconds++);
     });
     try {
       await widget.controller.writeAiModel(model);
@@ -105,26 +119,45 @@ class _AiFixDialogState extends State<_AiFixDialog> {
         errors: widget.errors,
         instruction: _instruction.text,
       );
-      if (!mounted) return;
+      _timer?.cancel();
+      _timer = null;
+      if (!mounted || _cancelled) return;
       setState(() {
         _busy = false;
         _resultText = fixed;
         _result.text = fixed;
       });
     } on AiException catch (error) {
-      if (!mounted) return;
+      _timer?.cancel();
+      _timer = null;
+      if (!mounted || _cancelled) return;
       setState(() {
         _busy = false;
         _error = error.message;
       });
+    } catch (error) {
+      _timer?.cancel();
+      _timer = null;
+      if (!mounted || _cancelled) return;
+      setState(() {
+        _busy = false;
+        _error = error.toString();
+      });
     }
+  }
+
+  void _cancel() {
+    _cancelled = true;
+    _timer?.cancel();
+    _timer = null;
+    setState(() => _busy = false);
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return AlertDialog(
-title: Row(
+      title: Row(
         children: <Widget>[
           const Icon(Icons.auto_fix_high, size: 20),
           const SizedBox(width: 8),
@@ -166,7 +199,7 @@ title: Row(
               ],
             ),
             const SizedBox(height: 12),
-TextField(
+            TextField(
               controller: _instruction,
               decoration: InputDecoration(
                 labelText: context.tr('Extra instruction (optional)'),
@@ -187,7 +220,7 @@ TextField(
                   border: Border.all(color: theme.dividerColor),
                   borderRadius: BorderRadius.circular(6),
                 ),
-child: _busy
+                child: _busy
                     ? Center(
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
@@ -195,6 +228,16 @@ child: _busy
                             const CircularProgressIndicator(),
                             const SizedBox(height: 12),
                             Text(context.tr('Asking the local model…')),
+                            const SizedBox(height: 6),
+                            Text(
+                              '$_elapsedSeconds s',
+                              style: const TextStyle(fontSize: 12),
+                            ),
+                            const SizedBox(height: 12),
+                            TextButton(
+                              onPressed: _cancel,
+                              child: Text(context.tr('Cancel')),
+                            ),
                           ],
                         ),
                       )
@@ -206,7 +249,7 @@ child: _busy
                         textAlignVertical: TextAlignVertical.top,
                         style: const TextStyle(
                             fontFamily: 'monospace', fontSize: 12),
-decoration: InputDecoration(
+                        decoration: InputDecoration(
                           border: InputBorder.none,
                           hintText: _resultText == null
                               ? context.tr('The corrected source will appear here.')
@@ -225,7 +268,7 @@ decoration: InputDecoration(
               ? null
               : () {
                   Clipboard.setData(ClipboardData(text: _resultText!));
-ScaffoldMessenger.of(context).showSnackBar(
+                  ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text(context.tr('AI result copied to clipboard.')),
                       behavior: SnackBarBehavior.floating,
@@ -254,7 +297,7 @@ ScaffoldMessenger.of(context).showSnackBar(
     );
   }
 
-Widget _modelPicker() {
+  Widget _modelPicker() {
     if (_loadingModels) {
       return Row(
         children: <Widget>[
@@ -277,8 +320,7 @@ Widget _modelPicker() {
       value: _selectedModel,
       isExpanded: true,
       items: <DropdownMenuItem<String>>[
-        for (final model in _models)
-          DropdownMenuItem<String>(value: model, child: Text(model)),
+        for (final model in _models) DropdownMenuItem<String>(value: model, child: Text(model)),
       ],
       onChanged: (value) => setState(() => _selectedModel = value),
     );
