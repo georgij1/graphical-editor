@@ -369,17 +369,46 @@ class _Title extends StatelessWidget {
   }
 }
 
-class _OpenTabsBar extends StatelessWidget {
+class _OpenTabsBar extends StatefulWidget {
   const _OpenTabsBar({required this.controller});
 
   final EditorController controller;
 
   @override
+  State<_OpenTabsBar> createState() => _OpenTabsBarState();
+}
+
+class _OpenTabsBarState extends State<_OpenTabsBar> {
+  int _hovered = -1;
+
+  EditorController get controller => widget.controller;
+
+  IconData _iconFor(String name) {
+    final lower = name.toLowerCase();
+    if (lower.endsWith('.java')) return Icons.data_object;
+    if (lower.endsWith('.fxml') || lower.endsWith('.xml')) {
+      return Icons.code;
+    }
+    if (lower.endsWith('.bat') || lower.endsWith('.sh') || lower.endsWith('.cmd')) {
+      return Icons.terminal;
+    }
+    if (lower.endsWith('.json')) return Icons.data_object;
+    if (lower.endsWith('.md')) return Icons.article_outlined;
+    if (lower.endsWith('.gitignore')) return Icons.visibility_off_outlined;
+    return Icons.insert_drive_file_outlined;
+  }
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Container(
-      height: 32,
-      color: theme.colorScheme.surfaceContainerHighest,
+      height: 36,
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerHighest,
+        border: Border(
+          bottom: BorderSide(color: theme.dividerColor, width: 1),
+        ),
+      ),
       child: ListenableBuilder(
         listenable: controller,
         builder: (context, _) {
@@ -390,32 +419,74 @@ class _OpenTabsBar extends StatelessWidget {
             itemBuilder: (context, index) {
               final tab = tabs[index];
               final active = index == controller.activeTabIndex;
+              final hovered = _hovered == index;
               final name = tab.path.split('/').last;
-              return GestureDetector(
-                onTap: () => controller.activateTab(index),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10),
-                  decoration: BoxDecoration(
-                    color: active ? theme.colorScheme.surface : Colors.transparent,
-                    border: Border(
-                      bottom: BorderSide(
-                        color: active
-                            ? theme.colorScheme.primary
-                            : Colors.transparent,
-                        width: 2,
+              return MouseRegion(
+                onEnter: (_) => setState(() => _hovered = index),
+                onExit: (_) => setState(() => _hovered = -1),
+                child: GestureDetector(
+                  onTap: () => controller.activateTab(index),
+                  child: Container(
+                    constraints: const BoxConstraints(minWidth: 90, maxWidth: 200),
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    decoration: BoxDecoration(
+                      color: active
+                          ? theme.colorScheme.surface
+                          : (hovered
+                              ? theme.colorScheme.surface.withValues(alpha: 0.5)
+                              : Colors.transparent),
+                      border: Border(
+                        right: BorderSide(color: theme.dividerColor, width: 1),
+                        bottom: BorderSide(
+                          color: active
+                              ? theme.colorScheme.primary
+                              : Colors.transparent,
+                          width: 2,
+                        ),
                       ),
                     ),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: <Widget>[
-                      Text(name, style: const TextStyle(fontSize: 12)),
-                      const SizedBox(width: 6),
-                      InkWell(
-                        onTap: () => controller.closeTab(index),
-                        child: const Icon(Icons.close, size: 14),
-                      ),
-                    ],
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: <Widget>[
+                        Icon(
+                          _iconFor(name),
+                          size: 14,
+                          color: active
+                              ? theme.colorScheme.primary
+                              : theme.colorScheme.onSurfaceVariant,
+                        ),
+                        const SizedBox(width: 6),
+                        Flexible(
+                          child: Text(
+                            name,
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight:
+                                  active ? FontWeight.w600 : FontWeight.normal,
+                              color: active
+                                  ? theme.colorScheme.onSurface
+                                  : theme.colorScheme.onSurfaceVariant,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                            maxLines: 1,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        if (active || hovered)
+                          InkWell(
+                            onTap: () => controller.closeTab(index),
+                            borderRadius: BorderRadius.circular(4),
+                            child: Padding(
+                              padding: const EdgeInsets.all(2),
+                              child: Icon(
+                                Icons.close,
+                                size: 12,
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
                   ),
                 ),
               );
