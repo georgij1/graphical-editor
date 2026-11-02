@@ -424,9 +424,11 @@ class _OpenTabsBarState extends State<_OpenTabsBar> {
               return MouseRegion(
                 onEnter: (_) => setState(() => _hovered = index),
                 onExit: (_) => setState(() => _hovered = -1),
-                child: InkWell(
-                  onTap: () => controller.activateTab(index),
-                  child: Container(
+                child: Material(
+                  type: MaterialType.transparency,
+                  child: InkWell(
+                    onTap: () => controller.activateTab(index),
+                    child: Container(
                     constraints: const BoxConstraints(minWidth: 90, maxWidth: 200),
                     padding: const EdgeInsets.symmetric(horizontal: 8),
                     decoration: BoxDecoration(
@@ -488,6 +490,7 @@ class _OpenTabsBarState extends State<_OpenTabsBar> {
                       ],
                     ),
                   ),
+                ),
                 ),
               );
             },
