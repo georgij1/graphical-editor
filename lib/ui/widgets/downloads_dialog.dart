@@ -97,9 +97,8 @@ class _DownloadsDialogState extends State<DownloadsDialog> {
           Text(context.tr('Download client')),
         ],
       ),
-      content: SizedBox(
-        width: 460,
-        height: 320,
+      content: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 460, maxHeight: 400),
         child: _loading
             ? const Center(child: CircularProgressIndicator())
             : SingleChildScrollView(
