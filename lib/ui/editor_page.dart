@@ -425,7 +425,10 @@ class _OpenTabsBarState extends State<_OpenTabsBar> {
                 onEnter: (_) => setState(() => _hovered = index),
                 onExit: (_) => setState(() => _hovered = -1),
                 child: GestureDetector(
-                  onTap: () => controller.activateTab(index),
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () {
+                    controller.activateTab(index);
+                  },
                   child: Container(
                     constraints: const BoxConstraints(minWidth: 90, maxWidth: 200),
                     padding: const EdgeInsets.symmetric(horizontal: 8),
