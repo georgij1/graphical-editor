@@ -39,14 +39,6 @@ const List<DownloadTarget> downloadTargets = <DownloadTarget>[
     fileName: 'graphical_editor-linux.tar.gz',
     icon: Icons.computer_outlined,
   ),
-  DownloadTarget(
-    id: 'android',
-    title: 'Android',
-    subtitle: 'APK for phones and tablets',
-    group: 'Mobile',
-    fileName: 'graphical_editor.apk',
-    icon: Icons.android_outlined,
-  ),
 ];
 
 /// Base URL where client artifacts are served. Override at build time with

@@ -48,3 +48,15 @@ app.*.map.json
 .widget_preview/
 backend/target/
 backend-dart/
+
+# Platform scaffolding (regenerated via 'flutter create --platforms=...')
+/windows/
+/linux/
+
+# Built client artifacts (large binaries, served from downloads/)
+downloads/*.zip
+downloads/*.tar.gz
+downloads/*.apk
+downloads/*.ipa
+downloads/*.dmg
+downloads/*.exe

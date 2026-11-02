@@ -153,50 +153,6 @@ class _CodeViewState extends State<CodeView> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
-          if (controller.openTabs.isNotEmpty)
-            Container(
-              height: 32,
-              color: theme.colorScheme.surfaceContainerHighest,
-              child: ListView.builder(
-                scrollDirection: Axis.horizontal,
-                itemCount: controller.openTabs.length,
-                itemBuilder: (context, index) {
-                  final tab = controller.openTabs[index];
-                  final active = index == controller.activeTabIndex;
-                  final name = tab.path.split('/').last;
-                  return GestureDetector(
-                    onTap: () => controller.activateTab(index),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10),
-                      decoration: BoxDecoration(
-                        color: active
-                            ? theme.colorScheme.surface
-                            : Colors.transparent,
-                        border: Border(
-                          bottom: BorderSide(
-                            color: active
-                                ? theme.colorScheme.primary
-                                : Colors.transparent,
-                            width: 2,
-                          ),
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: <Widget>[
-                          Text(name, style: const TextStyle(fontSize: 12)),
-                          const SizedBox(width: 6),
-                          InkWell(
-                            onTap: () => controller.closeTab(index),
-                            child: const Icon(Icons.close, size: 14),
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ),
           Container(
             color: theme.colorScheme.surfaceContainerHighest,
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
