@@ -5,3 +5,6 @@ test/
 scripts/
 downloads/
 .git/
+# Platform scaffolding (not needed for web build)
+linux/
+windows/
