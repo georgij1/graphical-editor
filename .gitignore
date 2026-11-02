@@ -53,10 +53,5 @@ backend-dart/
 /windows/
 /linux/
 
-# Built client artifacts (large binaries, served from downloads/)
-downloads/*.zip
-downloads/*.tar.gz
-downloads/*.apk
-downloads/*.ipa
-downloads/*.dmg
-downloads/*.exe
+# Built client artifacts (served from disk, not from git)
+downloads/
