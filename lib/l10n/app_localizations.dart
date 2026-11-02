@@ -419,6 +419,8 @@ class AppLocalizations {
     'No issues found.': 'Ошибок нет.',
     'Select a file in the project tree to start editing.':
         'Выберите файл в дереве проекта, чтобы начать редактирование.',
+    'No open files. Select a file in the project tree.':
+        'Нет открытых файлов. Выберите файл в дереве проекта.',
     // Java/FXML checker messages (keys keep {0}… slots for the arguments).
     "';' expected": "Ожидается ';'.",
     "')' expected": "Ожидается ')'.",

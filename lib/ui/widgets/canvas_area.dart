@@ -48,6 +48,27 @@ class CanvasArea extends StatelessWidget {
       );
     }
 
+    // All tabs closed: invite the user to open a file instead of an empty
+    // canvas.
+    if (controller.openTabs.isEmpty && !controller.codeMode) {
+      final theme = Theme.of(context);
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            Icon(Icons.tab_outlined,
+                size: 48, color: theme.colorScheme.onSurfaceVariant),
+            const SizedBox(height: 12),
+            Text(
+              context.tr('No open files. Select a file in the project tree.'),
+              style: theme.textTheme.titleMedium,
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      );
+    }
+
     final codeView = CodeView(
       key: ValueKey<String>('${controller.codePath}#${controller.codeEpoch}'),
       controller: controller,
