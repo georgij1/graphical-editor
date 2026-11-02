@@ -430,10 +430,14 @@ class _ProjectTreePanelState extends State<ProjectTreePanel> {
     final padding = EdgeInsets.only(left: 6 + depth * 14.0, right: 6);
 
     if (file.isBuildFile) {
+      final selected = controller.codeMode && file.path == controller.codePath;
       final tile = ListTile(
         dense: true,
         visualDensity: VisualDensity.compact,
         contentPadding: padding,
+        selected: selected,
+        selectedTileColor:
+            Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.4),
         leading: const Icon(Icons.description_outlined, size: 16),
         title: Text(file.name, style: const TextStyle(fontSize: 12)),
         onTap: () => controller.showSource(
@@ -465,10 +469,14 @@ class _ProjectTreePanelState extends State<ProjectTreePanel> {
     }
 
     if (file.isJava) {
+      final selected = controller.codeMode && file.path == controller.codePath;
       final tile = ListTile(
         dense: true,
         visualDensity: VisualDensity.compact,
         contentPadding: padding,
+        selected: selected,
+        selectedTileColor:
+            Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.4),
         leading: const Icon(Icons.data_object, size: 16),
         title: Text(file.name, style: const TextStyle(fontSize: 12)),
         onTap: () => controller.showSource(
@@ -522,7 +530,9 @@ class _ProjectTreePanelState extends State<ProjectTreePanel> {
     }
 
     final scene = file.scene!;
-    final active = identical(controller.activeScene, scene);
+    final active = controller.codeMode
+        ? file.path == controller.codePath
+        : identical(controller.activeScene, scene);
     final controllerClass = scene.controllerClass;
     final tile = ListTile(
       dense: true,
