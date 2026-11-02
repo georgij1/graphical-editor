@@ -5,17 +5,12 @@ services:
       JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
       DATA_DIR: /data
       DOWNLOADS_DIR: /downloads
+      JAVAFX_LIB: /opt/javafx/lib
+      JAVA_MODULES: javafx.controls,javafx.fxml
       PORT: 8080
     volumes:
       - backend-data:/data
       - ./downloads:/downloads:ro
-    restart: unless-stopped
-    networks:
-      - editor-net
-
-  # Compiles exported projects into a runnable JAR (no network at request time).
-  builder:
-    build: ./builder
     restart: unless-stopped
     networks:
       - editor-net
@@ -30,7 +25,6 @@ services:
       - "host.docker.internal:host-gateway"
     depends_on:
       - backend
-      - builder
     restart: unless-stopped
     networks:
       - editor-net

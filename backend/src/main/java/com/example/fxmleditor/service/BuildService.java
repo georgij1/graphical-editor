@@ -1,113 +1,41 @@
-import com.sun.net.httpserver.HttpExchange;
-import com.sun.net.httpserver.HttpServer;
+package com.example.fxmleditor.service;
 
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.net.InetSocketAddress;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+
+import java.io.*;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.ArrayList;
+import java.nio.file.*;
+import java.util.*;
 import java.util.Comparator;
-import java.util.List;
-import java.util.concurrent.Executors;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 import java.util.zip.ZipOutputStream;
 
-/**
- * Tiny JavaFX build service.
- *
- * Accepts a project archive (the very zip the editor exports), compiles the
- * Java sources against a pre-downloaded JavaFX SDK and returns a runnable
- * artifact:
- *
- * <pre>
- *   POST /build         -> application/java-archive (app.jar)
- *   POST /build/bundle  -> application/zip (app.jar + JavaFX SDK + run scripts)
- *   GET  /health        -> {"status":"ok"}
- * </pre>
- *
- * Nothing is resolved from the network at request time, so builds are fast and
- * work offline.
- */
-public class BuildServer {
+@Service
+public class BuildService {
 
     private static final int MAX_BODY = 64 * 1024 * 1024;
-    private static final Path JAVAFX_LIB = Paths.get(env("JAVAFX_LIB", "/opt/javafx/lib"));
-    private static final String JAVA_MODULES = env("JAVA_MODULES", "javafx.controls,javafx.fxml");
+    private final Path javafxLib;
+    private final String javaModules;
 
     private static final Pattern PACKAGE = Pattern.compile("(?m)^\\s*package\\s+([\\w.]+)\\s*;");
     private static final Pattern APPLICATION_CLASS =
             Pattern.compile("public\\s+class\\s+(\\w+)\\s+extends\\s+Application");
 
-    public static void main(String[] args) throws IOException {
-        int port = Integer.parseInt(env("PORT", "8081"));
-        HttpServer server = HttpServer.create(new InetSocketAddress(port), 0);
-        server.setExecutor(Executors.newFixedThreadPool(2));
-        // Longest prefix wins, so /build/bundle is matched before /build.
-        server.createContext("/build/bundle", exchange -> handle(exchange, true));
-        server.createContext("/build", exchange -> handle(exchange, false));
-        server.createContext("/build/health", exchange -> {
-            cors(exchange);
-            respond(exchange, 200, "application/json",
-                    "{\"status\":\"ok\"}".getBytes(StandardCharsets.UTF_8));
-        });
-        server.createContext("/health", exchange -> {
-            cors(exchange);
-            respond(exchange, 200, "application/json",
-                    "{\"status\":\"ok\"}".getBytes(StandardCharsets.UTF_8));
-        });
-        server.start();
-        System.out.println("builder listening on port " + port);
+    public BuildService(@Value("${app.javafx-lib:/opt/javafx/lib}") String javafxLib,
+                        @Value("${app.java-modules:javafx.controls,javafx.fxml}") String javaModules) {
+        this.javafxLib = Paths.get(javafxLib);
+        this.javaModules = javaModules;
     }
 
-    private static void handle(HttpExchange exchange, boolean bundle) throws IOException {
-        try {
-            cors(exchange);
-            if (!"POST".equalsIgnoreCase(exchange.getRequestMethod())) {
-                respond(exchange, 405, "text/plain", "Use POST".getBytes(StandardCharsets.UTF_8));
-                return;
-            }
-            byte[] body = exchange.getRequestBody().readNBytes(MAX_BODY + 1);
-            if (body.length > MAX_BODY) {
-                respond(exchange, 413, "text/plain",
-                        "Project is too large".getBytes(StandardCharsets.UTF_8));
-                return;
-            }
-            byte[] artifact;
-            try {
-                artifact = build(body, bundle);
-            } catch (BuildException error) {
-                // The reason of the failure is written to the log as well, so
-                // it can be read without opening the window of the editor.
-                System.err.println("build failed: " + error.getMessage());
-                respond(exchange, 400, "text/plain",
-                        error.getMessage().getBytes(StandardCharsets.UTF_8));
-                return;
-            }
-            String type = bundle ? "application/zip" : "application/java-archive";
-            String name = bundle ? "bundle.zip" : "app.jar";
-            exchange.getResponseHeaders().add("Content-Disposition",
-                    "attachment; filename=\"" + name + "\"");
-            exchange.getResponseHeaders().add("X-Artifact", name);
-            respond(exchange, 200, type, artifact);
-        } catch (Exception error) {
-            error.printStackTrace();
-            respond(exchange, 500, "text/plain",
-                    ("Build failed: " + error).getBytes(StandardCharsets.UTF_8));
-        } finally {
-            exchange.close();
-        }
+    public static class BuildException extends Exception {
+        public BuildException(String message) { super(message); }
     }
 
-    /** Extracts, compiles and packages the project; returns the artifact bytes. */
-    private static byte[] build(byte[] archive, boolean bundle) throws IOException, BuildException {
+    public byte[] build(byte[] archive, boolean bundle) throws IOException, BuildException {
         Path work = Files.createTempDirectory("javafx-build-");
         try {
             Path extracted = unzip(archive, work);
@@ -131,12 +59,9 @@ public class BuildServer {
 
             Path out = work.resolve("out");
             Files.createDirectories(out);
-            // The JavaFX SDK puts module-info into the per-platform jars, so the
-            // full SDK directory cannot be used as a module path (duplicate
-            // modules). Compiling against the classpath avoids that entirely.
             List<String> javac = new ArrayList<>(List.of(
                     "javac", "-nowarn", "-encoding", "UTF-8", "--release", "21",
-                    "-cp", JAVAFX_LIB + "/*",
+                    "-cp", javafxLib + "/*",
                     "-d", out.toString()));
             for (Path source : sources) {
                 javac.add(source.toString());
@@ -165,15 +90,14 @@ public class BuildServer {
         }
     }
 
-    /** app.jar + the JavaFX SDK + launch scripts, ready for the user's machine. */
-    private static byte[] bundle(Path work, Path jar, String mainClass) throws IOException {
+    private byte[] bundle(Path work, Path jar, String mainClass) throws IOException {
         ByteArrayOutputStream buffer = new ByteArrayOutputStream();
         try (ZipOutputStream zip = new ZipOutputStream(buffer)) {
             zip.putNextEntry(new ZipEntry("app.jar"));
             Files.copy(jar, zip);
             zip.closeEntry();
 
-            try (var jars = Files.list(JAVAFX_LIB)) {
+            try (var jars = Files.list(javafxLib)) {
                 for (Path sdk : jars.filter(p -> p.toString().endsWith(".jar")).toList()) {
                     zip.putNextEntry(new ZipEntry("lib/" + sdk.getFileName()));
                     Files.copy(sdk, zip);
@@ -209,8 +133,7 @@ public class BuildServer {
         return buffer.toByteArray();
     }
 
-    /** Finds the `public class X extends Application` entry point. */
-    private static String detectMainClass(List<Path> sources) throws IOException, BuildException {
+    private String detectMainClass(List<Path> sources) throws IOException, BuildException {
         for (Path source : sources) {
             String code = Files.readString(source);
             Matcher classMatcher = APPLICATION_CLASS.matcher(code);
@@ -224,16 +147,14 @@ public class BuildServer {
         throw new BuildException("No class extending javafx.application.Application was found");
     }
 
-    private static Path unzip(byte[] archive, Path target) throws IOException, BuildException {
+    private Path unzip(byte[] archive, Path target) throws IOException, BuildException {
         Path nested = target.resolve("project");
         Files.createDirectories(nested);
-        try (ZipInputStream zip = new ZipInputStream(new java.io.ByteArrayInputStream(archive))) {
+        try (ZipInputStream zip = new ZipInputStream(new ByteArrayInputStream(archive))) {
             ZipEntry entry;
             while ((entry = zip.getNextEntry()) != null) {
-                // Some zip tools write Windows separators; normalise them.
                 String name = entry.getName().replace('\\', '/');
                 Path destination = nested.resolve(name).normalize();
-                // Reject path traversal ("../") from untrusted archives.
                 if (!destination.startsWith(nested)) {
                     throw new BuildException("Archive contains an unsafe path: " + name);
                 }
@@ -242,18 +163,14 @@ public class BuildServer {
                     continue;
                 }
                 Files.createDirectories(destination.getParent());
-                Files.copy(zip, destination, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                Files.copy(zip, destination, StandardCopyOption.REPLACE_EXISTING);
             }
         }
         stripByteOrderMarks(nested);
         return nested;
     }
 
-    /**
-     * javac rejects a UTF-8 byte order mark, and editors on Windows happily add
-     * one, so it is removed from every text file we unpacked.
-     */
-    private static void stripByteOrderMarks(Path root) throws IOException {
+    private void stripByteOrderMarks(Path root) throws IOException {
         try (var walk = Files.walk(root)) {
             for (Path file : walk.filter(Files::isRegularFile).toList()) {
                 byte[] content = Files.readAllBytes(file);
@@ -268,11 +185,7 @@ public class BuildServer {
         }
     }
 
-    /**
-     * Archives are exported with a single top-level project folder; strip it.
-     * Archives without such a folder are used as they are.
-     */
-    private static Path singleRoot(Path extracted) throws IOException {
+    private Path singleRoot(Path extracted) throws IOException {
         if (Files.isDirectory(extracted.resolve("src"))) {
             return extracted;
         }
@@ -286,7 +199,7 @@ public class BuildServer {
         return extracted;
     }
 
-    private static void run(List<String> command, Path workDir, String message)
+    private void run(List<String> command, Path workDir, String message)
             throws IOException, BuildException {
         Process process = new ProcessBuilder(command)
                 .directory(workDir.toFile())
@@ -309,7 +222,7 @@ public class BuildServer {
         }
     }
 
-    private static void deleteRecursively(Path path) throws IOException {
+    private void deleteRecursively(Path path) throws IOException {
         if (!Files.exists(path)) {
             return;
         }
@@ -324,37 +237,8 @@ public class BuildServer {
         }
     }
 
-    private static void respond(HttpExchange exchange, int status, String type, byte[] body)
-            throws IOException {
-        exchange.getResponseHeaders().set("Content-Type", type);
-        exchange.sendResponseHeaders(status, body.length == 0 ? -1 : body.length);
-        if (body.length > 0) {
-            try (OutputStream out = exchange.getResponseBody()) {
-                out.write(body);
-            }
-        }
-    }
-
-    private static void cors(HttpExchange exchange) {
-        exchange.getResponseHeaders().set("Access-Control-Allow-Origin", "*");
-        exchange.getResponseHeaders().set("Access-Control-Allow-Methods", "POST, GET, OPTIONS");
-        exchange.getResponseHeaders().set("Access-Control-Allow-Headers", "Content-Type");
-    }
-
-    private static String trim(String value) {
+    private String trim(String value) {
         String trimmed = value.strip();
         return trimmed.length() > 4000 ? trimmed.substring(0, 4000) + "…" : trimmed;
-    }
-
-    private static String env(String key, String fallback) {
-        String value = System.getenv(key);
-        return value == null || value.isBlank() ? fallback : value;
-    }
-
-    /** A build problem that should be reported to the user, not as a crash. */
-    private static final class BuildException extends Exception {
-        BuildException(String message) {
-            super(message);
-        }
     }
 }

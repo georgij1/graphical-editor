@@ -10,6 +10,8 @@ spring:
 app:
   data-dir: ${DATA_DIR:/data}
   downloads-dir: ${DOWNLOADS_DIR:/downloads}
+  javafx-lib: ${JAVAFX_LIB:/opt/javafx/lib}
+  java-modules: ${JAVA_MODULES:javafx.controls,javafx.fxml}
   jwt-secret: ${JWT_SECRET:change-me-in-production}
   jwt-expiration-hours: 240
 
