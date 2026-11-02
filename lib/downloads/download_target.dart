@@ -32,14 +32,6 @@ const List<DownloadTarget> downloadTargets = <DownloadTarget>[
     icon: Icons.desktop_windows_outlined,
   ),
   DownloadTarget(
-    id: 'macos',
-    title: 'macOS',
-    subtitle: 'Build for Apple Silicon and Intel',
-    group: 'Desktop',
-    fileName: 'graphical_editor-macos.zip',
-    icon: Icons.laptop_mac_outlined,
-  ),
-  DownloadTarget(
     id: 'linux',
     title: 'Linux',
     subtitle: 'Build for Linux (x64, tar.gz)',
@@ -54,14 +46,6 @@ const List<DownloadTarget> downloadTargets = <DownloadTarget>[
     group: 'Mobile',
     fileName: 'graphical_editor.apk',
     icon: Icons.android_outlined,
-  ),
-  DownloadTarget(
-    id: 'ios',
-    title: 'iOS',
-    subtitle: 'Build for iPhone and iPad (signed)',
-    group: 'Mobile',
-    fileName: 'graphical_editor-ios.ipa',
-    icon: Icons.phone_iphone_outlined,
   ),
 ];
 
