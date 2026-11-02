@@ -1297,6 +1297,25 @@ class EditorController extends ChangeNotifier {
     _standaloneOpen = false;
     _openTabs.clear();
     _activeTabIndex = -1;
+    // Collaborative (shared) projects do not auto-open a scene: the user
+    // picks the file to work on from the project tree, so two people do not
+    // silently overwrite each other's view of "the" main scene.
+    if (project.shared || project.collaborative) {
+      _activeScene = null;
+      _openSource = null;
+      _document = FxmlDocument.empty();
+      _fileName = null;
+      _selected = null;
+      _dirty = false;
+      _undoStack.clear();
+      _redoStack.clear();
+      _endEditChain();
+      revalidate();
+      notifyListeners();
+      _startCollaboration(project);
+      _startPresence(project);
+      return;
+    }
     final scene = project.mainScene;
     if (scene != null) {
       openScene(scene);
