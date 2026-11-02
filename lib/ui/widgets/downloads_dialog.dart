@@ -99,7 +99,7 @@ class _DownloadsDialogState extends State<DownloadsDialog> {
       ),
       content: SizedBox(
         width: 460,
-        height: 460,
+        height: 320,
         child: _loading
             ? const Center(child: CircularProgressIndicator())
             : SingleChildScrollView(
