@@ -54,9 +54,8 @@ class _DownloadsDialogState extends State<DownloadsDialog> {
 
   Future<void> _probeAll() async {
     final probe = widget.probe ?? _httpProbe;
-    final base = downloadsBaseUrl();
     final entries = await Future.wait(downloadTargets.map((target) async {
-      final ok = await probe(downloadUri(base, target.fileName));
+      final ok = await probe(clientDownloadUri(target.id));
       return MapEntry(target.id, ok);
     }));
     if (!mounted) return;
@@ -70,7 +69,7 @@ class _DownloadsDialogState extends State<DownloadsDialog> {
 
   Future<void> _download(DownloadTarget target) async {
     setState(() => _opening.add(target.id));
-    final uri = downloadUri(downloadsBaseUrl(), target.fileName);
+    final uri = clientDownloadUri(target.id);
     final ok = await launchUrl(uri, webOnlyWindowName: '_blank');
     if (!mounted) return;
     setState(() => _opening.remove(target.id));

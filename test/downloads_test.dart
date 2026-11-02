@@ -6,7 +6,7 @@ import 'package:graphical_editor/l10n/app_localizations.dart';
 import 'package:graphical_editor/ui/widgets/downloads_dialog.dart';
 
 Future<bool> _probe(Uri uri) async =>
-    uri.path.endsWith('graphical_editor-windows.zip');
+    uri.path.contains('windows') && uri.path.endsWith('/download');
 
 Widget _app(Locale locale) {
   return MaterialApp(

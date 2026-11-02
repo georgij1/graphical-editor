@@ -58,3 +58,18 @@ Uri downloadUri(String baseUrl, String fileName) {
   final full = Uri.parse('$normalized/$fileName');
   return full.hasScheme ? full : Uri.base.resolve(full.toString());
 }
+
+/// Base URL for the backend client API. Override at build time with
+/// `--dart-define=API_BASE_URL=...`; defaults to same-origin `/api`.
+String clientsApiBaseUrl() {
+  const fromEnv = String.fromEnvironment('API_BASE_URL', defaultValue: '/api');
+  final normalized = fromEnv.endsWith('/')
+      ? fromEnv.substring(0, fromEnv.length - 1)
+      : fromEnv;
+  return '$normalized/clients';
+}
+
+/// URI used to download a client artifact through the backend controller.
+Uri clientDownloadUri(String id) {
+  return Uri.parse('${clientsApiBaseUrl()}/$id/download');
+}
