@@ -424,11 +424,8 @@ class _OpenTabsBarState extends State<_OpenTabsBar> {
               return MouseRegion(
                 onEnter: (_) => setState(() => _hovered = index),
                 onExit: (_) => setState(() => _hovered = -1),
-                child: GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onTap: () {
-                    controller.activateTab(index);
-                  },
+                child: InkWell(
+                  onTap: () => controller.activateTab(index),
                   child: Container(
                     constraints: const BoxConstraints(minWidth: 90, maxWidth: 200),
                     padding: const EdgeInsets.symmetric(horizontal: 8),
