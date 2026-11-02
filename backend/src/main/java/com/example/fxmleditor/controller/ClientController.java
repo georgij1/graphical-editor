@@ -47,7 +47,9 @@ public class ClientController {
     }
 
     @GetMapping
-    @Operation(summary = "List the available downloadable clients")
+    @Operation(summary = "List the available downloadable clients",
+            description = "Returns the clients that are actually present in the downloads directory. "
+                    + "Use the downloadUrl field (or GET /api/clients/{id}/download) to fetch the artifact.")
     public ResponseEntity<?> list() {
         List<Map<String, Object>> out = new ArrayList<>();
         for (Map.Entry<String, String> e : FILES.entrySet()) {
@@ -65,7 +67,9 @@ public class ClientController {
     }
 
     @GetMapping("/{id}/download")
-    @Operation(summary = "Download a client artifact")
+    @Operation(summary = "Download a client artifact",
+            description = "Streams the requested client file as an attachment. "
+                    + "The response body is the binary file; Swagger UI may offer a download link.")
     public ResponseEntity<Resource> download(@PathVariable String id) {
         String name = FILES.get(id);
         if (name == null) return ResponseEntity.notFound().build();
