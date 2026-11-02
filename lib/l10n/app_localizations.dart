@@ -417,6 +417,8 @@ class AppLocalizations {
     'AI suggestion loaded. Review and Apply.':
         'Предложение ИИ загружено. Проверьте и нажмите «Применить».',
     'No issues found.': 'Ошибок нет.',
+    'Select a file in the project tree to start editing.':
+        'Выберите файл в дереве проекта, чтобы начать редактирование.',
     // Java/FXML checker messages (keys keep {0}… slots for the arguments).
     "';' expected": "Ожидается ';'.",
     "')' expected": "Ожидается ')'.",

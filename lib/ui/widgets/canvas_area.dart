@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../editor/editor_controller.dart';
+import '../../l10n/app_localizations.dart';
 import 'canvas_view.dart';
 import 'project_home.dart';
 import 'source_view.dart';
@@ -24,6 +25,27 @@ class CanvasArea extends StatelessWidget {
     // empty white sheet, so present a project picker instead.
     if (!controller.hasOpenDocument) {
       return ProjectHome(controller: controller);
+    }
+
+    // A collaborative project opens without auto-loading a scene: prompt the
+    // user to pick a file from the tree instead of showing an empty canvas.
+    if (controller.activeScene == null && !controller.codeMode) {
+      final theme = Theme.of(context);
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            Icon(Icons.folder_open_outlined,
+                size: 48, color: theme.colorScheme.onSurfaceVariant),
+            const SizedBox(height: 12),
+            Text(
+              context.tr('Select a file in the project tree to start editing.'),
+              style: theme.textTheme.titleMedium,
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      );
     }
 
     final codeView = CodeView(
