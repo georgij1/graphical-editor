@@ -4,9 +4,11 @@ services:
     environment:
       JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
       DATA_DIR: /data
+      DOWNLOADS_DIR: /downloads
       PORT: 8080
     volumes:
       - backend-data:/data
+      - ./downloads:/downloads:ro
     restart: unless-stopped
     networks:
       - editor-net

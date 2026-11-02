@@ -9,6 +9,7 @@ spring:
 # Data directory for JSON persistence
 app:
   data-dir: ${DATA_DIR:/data}
+  downloads-dir: ${DOWNLOADS_DIR:/downloads}
   jwt-secret: ${JWT_SECRET:change-me-in-production}
   jwt-expiration-hours: 240
 
