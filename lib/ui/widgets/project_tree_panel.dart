@@ -166,6 +166,8 @@ class _ProjectTreePanelState extends State<ProjectTreePanel> {
 
   _DirNode _buildTree(Project project) {
     final root = _DirNode(project.name, project.name);
+    // ignore: avoid_print
+    print('🌳 TREE build: name=${project.name} scenes=${project.scenes.length} mainClass=${project.mainClass}');
 
     void addFile(
       String path, {
@@ -198,6 +200,12 @@ class _ProjectTreePanelState extends State<ProjectTreePanel> {
 
     // Add generated Java sources
     final generatedFiles = JavaGenerator.generate(project);
+    // ignore: avoid_print
+    print('🌳 generatedFiles: ${generatedFiles.length}');
+    for (final f in generatedFiles) {
+      // ignore: avoid_print
+      print('  📄 ${f.path}');
+    }
     for (final source in generatedFiles) {
       addFile(source.path, content: source.content, isJava: true);
     }
@@ -256,6 +264,8 @@ class _ProjectTreePanelState extends State<ProjectTreePanel> {
       }
     }
 
+    // ignore: avoid_print
+    print('🌳 ROOT dirs: ${root.dirs.keys.toList()}, files: ${root.files.length}');
     return root;
   }
 
