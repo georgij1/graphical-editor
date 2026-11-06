@@ -155,7 +155,8 @@ class _ProjectTreePanelState extends State<ProjectTreePanel> {
                 },
               ),
               const Divider(height: 1),
-              ..._renderChildren(context, projectNow, root, 0),
+              // Root project folder tile (renders recursively)
+              _directoryTile(context, projectNow, root, 0),
             ],
           );
         },
