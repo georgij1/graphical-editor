@@ -412,6 +412,8 @@ class AppLocalizations {
     'Description (optional)': 'Описание (необязательно)',
     'Cancel': 'Отмена',
     'Create': 'Создать',
+    'New folder': 'Новая папка',
+    'Folder name': 'Имя папки',
     'Rename scene': 'Переименовать сцену',
     'Delete scene': 'Удалить сцену',
     'Close': 'Закрыть',
