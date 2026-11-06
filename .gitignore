@@ -55,3 +55,5 @@ backend-dart/
 
 # Built client artifacts (served from disk, not from git)
 downloads/
+backend/build/
+backend/.gradle/

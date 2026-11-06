@@ -1,9 +1,15 @@
-FROM maven:3.9-eclipse-temurin-21 AS build
+FROM eclipse-temurin:21-jdk AS build
 WORKDIR /app
-COPY pom.xml ./
-RUN mvn -q -o dependency:go-offline 2>/dev/null || mvn -q dependency:go-offline
+
+# Copy Gradle wrapper (small, cached layer)
+COPY gradlew gradlew.bat ./
+COPY gradle/wrapper ./gradle/wrapper
+COPY build.gradle settings.gradle ./
+RUN chmod +x gradlew && ./gradlew --no-daemon --console=plain dependencies
+
+# Copy sources and build
 COPY src ./src
-RUN mvn -q -DskipTests package
+RUN ./gradlew --no-daemon --console=plain bootJar -x test
 
 FROM eclipse-temurin:21-jdk AS runtime
 WORKDIR /app
@@ -23,7 +29,7 @@ RUN set -eux; \
     done; \
     chmod -R a+rX /opt/javafx/lib
 
-COPY --from=build /app/target/fxml-editor-backend-*.jar /app/app.jar
+COPY --from=build /app/build/libs/fxml-editor-backend-*.jar /app/app.jar
 
 ENV PORT=8080 \
     DATA_DIR=/data \
