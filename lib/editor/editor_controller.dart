@@ -1934,13 +1934,60 @@ class EditorController extends ChangeNotifier {
     return null;
   }
 
-  /// Deletes an empty folder from the project.
+  /// Renames a folder. Returns an error message if the folder cannot be
+  /// renamed, or null on success.
+  String? renameFolder(String oldPath, String newName) {
+    final project = _currentProject;
+    if (project == null) return 'No project is open.';
+    
+    // Remove trailing slash if present
+    final cleanOldPath = oldPath.endsWith('/') ? oldPath.substring(0, oldPath.length - 1) : oldPath;
+    final cleanNewPath = '$newName/';
+    
+    // Find all entries that start with this path and rename them
+    final entriesToRename = project.sourceOverrides.entries
+        .where((e) => e.key.startsWith('$cleanOldPath/') || e.key == '$cleanOldPath/')
+        .toList();
+    
+    for (final entry in entriesToRename) {
+      project.sourceOverrides.remove(entry.key);
+      final newKey = entry.key.replaceFirst('$cleanOldPath/', '$cleanOldPath/$cleanNewPath');
+      project.sourceOverrides[newKey] = entry.value;
+    }
+    
+    // If this is an empty folder marker, rename it directly
+    if (project.sourceOverrides.containsKey('$cleanOldPath/')) {
+      project.sourceOverrides.remove('$cleanOldPath/');
+      project.sourceOverrides['$cleanOldPath/$cleanNewPath'] = '';
+    }
+    
+    _persist();
+    notifyListeners();
+    return null;
+  }
+
+  /// Deletes a folder and all its contents from the project.
   String? deleteFolder(String folderPath) {
     final project = _currentProject;
     if (project == null) return 'No project is open.';
     
-    // Remove the folder key (ends with /)
-    project.sourceOverrides.remove(folderPath);
+    // Remove trailing slash if present
+    final cleanPath = folderPath.endsWith('/') ? folderPath : '$folderPath/';
+    
+    // Remove all entries that start with this path
+    final keysToRemove = project.sourceOverrides.keys
+        .where((k) => k.startsWith(cleanPath) || k == cleanPath)
+        .toList();
+    
+    for (final key in keysToRemove) {
+      project.sourceOverrides.remove(key);
+      // Close tab if open
+      final tabIndex = _openTabs.indexWhere((f) => f.path == key);
+      if (tabIndex >= 0) {
+        closeTab(tabIndex);
+      }
+    }
+    
     _persist();
     notifyListeners();
     return null;

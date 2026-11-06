@@ -327,71 +327,81 @@ class _ProjectTreePanelState extends State<ProjectTreePanel> {
         ),
         child: Row(
           children: <Widget>[
-            if (!empty)
-              _contextMenu(
-                context,
-                Icon(
-                  collapsed ? Icons.chevron_right : Icons.expand_more,
-                  size: 16,
-                ),
-                <PopupMenuEntry<int>>[
-                  PopupMenuItem<int>(
-                    value: 1,
-                    child: Text(context.tr('New scene')),
-                  ),
-                  PopupMenuItem<int>(
-                    value: 2,
-                    child: Text(context.tr('New folder')),
-                  ),
-                  PopupMenuItem<int>(
-                    value: 3,
-                    child: Text(context.tr('New file')),
-                  ),
-                  const PopupMenuDivider(),
-                  PopupMenuItem<int>(
-                    value: 4,
-                    child: Text(context.tr('Rename')),
-                  ),
-                  PopupMenuItem<int>(
-                    value: 5,
-                    child: Text(context.tr('Delete')),
-                  ),
-                ],
-                (value) async {
-                  if (value == 1) {
-                    final name = await showPromptDialog(
-                      context,
-                      title: context.tr('New scene'),
-                      initial: 'scene',
-                    );
-                    if (!mounted) return;
-                    if (name != null && name.trim().isNotEmpty) {
-                      controller.newScene(name);
-                    }
-                  } else if (value == 2) {
-                    _say(
-                      context,
-                      context.tr('Folder creation is not supported yet.'),
-                    );
-                  } else if (value == 3) {
-                    final result = await showNewFileModal(context);
-                    if (!mounted || result == null) return;
-                    final fileName = result['name']!;
-                    final fileType = result['type']!;
-                    controller.newFile(fileName, fileType, folderPath: dir.path);
-                  } else if (value == 4) {
-                    _say(
-                      context,
-                      context.tr('Folder rename is not supported yet.'),
-                    );
-                  } else if (value == 5) {
-                    _say(
-                      context,
-                      context.tr('Folder deletion is not supported yet.'),
-                    );
-                  }
-                },
+            _contextMenu(
+              context,
+              Icon(
+                empty
+                    ? Icons.folder_outlined
+                    : (collapsed ? Icons.chevron_right : Icons.expand_more),
+                size: 16,
               ),
+              <PopupMenuEntry<int>>[
+                PopupMenuItem<int>(
+                  value: 1,
+                  child: Text(context.tr('New scene')),
+                ),
+                PopupMenuItem<int>(
+                  value: 2,
+                  child: Text(context.tr('New folder')),
+                ),
+                PopupMenuItem<int>(
+                  value: 3,
+                  child: Text(context.tr('New file')),
+                ),
+                const PopupMenuDivider(),
+                PopupMenuItem<int>(
+                  value: 4,
+                  child: Text(context.tr('Rename')),
+                ),
+                PopupMenuItem<int>(
+                  value: 5,
+                  child: Text(context.tr('Delete')),
+                ),
+              ],
+              (value) async {
+                if (value == 1) {
+                  final name = await showPromptDialog(
+                    context,
+                    title: context.tr('New scene'),
+                    initial: 'scene',
+                  );
+                  if (!mounted) return;
+                  if (name != null && name.trim().isNotEmpty) {
+                    controller.newScene(name);
+                  }
+                } else if (value == 2) {
+                  final name = await showNewFolderModal(context);
+                  if (!mounted || name == null) return;
+                  controller.newFolder(name, folderPath: dir.path);
+                } else if (value == 3) {
+                  final result = await showNewFileModal(context);
+                  if (!mounted || result == null) return;
+                  final fileName = result['name']!;
+                  final fileType = result['type']!;
+                  controller.newFile(fileName, fileType, folderPath: dir.path);
+                } else if (value == 4) {
+                  final newName = await showPromptDialog(
+                    context,
+                    title: '${context.tr('Rename')} — ${context.tr('Folder')}',
+                    initial: dir.name,
+                  );
+                  if (newName == null || !context.mounted) return;
+                  controller.renameFolder(dir.path, newName);
+                } else if (value == 5) {
+                  if (!context.mounted) return;
+                  final ok = await confirmDialog(
+                    context,
+                    title: context.tr('Delete'),
+                    message: '${context.tr('Delete')} ${dir.name}?',
+                  );
+                  if (!ok || !context.mounted) return;
+                  final error = controller.deleteFolder(dir.path);
+                  if (error != null && context.mounted) {
+                    _say(context, context.tr(error));
+                  }
+                }
+              },
+            ),
             if (!empty) const SizedBox(width: 2),
             const Icon(Icons.folder_outlined, size: 16),
             const SizedBox(width: 6),
