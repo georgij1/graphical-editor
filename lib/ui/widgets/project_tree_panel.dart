@@ -196,9 +196,13 @@ class _ProjectTreePanelState extends State<ProjectTreePanel> {
       );
     }
 
-    for (final source in JavaGenerator.generate(project)) {
+    // Add generated Java sources
+    final generatedFiles = JavaGenerator.generate(project);
+    for (final source in generatedFiles) {
       addFile(source.path, content: source.content, isJava: true);
     }
+
+    // Add build files
     for (final file in const BuildFiles().generate(project, BuildTool.maven)) {
       addFile(
         file.path,
@@ -208,12 +212,16 @@ class _ProjectTreePanelState extends State<ProjectTreePanel> {
         isXml: file.path.endsWith('.xml'),
       );
     }
+
+    // Add project.json
     addFile(
       'project.json',
       content: const JsonEncoder.withIndent('  ').convert(project.toJson()),
       isJava: false,
       isBuildFile: true,
     );
+
+    // Add FXML scenes
     final pkgDir = JavaGenerator.packageDir(project);
     for (final scene in project.scenes) {
       addFile(
@@ -225,9 +233,9 @@ class _ProjectTreePanelState extends State<ProjectTreePanel> {
       );
     }
 
-    // Add user-created files from sourceOverrides that are not standard files
+    // Add user-created files from sourceOverrides
     final standardPaths = <String>{
-      ...JavaGenerator.generate(project, applyOverrides: false).map((f) => f.path),
+      ...generatedFiles.map((f) => f.path),
       ...const BuildFiles()
           .generate(project, BuildTool.maven)
           .map((f) => f.path),
@@ -247,6 +255,7 @@ class _ProjectTreePanelState extends State<ProjectTreePanel> {
         );
       }
     }
+
     return root;
   }
 
