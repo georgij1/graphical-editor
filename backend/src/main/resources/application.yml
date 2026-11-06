@@ -6,19 +6,19 @@ spring:
     serialization:
       write-dates-as-timestamps: false
 
-# Data directory for JSON persistence
+# Директория для хранения JSON-данных
 app:
-  data-dir: ${DATA_DIR:/data}
-  downloads-dir: ${DOWNLOADS_DIR:/downloads}
-  javafx-lib: ${JAVAFX_LIB:/opt/javafx/lib}
-  java-modules: ${JAVA_MODULES:javafx.controls,javafx.fxml}
-  jwt-secret: ${JWT_SECRET:change-me-in-production}
-  jwt-expiration-hours: 240
+  data-dir: ${DATA_DIR:/data}           # директория для хранения JSON-данных
+  downloads-dir: ${DOWNLOADS_DIR:/downloads}  # директория со скачиваемыми клиентами
+  javafx-lib: ${JAVAFX_LIB:/opt/javafx/lib}   # путь к JavaFX SDK внутри контейнера
+  java-modules: ${JAVA_MODULES:javafx.controls,javafx.fxml}  # модули JavaFX
+  jwt-secret: ${JWT_SECRET:change-me-in-production}  # секрет JWT (обязательно заменить в проде)
+  jwt-expiration-hours: 240             # время жизни токена (10 суток)
 
 springdoc:
   api-docs:
-    path: /v3/api-docs
+    path: /v3/api-docs            # OpenAPI-спецификация
   swagger-ui:
-    path: /swagger-ui.html
-    operations-sorter: method
-    tags-sorter: alpha
+    path: /swagger-ui.html        # интерфейс Swagger UI
+    operations-sorter: method     # сортировка операций по HTTP-методу
+    tags-sorter: alpha            # сортировка тегов по алфавиту
