@@ -253,6 +253,11 @@ class _ProjectTreePanelState extends State<ProjectTreePanel> {
           isJava: entry.key.endsWith('.java'),
           isXml: entry.key.endsWith('.xml') || entry.key.endsWith('.fxml'),
         );
+        // ignore: avoid_print
+        print('📂 Added user file to tree: ${entry.key}');
+      } else {
+        // ignore: avoid_print
+        print('⏭️ Skipping standard file: ${entry.key}');
       }
     }
 

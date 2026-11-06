@@ -1852,6 +1852,10 @@ class EditorController extends ChangeNotifier {
     }
     
     project.sourceOverrides[path] = content;
+    // ignore: avoid_print
+    print('📄 File created at: $path, type: $fileType, content length: ${content.length}');
+    // ignore: avoid_print
+    print('📋 sourceOverrides keys: ${project.sourceOverrides.keys.toList()}');
     showSource(GeneratedFile(
       path: path,
       content: content,
