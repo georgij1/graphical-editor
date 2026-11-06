@@ -1812,23 +1812,20 @@ class EditorController extends ChangeNotifier {
   void newFile(String fileName, String fileType, {String? folderPath}) {
     final project = _currentProject;
     if (project == null) return;
-    
+
     // Remove project name prefix from folderPath if present
     String? cleanFolderPath = folderPath;
     if (folderPath != null && folderPath.startsWith('${project.name}/')) {
       cleanFolderPath = folderPath.substring(project.name.length + 1);
     }
-    
+
     final String path;
     if (cleanFolderPath != null && cleanFolderPath.isNotEmpty) {
       path = '$cleanFolderPath/$fileName';
     } else {
       path = 'src/main/java/${JavaGenerator.packageDir(project)}/$fileName';
     }
-    
-    // ignore: avoid_print
-    print('📄 Creating file: $path');
-    
+
     String content;
     switch (fileType) {
       case 'Java':
@@ -1841,21 +1838,17 @@ class EditorController extends ChangeNotifier {
       case 'XML':
         content = '<?xml version="1.0" encoding="UTF-8"?>\n<root>\n    <!-- TODO: add content -->\n</root>\n';
         break;
-      case 'Properties':
-        content = '# Configuration file\nkey=value\n';
-        break;
       case 'Markdown':
         content = '# $fileName\n\n<!-- TODO: add content -->\n';
         break;
-      default: // Text
+      case 'Custom':
+        content = '';
+        break;
+      default:
         content = '';
     }
-    
+
     project.sourceOverrides[path] = content;
-    // ignore: avoid_print
-    print('📄 File created at: $path, type: $fileType, content length: ${content.length}');
-    // ignore: avoid_print
-    print('📋 sourceOverrides keys: ${project.sourceOverrides.keys.toList()}');
     showSource(GeneratedFile(
       path: path,
       content: content,
@@ -1897,6 +1890,25 @@ class EditorController extends ChangeNotifier {
     notifyListeners();
     return null;
   }
+
+  /// Renames a user-created file. Returns an error message if the file
+  /// cannot be renamed, or null on success.
+  String? renameFile(String oldPath, String newName) {
+    final project = _currentProject;
+    if (project == null) return 'No project is open.';
+    final content = project.sourceOverrides.remove(oldPath);
+    if (content == null) return 'File not found.';
+    
+    final parts = oldPath.split('/');
+    parts[parts.length - 1] = newName;
+    final newPath = parts.join('/');
+    
+    project.sourceOverrides[newPath] = content;
+    _persist();
+    notifyListeners();
+    return null;
+  }
+
   void renameScene(SceneFile scene, String newName) {
     final project = _currentProject;
     final safe = newName.trim().replaceAll(RegExp(r'\s+'), '_');

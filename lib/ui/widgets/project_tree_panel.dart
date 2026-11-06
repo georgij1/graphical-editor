@@ -245,9 +245,6 @@ class _ProjectTreePanelState extends State<ProjectTreePanel> {
       ),
     };
 
-    // ignore: avoid_print
-    print('🌲 _buildTree: standardPaths = $standardPaths');
-
     for (final entry in project.sourceOverrides.entries) {
       if (!standardPaths.contains(entry.key)) {
         addFile(
@@ -256,11 +253,6 @@ class _ProjectTreePanelState extends State<ProjectTreePanel> {
           isJava: entry.key.endsWith('.java'),
           isXml: entry.key.endsWith('.xml') || entry.key.endsWith('.fxml'),
         );
-        // ignore: avoid_print
-        print('📂 Added user file to tree: ${entry.key}');
-      } else {
-        // ignore: avoid_print
-        print('⏭️ Skipping standard file: ${entry.key}');
       }
     }
 
@@ -275,8 +267,6 @@ class _ProjectTreePanelState extends State<ProjectTreePanel> {
     _DirNode dir,
     int depth,
   ) {
-    // ignore: avoid_print
-    print('🎨 _renderChildren for: ${dir.path}, dirs: ${dir.dirs.keys.toList()}, files: ${dir.files.map((f) => f.name).toList()}');
     final widgets = <Widget>[];
 
     // Рендерим поддиректории (они сами рекурсивно рендерят своё содержимое)
@@ -374,8 +364,6 @@ class _ProjectTreePanelState extends State<ProjectTreePanel> {
                     if (!mounted || result == null) return;
                     final fileName = result['name']!;
                     final fileType = result['type']!;
-                    // ignore: avoid_print
-                    print('📁 Creating file in folder: $dir.path');
                     controller.newFile(fileName, fileType, folderPath: dir.path);
                   } else if (value == 4) {
                     _say(
@@ -602,51 +590,120 @@ class _ProjectTreePanelState extends State<ProjectTreePanel> {
     }
 
     // FXML scene file
-    if (file.scene == null) return const SizedBox.shrink();
+    if (file.scene != null) {
+      final scene = file.scene!;
+      final active = controller.codeMode
+          ? file.path == controller.codePath
+          : identical(controller.activeScene, scene);
+      final controllerClass = scene.controllerClass;
+      final tile = ListTile(
+        dense: true,
+        visualDensity: VisualDensity.compact,
+        contentPadding: padding,
+        selected: active,
+        selectedTileColor: Theme.of(context).colorScheme.primaryContainer
+            .withValues(alpha: 0.4),
+        leading: const Icon(Icons.description_outlined, size: 16),
+        title: Text(file.name, style: const TextStyle(fontSize: 12)),
+        subtitle: controllerClass == null || controllerClass.isEmpty
+            ? null
+            : Text(
+                controllerClass,
+                style: const TextStyle(fontSize: 10),
+                overflow: TextOverflow.ellipsis,
+              ),
+        onTap: () {
+          controller.openScene(scene);
+          controller.setCodeMode(false);
+        },
+      );
+      return _contextMenu(
+        context,
+        tile,
+        <PopupMenuEntry<int>>[
+          PopupMenuItem<int>(value: 1, child: Text(context.tr('Open in editor'))),
+          const PopupMenuDivider(),
+          PopupMenuItem<int>(value: 2, child: Text(context.tr('Rename'))),
+          PopupMenuItem<int>(value: 3, child: Text(context.tr('Delete'))),
+        ],
+        (value) async {
+          if (value == 1) {
+            controller.openScene(scene);
+            controller.setCodeMode(false);
+          } else if (value == 2) {
+            widget.onRenameScene(scene);
+          } else if (value == 3) {
+            widget.onDeleteScene(scene);
+          }
+        },
+      );
+    }
 
-    final scene = file.scene!;
-    final active = controller.codeMode
-        ? file.path == controller.codePath
-        : identical(controller.activeScene, scene);
-    final controllerClass = scene.controllerClass;
+    // User-created file (CSS, JSON, etc.)
+    return _renderUserFileTile(context, project, file, depth);
+  }
+
+  Widget _renderUserFileTile(
+    BuildContext context,
+    Project project,
+    _FileNode file,
+    int depth,
+  ) {
+    final padding = EdgeInsets.only(left: 6 + depth * 14.0, right: 6);
     final tile = ListTile(
       dense: true,
       visualDensity: VisualDensity.compact,
       contentPadding: padding,
-      selected: active,
-      selectedTileColor: Theme.of(context).colorScheme.primaryContainer
-          .withValues(alpha: 0.4),
-      leading: const Icon(Icons.description_outlined, size: 16),
+      leading: const Icon(Icons.insert_drive_file, size: 16),
       title: Text(file.name, style: const TextStyle(fontSize: 12)),
-      subtitle: controllerClass == null || controllerClass.isEmpty
-          ? null
-          : Text(
-              controllerClass,
-              style: const TextStyle(fontSize: 10),
-              overflow: TextOverflow.ellipsis,
-            ),
-      onTap: () {
-        controller.openScene(scene);
-        controller.setCodeMode(false);
-      },
+      onTap: () => controller.showSource(
+        GeneratedFile(
+          path: file.path,
+          content: file.content ?? '',
+          isJava: file.path.endsWith('.java'),
+          isXml: file.path.endsWith('.xml') || file.path.endsWith('.fxml'),
+        ),
+      ),
     );
     return _contextMenu(
       context,
       tile,
       <PopupMenuEntry<int>>[
-        PopupMenuItem<int>(value: 1, child: Text(context.tr('Open in editor'))),
+        PopupMenuItem<int>(value: 1, child: Text(context.tr('Open source'))),
         const PopupMenuDivider(),
         PopupMenuItem<int>(value: 2, child: Text(context.tr('Rename'))),
         PopupMenuItem<int>(value: 3, child: Text(context.tr('Delete'))),
       ],
       (value) async {
         if (value == 1) {
-          controller.openScene(scene);
-          controller.setCodeMode(false);
+          controller.showSource(
+            GeneratedFile(
+              path: file.path,
+              content: file.content ?? '',
+              isJava: file.path.endsWith('.java'),
+              isXml: file.path.endsWith('.xml') || file.path.endsWith('.fxml'),
+            ),
+          );
         } else if (value == 2) {
-          widget.onRenameScene(scene);
+          final newName = await showPromptDialog(
+            context,
+            title: '${context.tr('Rename')} — ${context.tr('File')}',
+            initial: file.name,
+          );
+          if (newName == null || !context.mounted) return;
+          controller.renameFile(file.path, newName);
         } else if (value == 3) {
-          widget.onDeleteScene(scene);
+          if (!context.mounted) return;
+          final ok = await confirmDialog(
+            context,
+            title: context.tr('Delete'),
+            message: '${context.tr('Delete')} ${file.name}?',
+          );
+          if (!ok || !context.mounted) return;
+          final error = controller.deleteFile(file.path);
+          if (error != null && context.mounted) {
+            _say(context, context.tr(error));
+          }
         }
       },
     );
