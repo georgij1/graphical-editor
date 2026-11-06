@@ -267,14 +267,18 @@ class _ProjectTreePanelState extends State<ProjectTreePanel> {
     _DirNode dir,
     int depth,
   ) {
-    final widgets = <Widget>[
-      for (final child in _sortedDirs(dir))
-        _directoryTile(context, project, child, depth),
-      // Файлы отображаются на один уровень глубже родительской папки,
-      // как в обычном IDE: папка «содержит» файлы, поэтому они сдвинуты вправо.
-      for (final file in _sortedFiles(dir))
-        _fileTile(context, project, file, depth + 1),
-    ];
+    final widgets = <Widget>[];
+
+    // Рендерим поддиректории (они сами рекурсивно рендерят своё содержимое)
+    for (final child in _sortedDirs(dir)) {
+      widgets.add(_directoryTile(context, project, child, depth));
+    }
+
+    // Файлы отображаются на один уровень глубже родительской папки
+    for (final file in _sortedFiles(dir)) {
+      widgets.add(_fileTile(context, project, file, depth + 1));
+    }
+
     return widgets;
   }
 
