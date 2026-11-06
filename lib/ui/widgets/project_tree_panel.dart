@@ -200,18 +200,29 @@ class _ProjectTreePanelState extends State<ProjectTreePanel> {
       addFile(source.path, content: source.content, isJava: true);
     }
 
-    // Add user-created files from sourceOverrides that are not in the generated list
-    final generatedPaths = JavaGenerator.generate(project)
-        .map((f) => f.path)
-        .toSet();
+    // Add user-created files from sourceOverrides
+    final existingPaths = <String>{
+      ...JavaGenerator.generate(project).map((f) => f.path),
+      ...const BuildFiles()
+          .generate(project, BuildTool.maven)
+          .map((f) => f.path),
+      'project.json',
+    };
+    final pkgDir = JavaGenerator.packageDir(project);
+    existingPaths.addAll(
+      project.scenes.map(
+        (s) => 'src/main/resources/$pkgDir/${s.name}.fxml',
+      ),
+    );
+
     for (final entry in project.sourceOverrides.entries) {
-      if (!generatedPaths.contains(entry.key) &&
-          !entry.key.startsWith('src/main/resources/')) {
+      if (!existingPaths.contains(entry.key)) {
         addFile(
           entry.key,
           content: entry.value,
           isJava: entry.key.endsWith('.java'),
-          isXml: entry.key.endsWith('.xml') || entry.key.endsWith('.fxml'),
+          isXml:
+              entry.key.endsWith('.xml') || entry.key.endsWith('.fxml'),
         );
       }
     }
@@ -230,10 +241,6 @@ class _ProjectTreePanelState extends State<ProjectTreePanel> {
       isJava: false,
       isBuildFile: true,
     );
-    final pkgDir = JavaGenerator.packageDir(project);
-    final scenePaths = project.scenes
-        .map((s) => 'src/main/resources/$pkgDir/${s.name}.fxml')
-        .toSet();
     for (final scene in project.scenes) {
       addFile(
         'src/main/resources/$pkgDir/${scene.name}.fxml',
@@ -241,54 +248,6 @@ class _ProjectTreePanelState extends State<ProjectTreePanel> {
         scene: scene,
         isJava: false,
         isXml: true,
-      );
-    }
-
-    // Add user-created FXML files from sourceOverrides that are not scenes
-    for (final entry in project.sourceOverrides.entries) {
-      if (entry.key.startsWith('src/main/resources/') &&
-          entry.key.endsWith('.fxml') &&
-          !scenePaths.contains(entry.key)) {
-        addFile(
-          entry.key,
-          content: entry.value,
-          isJava: false,
-          isXml: true,
-        );
-      }
-    }
-
-    // Add any other user-created files from sourceOverrides
-    final javaPrefix = 'src/main/java/';
-    final resourcesPrefix = 'src/main/resources/';
-    final buildPaths = const BuildFiles()
-        .generate(project, BuildTool.maven)
-        .map((f) => f.path)
-        .toSet();
-    buildPaths.add('project.json');
-
-    for (final entry in project.sourceOverrides.entries) {
-      final path = entry.key;
-      // Skip if already added (generated Java, scenes, or build files)
-      if (generatedPaths.contains(path) ||
-          scenePaths.contains(path) ||
-          buildPaths.contains(path)) {
-        continue;
-      }
-      // Skip if in resources but not FXML (handled above)
-      if (path.startsWith(resourcesPrefix) && !path.endsWith('.fxml')) {
-        continue;
-      }
-      // Skip if in java but already in generatedPaths (handled above)
-      if (path.startsWith(javaPrefix) && generatedPaths.contains(path)) {
-        continue;
-      }
-
-      addFile(
-        path,
-        content: entry.value,
-        isJava: path.endsWith('.java'),
-        isXml: path.endsWith('.xml') || path.endsWith('.fxml'),
       );
     }
     return root;
