@@ -245,6 +245,9 @@ class _ProjectTreePanelState extends State<ProjectTreePanel> {
       ),
     };
 
+    // ignore: avoid_print
+    print('🌲 _buildTree: standardPaths = $standardPaths');
+
     for (final entry in project.sourceOverrides.entries) {
       if (!standardPaths.contains(entry.key)) {
         addFile(
@@ -272,6 +275,8 @@ class _ProjectTreePanelState extends State<ProjectTreePanel> {
     _DirNode dir,
     int depth,
   ) {
+    // ignore: avoid_print
+    print('🎨 _renderChildren for: ${dir.path}, dirs: ${dir.dirs.keys.toList()}, files: ${dir.files.map((f) => f.name).toList()}');
     final widgets = <Widget>[];
 
     // Рендерим поддиректории (они сами рекурсивно рендерят своё содержимое)
