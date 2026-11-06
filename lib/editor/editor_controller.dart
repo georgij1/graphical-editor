@@ -1806,11 +1806,19 @@ class EditorController extends ChangeNotifier {
   }
 
   /// Creates a new file in the project with the given name and type.
-  void newFile(String fileName, String fileType) {
+  /// [folderPath] is the tree path of the folder to place the file into
+  /// (e.g. "MyApp/src/main/resources"). When null, Java sources go to
+  /// `src/main/java/{package}/`.
+  void newFile(String fileName, String fileType, {String? folderPath}) {
     final project = _currentProject;
     if (project == null) return;
     
-    final path = 'src/main/java/${JavaGenerator.packageDir(project)}/$fileName';
+    final String path;
+    if (folderPath != null && folderPath.isNotEmpty) {
+      path = '$folderPath/$fileName';
+    } else {
+      path = 'src/main/java/${JavaGenerator.packageDir(project)}/$fileName';
+    }
     
     String content;
     switch (fileType) {

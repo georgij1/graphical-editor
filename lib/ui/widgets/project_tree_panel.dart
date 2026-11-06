@@ -364,7 +364,7 @@ class _ProjectTreePanelState extends State<ProjectTreePanel> {
                     if (!mounted || result == null) return;
                     final fileName = result['name']!;
                     final fileType = result['type']!;
-                    controller.newFile(fileName, fileType);
+                    controller.newFile(fileName, fileType, folderPath: dir.path);
                   } else if (value == 4) {
                     _say(
                       context,
