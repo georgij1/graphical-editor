@@ -213,6 +213,8 @@ class AppLocalizations {
     'New folder': 'Новая папка',
     'Folder name': 'Имя папки',
     'Folder': 'Папка',
+    'Cannot delete the project root.': 'Нельзя удалить корень проекта.',
+    'Cannot rename the project root.': 'Нельзя переименовать корень проекта.',
     'New file': 'Новый файл',
     'File name': 'Имя файла',
     'File type': 'Тип файла',

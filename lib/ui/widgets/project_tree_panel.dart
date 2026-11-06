@@ -378,18 +378,22 @@ class _ProjectTreePanelState extends State<ProjectTreePanel> {
         } else if (value == 2) {
           final name = await showNewFolderModal(context);
           if (!mounted || name == null) return;
-          final cleanPath = dir.path.startsWith('${project.name}/')
-              ? dir.path.substring(project.name.length + 1)
-              : dir.path;
+          final cleanPath = dir.path == project.name
+              ? ''
+              : (dir.path.startsWith('${project.name}/')
+                  ? dir.path.substring(project.name.length + 1)
+                  : dir.path);
           controller.newFolder(name, folderPath: cleanPath);
         } else if (value == 3) {
           final result = await showNewFileModal(context);
           if (!mounted || result == null) return;
           final fileName = result['name']!;
           final fileType = result['type']!;
-          final cleanPath = dir.path.startsWith('${project.name}/')
-              ? dir.path.substring(project.name.length + 1)
-              : dir.path;
+          final cleanPath = dir.path == project.name
+              ? ''
+              : (dir.path.startsWith('${project.name}/')
+                  ? dir.path.substring(project.name.length + 1)
+                  : dir.path);
           controller.newFile(fileName, fileType, folderPath: cleanPath);
         } else if (value == 4) {
           final newName = await showPromptDialog(
@@ -398,9 +402,15 @@ class _ProjectTreePanelState extends State<ProjectTreePanel> {
             initial: dir.name,
           );
           if (newName == null || !context.mounted) return;
-          final cleanPath = dir.path.startsWith('${project.name}/')
-              ? dir.path.substring(project.name.length + 1)
-              : dir.path;
+          final cleanPath = dir.path == project.name
+              ? ''
+              : (dir.path.startsWith('${project.name}/')
+                  ? dir.path.substring(project.name.length + 1)
+                  : dir.path);
+          if (cleanPath.isEmpty) {
+            _say(context, context.tr('Cannot rename the project root.'));
+            return;
+          }
           controller.renameFolder(cleanPath, newName);
         } else if (value == 5) {
           if (!context.mounted) return;
@@ -411,9 +421,15 @@ class _ProjectTreePanelState extends State<ProjectTreePanel> {
           );
           if (!ok || !context.mounted) return;
           // Remove project name prefix from dir.path
-          final cleanPath = dir.path.startsWith('${project.name}/')
-              ? dir.path.substring(project.name.length + 1)
-              : dir.path;
+          final cleanPath = dir.path == project.name
+              ? ''
+              : (dir.path.startsWith('${project.name}/')
+                  ? dir.path.substring(project.name.length + 1)
+                  : dir.path);
+          if (cleanPath.isEmpty) {
+            _say(context, context.tr('Cannot delete the project root.'));
+            return;
+          }
           final error = controller.deleteFolder(cleanPath);
           if (error != null && context.mounted) {
             _say(context, context.tr(error));
