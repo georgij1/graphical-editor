@@ -378,13 +378,19 @@ class _ProjectTreePanelState extends State<ProjectTreePanel> {
         } else if (value == 2) {
           final name = await showNewFolderModal(context);
           if (!mounted || name == null) return;
-          controller.newFolder(name, folderPath: dir.path);
+          final cleanPath = dir.path.startsWith('${project.name}/')
+              ? dir.path.substring(project.name.length + 1)
+              : dir.path;
+          controller.newFolder(name, folderPath: cleanPath);
         } else if (value == 3) {
           final result = await showNewFileModal(context);
           if (!mounted || result == null) return;
           final fileName = result['name']!;
           final fileType = result['type']!;
-          controller.newFile(fileName, fileType, folderPath: dir.path);
+          final cleanPath = dir.path.startsWith('${project.name}/')
+              ? dir.path.substring(project.name.length + 1)
+              : dir.path;
+          controller.newFile(fileName, fileType, folderPath: cleanPath);
         } else if (value == 4) {
           final newName = await showPromptDialog(
             context,
@@ -392,7 +398,10 @@ class _ProjectTreePanelState extends State<ProjectTreePanel> {
             initial: dir.name,
           );
           if (newName == null || !context.mounted) return;
-          controller.renameFolder(dir.path, newName);
+          final cleanPath = dir.path.startsWith('${project.name}/')
+              ? dir.path.substring(project.name.length + 1)
+              : dir.path;
+          controller.renameFolder(cleanPath, newName);
         } else if (value == 5) {
           if (!context.mounted) return;
           final ok = await confirmDialog(
@@ -401,7 +410,11 @@ class _ProjectTreePanelState extends State<ProjectTreePanel> {
             message: '${context.tr('Delete')} ${dir.name}?',
           );
           if (!ok || !context.mounted) return;
-          final error = controller.deleteFolder(dir.path);
+          // Remove project name prefix from dir.path
+          final cleanPath = dir.path.startsWith('${project.name}/')
+              ? dir.path.substring(project.name.length + 1)
+              : dir.path;
+          final error = controller.deleteFolder(cleanPath);
           if (error != null && context.mounted) {
             _say(context, context.tr(error));
           }
