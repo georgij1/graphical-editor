@@ -1805,6 +1805,40 @@ class EditorController extends ChangeNotifier {
     _persist();
   }
 
+  /// Creates a new file in the project with the given name and type.
+  void newFile(String fileName, String fileType) {
+    final project = _currentProject;
+    if (project == null) return;
+    
+    final path = 'src/main/java/${JavaGenerator.packageDir(project)}/$fileName';
+    
+    String content;
+    switch (fileType) {
+      case 'Java':
+        final className = fileName.replaceAll('.java', '');
+        content = 'package ${project.package};\n\npublic class $className {\n    // TODO: implement class\n}\n';
+        break;
+      case 'FXML':
+        content = '<?xml version="1.0" encoding="UTF-8"?>\n\n<?import javafx.scene.layout.VBox?>\n\n<VBox xmlns="http://javafx.com/javafx/17.0.2"\n      xmlns:fx="http://javafx.com/fxml/1">\n    <!-- TODO: add UI elements -->\n</VBox>\n';
+        break;
+      case 'XML':
+        content = '<?xml version="1.0" encoding="UTF-8"?>\n<root>\n    <!-- TODO: add content -->\n</root>\n';
+        break;
+      case 'Properties':
+        content = '# Configuration file\nkey=value\n';
+        break;
+      case 'Markdown':
+        content = '# $fileName\n\n<!-- TODO: add content -->\n';
+        break;
+      default: // Text
+        content = '';
+    }
+    
+    project.sourceOverrides[path] = content;
+    showSource(GeneratedFile(path: path, content: content));
+    _persist();
+  }
+
   void renameScene(SceneFile scene, String newName) {
     final project = _currentProject;
     final safe = newName.trim().replaceAll(RegExp(r'\s+'), '_');

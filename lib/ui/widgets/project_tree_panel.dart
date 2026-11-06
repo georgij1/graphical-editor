@@ -7,6 +7,7 @@ import '../../l10n/app_localizations.dart';
 import '../../project/build_files.dart';
 import '../../project/java_generator.dart';
 import '../../project/project.dart';
+import 'new_file_modal.dart';
 import 'project_dialogs.dart';
 
 /// Full project tree: the JavaFX application laid out like a real source tree
@@ -323,10 +324,11 @@ class _ProjectTreePanelState extends State<ProjectTreePanel> {
                       context.tr('Folder creation is not supported yet.'),
                     );
                   } else if (value == 3) {
-                    _say(
-                      context,
-                      context.tr('File creation is not supported yet.'),
-                    );
+                    final result = await showNewFileModal(context);
+                    if (!mounted || result == null) return;
+                    final fileName = result['name']!;
+                    final fileType = result['type']!;
+                    controller.newFile(fileName, fileType);
                   } else if (value == 4) {
                     _say(
                       context,
@@ -391,10 +393,11 @@ class _ProjectTreePanelState extends State<ProjectTreePanel> {
                   context.tr('Folder creation is not supported yet.'),
                 );
               } else if (value == 3) {
-                _say(
-                  context,
-                  context.tr('File creation is not supported yet.'),
-                );
+                final result = await showNewFileModal(context);
+                if (!mounted || result == null) return;
+                final fileName = result['name']!;
+                final fileType = result['type']!;
+                controller.newFile(fileName, fileType);
               } else if (value == 4) {
                 _say(
                   context,
