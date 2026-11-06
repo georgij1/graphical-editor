@@ -1807,8 +1807,8 @@ class EditorController extends ChangeNotifier {
 
   /// Creates a new file in the project with the given name and type.
   /// [folderPath] is the tree path of the folder to place the file into
-  /// (e.g. "MyApp/src/main/resources"). When null, Java sources go to
-  /// `src/main/java/{package}/`.
+  /// (e.g. "MyApp/src/main/resources" or just "MyApp" for the project root).
+  /// When null, Java sources go to `src/main/java/{package}/`.
   void newFile(String fileName, String fileType, {String? folderPath}) {
     final project = _currentProject;
     if (project == null) return;
@@ -1817,11 +1817,13 @@ class EditorController extends ChangeNotifier {
     String? cleanFolderPath = folderPath;
     if (folderPath != null && folderPath.startsWith('${project.name}/')) {
       cleanFolderPath = folderPath.substring(project.name.length + 1);
+    } else if (folderPath == project.name) {
+      cleanFolderPath = '';
     }
 
     final String path;
-    if (cleanFolderPath != null && cleanFolderPath.isNotEmpty) {
-      path = '$cleanFolderPath/$fileName';
+    if (cleanFolderPath != null) {
+      path = cleanFolderPath.isEmpty ? fileName : '$cleanFolderPath/$fileName';
     } else {
       path = 'src/main/java/${JavaGenerator.packageDir(project)}/$fileName';
     }
@@ -1869,11 +1871,13 @@ class EditorController extends ChangeNotifier {
     String? cleanFolderPath = folderPath;
     if (folderPath != null && folderPath.startsWith('${project.name}/')) {
       cleanFolderPath = folderPath.substring(project.name.length + 1);
+    } else if (folderPath == project.name) {
+      cleanFolderPath = '';
     }
 
     final String path;
-    if (cleanFolderPath != null && cleanFolderPath.isNotEmpty) {
-      path = '$cleanFolderPath/$folderName/';
+    if (cleanFolderPath != null) {
+      path = cleanFolderPath.isEmpty ? '$folderName/' : '$cleanFolderPath/$folderName/';
     } else {
       path = 'src/main/java/${JavaGenerator.packageDir(project)}/$folderName/';
     }
