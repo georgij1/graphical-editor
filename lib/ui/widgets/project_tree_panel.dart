@@ -8,6 +8,7 @@ import '../../project/build_files.dart';
 import '../../project/java_generator.dart';
 import '../../project/project.dart';
 import 'new_file_modal.dart';
+import 'new_folder_modal.dart';
 import 'project_dialogs.dart';
 
 /// Full project tree: the JavaFX application laid out like a real source tree
@@ -233,7 +234,7 @@ class _ProjectTreePanelState extends State<ProjectTreePanel> {
       );
     }
 
-    // Add user-created files from sourceOverrides
+    // Add user-created files and empty folders from sourceOverrides
     final standardPaths = <String>{
       ...generatedFiles.map((f) => f.path),
       ...const BuildFiles()
@@ -247,12 +248,25 @@ class _ProjectTreePanelState extends State<ProjectTreePanel> {
 
     for (final entry in project.sourceOverrides.entries) {
       if (!standardPaths.contains(entry.key)) {
-        addFile(
-          entry.key,
-          content: entry.value,
-          isJava: entry.key.endsWith('.java'),
-          isXml: entry.key.endsWith('.xml') || entry.key.endsWith('.fxml'),
-        );
+        // Check if this is an empty folder (ends with /)
+        if (entry.key.endsWith('/')) {
+          // Create folder structure without adding a file
+          final parts = entry.key.substring(0, entry.key.length - 1).split('/');
+          var dir = root;
+          for (final part in parts) {
+            dir = dir.dirs.putIfAbsent(
+              part,
+              () => _DirNode(part, '${dir.path}/$part'),
+            );
+          }
+        } else {
+          addFile(
+            entry.key,
+            content: entry.value,
+            isJava: entry.key.endsWith('.java'),
+            isXml: entry.key.endsWith('.xml') || entry.key.endsWith('.fxml'),
+          );
+        }
       }
     }
 
@@ -424,10 +438,9 @@ class _ProjectTreePanelState extends State<ProjectTreePanel> {
                   controller.newScene(name);
                 }
               } else if (value == 2) {
-                _say(
-                  context,
-                  context.tr('Folder creation is not supported yet.'),
-                );
+                final name = await showNewFolderModal(context);
+                if (!mounted || name == null) return;
+                controller.newFolder(name, folderPath: dir.path);
               } else if (value == 3) {
                 final result = await showNewFileModal(context);
                 if (!mounted || result == null) return;

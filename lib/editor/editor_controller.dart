@@ -1859,6 +1859,31 @@ class EditorController extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Creates a new folder in the project.
+  /// [folderPath] is the tree path of the parent folder (e.g. "MyApp/src/main/resources").
+  /// Empty folders are stored as special keys ending with '/' in sourceOverrides.
+  void newFolder(String folderName, {String? folderPath}) {
+    final project = _currentProject;
+    if (project == null) return;
+
+    String? cleanFolderPath = folderPath;
+    if (folderPath != null && folderPath.startsWith('${project.name}/')) {
+      cleanFolderPath = folderPath.substring(project.name.length + 1);
+    }
+
+    final String path;
+    if (cleanFolderPath != null && cleanFolderPath.isNotEmpty) {
+      path = '$cleanFolderPath/$folderName/';
+    } else {
+      path = 'src/main/java/${JavaGenerator.packageDir(project)}/$folderName/';
+    }
+
+    // Store as empty string with trailing slash to mark it as an empty folder
+    project.sourceOverrides[path] = '';
+    _persist();
+    notifyListeners();
+  }
+
 
   /// Deletes a file from the project. Returns an error message if the file
   /// cannot be deleted, or null on success.
@@ -1904,6 +1929,18 @@ class EditorController extends ChangeNotifier {
     final newPath = parts.join('/');
     
     project.sourceOverrides[newPath] = content;
+    _persist();
+    notifyListeners();
+    return null;
+  }
+
+  /// Deletes an empty folder from the project.
+  String? deleteFolder(String folderPath) {
+    final project = _currentProject;
+    if (project == null) return 'No project is open.';
+    
+    // Remove the folder key (ends with /)
+    project.sourceOverrides.remove(folderPath);
     _persist();
     notifyListeners();
     return null;
