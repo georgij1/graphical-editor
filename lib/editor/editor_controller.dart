@@ -1835,8 +1835,14 @@ class EditorController extends ChangeNotifier {
     }
     
     project.sourceOverrides[path] = content;
-    showSource(GeneratedFile(path: path, content: content));
+    showSource(GeneratedFile(
+      path: path,
+      content: content,
+      isJava: fileName.endsWith('.java'),
+      isXml: fileName.endsWith('.xml') || fileName.endsWith('.fxml'),
+    ));
     _persist();
+    notifyListeners();
   }
 
   void renameScene(SceneFile scene, String newName) {
