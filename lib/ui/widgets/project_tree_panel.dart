@@ -364,6 +364,8 @@ class _ProjectTreePanelState extends State<ProjectTreePanel> {
                     if (!mounted || result == null) return;
                     final fileName = result['name']!;
                     final fileType = result['type']!;
+                    // ignore: avoid_print
+                    print('📁 Creating file in folder: $dir.path');
                     controller.newFile(fileName, fileType, folderPath: dir.path);
                   } else if (value == 4) {
                     _say(

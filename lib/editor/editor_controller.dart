@@ -1813,12 +1813,21 @@ class EditorController extends ChangeNotifier {
     final project = _currentProject;
     if (project == null) return;
     
+    // Remove project name prefix from folderPath if present
+    String? cleanFolderPath = folderPath;
+    if (folderPath != null && folderPath.startsWith('${project.name}/')) {
+      cleanFolderPath = folderPath.substring(project.name.length + 1);
+    }
+    
     final String path;
-    if (folderPath != null && folderPath.isNotEmpty) {
-      path = '$folderPath/$fileName';
+    if (cleanFolderPath != null && cleanFolderPath.isNotEmpty) {
+      path = '$cleanFolderPath/$fileName';
     } else {
       path = 'src/main/java/${JavaGenerator.packageDir(project)}/$fileName';
     }
+    
+    // ignore: avoid_print
+    print('📄 Creating file: $path');
     
     String content;
     switch (fileType) {
