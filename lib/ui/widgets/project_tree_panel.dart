@@ -199,33 +199,6 @@ class _ProjectTreePanelState extends State<ProjectTreePanel> {
     for (final source in JavaGenerator.generate(project)) {
       addFile(source.path, content: source.content, isJava: true);
     }
-
-    // Add user-created files from sourceOverrides
-    final existingPaths = <String>{
-      ...JavaGenerator.generate(project).map((f) => f.path),
-      ...const BuildFiles()
-          .generate(project, BuildTool.maven)
-          .map((f) => f.path),
-      'project.json',
-    };
-    final pkgDir = JavaGenerator.packageDir(project);
-    existingPaths.addAll(
-      project.scenes.map(
-        (s) => 'src/main/resources/$pkgDir/${s.name}.fxml',
-      ),
-    );
-
-    for (final entry in project.sourceOverrides.entries) {
-      if (!existingPaths.contains(entry.key)) {
-        addFile(
-          entry.key,
-          content: entry.value,
-          isJava: entry.key.endsWith('.java'),
-          isXml:
-              entry.key.endsWith('.xml') || entry.key.endsWith('.fxml'),
-        );
-      }
-    }
     for (final file in const BuildFiles().generate(project, BuildTool.maven)) {
       addFile(
         file.path,
@@ -241,6 +214,7 @@ class _ProjectTreePanelState extends State<ProjectTreePanel> {
       isJava: false,
       isBuildFile: true,
     );
+    final pkgDir = JavaGenerator.packageDir(project);
     for (final scene in project.scenes) {
       addFile(
         'src/main/resources/$pkgDir/${scene.name}.fxml',
@@ -249,6 +223,29 @@ class _ProjectTreePanelState extends State<ProjectTreePanel> {
         isJava: false,
         isXml: true,
       );
+    }
+
+    // Add user-created files from sourceOverrides that are not standard files
+    final standardPaths = <String>{
+      ...JavaGenerator.generate(project, applyOverrides: false).map((f) => f.path),
+      ...const BuildFiles()
+          .generate(project, BuildTool.maven)
+          .map((f) => f.path),
+      'project.json',
+      ...project.scenes.map(
+        (s) => 'src/main/resources/$pkgDir/${s.name}.fxml',
+      ),
+    };
+
+    for (final entry in project.sourceOverrides.entries) {
+      if (!standardPaths.contains(entry.key)) {
+        addFile(
+          entry.key,
+          content: entry.value,
+          isJava: entry.key.endsWith('.java'),
+          isXml: entry.key.endsWith('.xml') || entry.key.endsWith('.fxml'),
+        );
+      }
     }
     return root;
   }
