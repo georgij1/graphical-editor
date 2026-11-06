@@ -492,6 +492,8 @@ class _ProjectTreePanelState extends State<ProjectTreePanel> {
         tile,
         <PopupMenuEntry<int>>[
           PopupMenuItem<int>(value: 1, child: Text(context.tr('Open source'))),
+          const PopupMenuDivider(),
+          PopupMenuItem<int>(value: 2, child: Text(context.tr('Delete'))),
         ],
         (value) async {
           if (value == 1) {
@@ -502,6 +504,18 @@ class _ProjectTreePanelState extends State<ProjectTreePanel> {
                 isXml: file.path.endsWith('.xml'),
               ),
             );
+          } else if (value == 2) {
+            if (!context.mounted) return;
+            final ok = await confirmDialog(
+              context,
+              title: context.tr('Delete'),
+              message: '${context.tr('Delete')} ${file.name}?',
+            );
+            if (!ok || !context.mounted) return;
+            final error = controller.deleteFile(file.path);
+            if (error != null && context.mounted) {
+              _say(context, context.tr(error));
+            }
           }
         },
       );
@@ -559,10 +573,17 @@ class _ProjectTreePanelState extends State<ProjectTreePanel> {
               _say(context, context.tr(error));
             }
           } else if (value == 3) {
-            _say(
+            if (!context.mounted) return;
+            final ok = await confirmDialog(
               context,
-              context.tr('Java file deletion is not supported yet.'),
+              title: context.tr('Delete'),
+              message: '${context.tr('Delete')} ${file.name}?',
             );
+            if (!ok || !context.mounted) return;
+            final error = controller.deleteFile(file.path);
+            if (error != null && context.mounted) {
+              _say(context, context.tr(error));
+            }
           }
         },
       );

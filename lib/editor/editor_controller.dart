@@ -1853,6 +1853,37 @@ class EditorController extends ChangeNotifier {
     notifyListeners();
   }
 
+
+  /// Deletes a file from the project. Returns an error message if the file
+  /// cannot be deleted, or null on success.
+  String? deleteFile(String path) {
+    final project = _currentProject;
+    if (project == null) return 'No project is open.';
+    if (path == 'project.json') return 'Cannot delete project.json.';
+    final generated = JavaGenerator.generate(project, applyOverrides: false)
+        .map((f) => f.path)
+        .toSet();
+    if (generated.contains(path)) {
+      return 'Generated files cannot be deleted.';
+    }
+    if (path.startsWith('src/main/resources/')) {
+      final pkgDir = JavaGenerator.packageDir(project);
+      final sceneFxmls = project.scenes
+          .map((s) => 'src/main/resources/' + pkgDir + '/' + s.name + '.fxml')
+          .toSet();
+      if (sceneFxmls.contains(path)) {
+        return 'Scene files cannot be deleted from the tree.';
+      }
+    }
+    project.sourceOverrides.remove(path);
+    final tabIndex = _openTabs.indexWhere((f) => f.path == path);
+    if (tabIndex >= 0) {
+      closeTab(tabIndex);
+    }
+    _persist();
+    notifyListeners();
+    return null;
+  }
   void renameScene(SceneFile scene, String newName) {
     final project = _currentProject;
     final safe = newName.trim().replaceAll(RegExp(r'\s+'), '_');
