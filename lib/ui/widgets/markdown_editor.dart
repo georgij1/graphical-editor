@@ -91,6 +91,7 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
 
   void _updateSuggestions(String value) {
     _hideSuggestions();
+    if (!_focusNode.hasFocus) return;
     final sel = _text.selection;
     if (!sel.isValid || sel.baseOffset != sel.extentOffset) return;
     final cursor = sel.baseOffset;
@@ -218,6 +219,7 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
     return CallbackShortcuts(
       bindings: <ShortcutActivator, VoidCallback>{
         const SingleActivator(LogicalKeyboardKey.keyS, control: true): _apply,
+        const SingleActivator(LogicalKeyboardKey.escape): _hideSuggestions,
       },
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
