@@ -5,6 +5,7 @@ import '../../l10n/app_localizations.dart';
 import 'canvas_view.dart';
 import 'project_home.dart';
 import 'source_view.dart';
+import 'markdown_editor.dart';
 
 /// The central editing surface. "Code" shows an editable text editor for the
 /// selected file (scene FXML or a generated Java source); "Canvas" shows the
@@ -73,6 +74,11 @@ class CanvasArea extends StatelessWidget {
       key: ValueKey<String>('${controller.codePath}#${controller.codeEpoch}'),
       controller: controller,
     );
+
+    // Markdown files get a dedicated editor with live preview.
+    if (controller.codePath.endsWith('.md')) {
+      return MarkdownEditor(controller: controller);
+    }
 
     // A generated Java source has no visual representation: show the editor
     // alone.
