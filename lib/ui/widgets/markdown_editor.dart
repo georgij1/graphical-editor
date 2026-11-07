@@ -168,15 +168,16 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
                   child: Container(
                     color: theme.colorScheme.surface,
                     padding: const EdgeInsets.all(16),
-                    child: SingleChildScrollView(
-                      child: Container(
-                        width: double.infinity,
-                        alignment: Alignment.topLeft,
-                        child: MarkdownPreview(
-                          source: _text.text,
-                          theme: theme,
+                    child: ListView(
+                      children: <Widget>[
+                        SizedBox(
+                          width: double.infinity,
+                          child: MarkdownPreview(
+                            source: _text.text,
+                            theme: theme,
+                          ),
                         ),
-                      ),
+                      ],
                     ),
                   ),
                 ),
