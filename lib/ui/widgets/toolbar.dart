@@ -70,7 +70,7 @@ class EditorToolbar extends StatelessWidget {
               onPressed: controller.canRedo ? controller.redo : null,
             ),
           ],
-          if (showCanvasTools) ...<Widget>[
+          if (showCanvasTools && controller.codePath.endsWith('.fxml')) ...<Widget>[
             const _Bar(),
             IconButton(
               tooltip: context.tr('Toggle grid'),
