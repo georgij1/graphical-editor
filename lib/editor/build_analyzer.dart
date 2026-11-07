@@ -164,6 +164,7 @@ class BuildAnalyzer {
   }) {
     final controllerIssues = BuildAnalyzer.controllerProblems(project);
     final importIssues = BuildAnalyzer.importProblems(project);
+    final markdownIssues = BuildAnalyzer.markdownProblems(project);
     final hasBuild = build != null;
 
     final inputs = _Inputs(<String, double>{
@@ -289,6 +290,15 @@ class BuildAnalyzer {
             );
         }
       }
+    }
+
+    // Markdown files: surface structural problems (unclosed code blocks, empty
+    // files) in the same report as the FXML/Java checks.
+    if (markdownIssues.isNotEmpty) {
+      issues.addAll(markdownIssues);
+      suggestions.add(
+        const ReportLine('Fix the Markdown files listed above.'),
+      );
     }
 
     final score = (rawScore * 100).round().clamp(0, 100);
@@ -451,6 +461,40 @@ class BuildAnalyzer {
   static String _simpleNameOf(String fqn) {
     final i = fqn.lastIndexOf('.');
     return i < 0 ? fqn : fqn.substring(i + 1);
+  }
+
+  // -------------------------------------------------------- markdown checks
+
+  /// Detects structural problems in the project's Markdown files (stored in
+  /// [Project.sourceOverrides]): empty files and unclosed fenced code blocks.
+  static List<ReportLine> markdownProblems(Project project) {
+    final problems = <ReportLine>[];
+    for (final entry in project.sourceOverrides.entries) {
+      final path = entry.key;
+      if (!path.toLowerCase().endsWith('.md')) continue;
+      final content = entry.value;
+      final name = path.split('/').last;
+      if (content.trim().isEmpty) {
+        problems.add(
+          ReportLine('Markdown file "{0}" is empty.', <String>[name]),
+        );
+        continue;
+      }
+      // Count fenced code blocks: an odd number means one is never closed.
+      final fenceCount = content
+          .split('\\n')
+          .where((line) => line.trimLeft().startsWith('```'))
+          .length;
+      if (fenceCount.isOdd) {
+        problems.add(
+          ReportLine.critical(
+            'Markdown file "{0}": an unclosed code block (```).',
+            <String>[name],
+          ),
+        );
+      }
+    }
+    return problems;
   }
 
   static bool _isValidJavaPackage(String package) {

@@ -282,6 +282,9 @@ class AppLocalizations {
     'Expand all': 'Развернуть всё',
     'Collapse all': 'Свернуть всё',
     'No scenes in the project.': 'В проекте нет сцен.',
+    'Markdown file "{0}" is empty.': 'Markdown-файл «{0}» пуст.',
+    'Markdown file "{0}": an unclosed code block (```).': 'Markdown-файл «{0}»: незакрытый блок кода (```).',
+    'Fix the Markdown files listed above.': 'Исправьте указанные выше Markdown-файлы.',
     'Add at least one scene to the project.':
         'Добавьте в проект хотя бы одну сцену.',
     'Java package is invalid.': 'Некорректный Java-пакет.',
