@@ -208,6 +208,8 @@ class MarkdownPreview extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Column(
+      mainAxisSize: MainAxisSize.min,
+      mainAxisAlignment: MainAxisAlignment.start,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: MarkdownParser.parse(source, theme: theme),
     );
