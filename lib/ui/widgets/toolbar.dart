@@ -57,7 +57,7 @@ class EditorToolbar extends StatelessWidget {
             ),
           // New/open/save/download live in the project tree, next to the files
           // they act on; the header keeps view and edit controls only.
-          if (showHistory) ...<Widget>[
+          if (showHistory && controller.codePath.endsWith('.fxml')) ...<Widget>[
             const _Bar(),
             IconButton(
               tooltip: context.tr('Undo (Ctrl+Z)'),
