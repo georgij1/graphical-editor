@@ -525,40 +525,43 @@ class _WideLayout extends StatelessWidget {
     if (!controller.hasOpenDocument) {
       return CanvasArea(controller: controller, onShowCode: onShowCode);
     }
+    final showLeftPanels = controller.hasOpenFxml;
     return Row(
       children: <Widget>[
-        SizedBox(
-          width: 264,
-          child: DefaultTabController(
-            length: 2,
-            child: Column(
-              children: <Widget>[
-                TabBar(
-                  tabs: <Widget>[
-                    Tab(
-                      icon: const Icon(Icons.widgets, size: 18),
-                      text: context.tr('Components'),
-                    ),
-                    Tab(
-                      icon: const Icon(Icons.account_tree, size: 18),
-                      text: context.tr('Outline'),
-                    ),
-                  ],
-                  labelStyle: const TextStyle(fontSize: 12),
-                ),
-                Expanded(
-                  child: TabBarView(
-                    children: <Widget>[
-                      PalettePanel(controller: controller),
-                      OutlinePanel(controller: controller),
+        if (showLeftPanels) ...<Widget>[
+          SizedBox(
+            width: 264,
+            child: DefaultTabController(
+              length: 2,
+              child: Column(
+                children: <Widget>[
+                  TabBar(
+                    tabs: <Widget>[
+                      Tab(
+                        icon: const Icon(Icons.widgets, size: 18),
+                        text: context.tr('Components'),
+                      ),
+                      Tab(
+                        icon: const Icon(Icons.account_tree, size: 18),
+                        text: context.tr('Outline'),
+                      ),
                     ],
+                    labelStyle: const TextStyle(fontSize: 12),
                   ),
-                ),
-              ],
+                  Expanded(
+                    child: TabBarView(
+                      children: <Widget>[
+                        PalettePanel(controller: controller),
+                        OutlinePanel(controller: controller),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
-        ),
-        const VerticalDivider(width: 1),
+          const VerticalDivider(width: 1),
+        ],
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
