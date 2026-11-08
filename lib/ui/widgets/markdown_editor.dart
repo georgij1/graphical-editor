@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../editor/code_validator.dart';
 import '../../editor/editor_controller.dart';
 import '../../l10n/app_localizations.dart';
 import 'markdown_parser.dart';
@@ -23,6 +24,7 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
   final FocusNode _focusNode = FocusNode();
   bool _dirty = false;
   int _lastEpoch = 0;
+  late ValidationResult _validation = _validate(_text.text);
   OverlayEntry? _overlayEntry;
   List<String> _suggestions = <String>[];
 
@@ -53,6 +55,7 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
       _lastEpoch = epoch;
       _text.text = widget.controller.codeContent;
       _dirty = false;
+      _validation = _validate(_text.text);
       setState(() {});
     }
   }
@@ -60,15 +63,22 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
   void _onChanged() {
     setState(() {
       _dirty = _text.text != widget.controller.codeContent;
+      _validation = _validate(_text.text);
     });
     _updateSuggestions(_text.text);
   }
 
   bool _apply() {
+    if (!_validation.isValid) {
+      final error = _validation.errors.first;
+      _showMessage(error.render(context.tr));
+      return false;
+    }
     final controller = widget.controller;
     final ok = controller.applyCode(_text.text);
     setState(() {
       _dirty = !ok;
+      _validation = _validate(_text.text);
     });
     _showMessage(
         ok ? context.tr('Markdown source applied.') : context.tr('Apply failed.'));
@@ -84,6 +94,9 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
         duration: const Duration(seconds: 2),
       ));
   }
+
+  ValidationResult _validate(String source) =>
+      CodeValidator.validateMarkdown(source);
 
   void _onFocusChanged() {
     if (!_focusNode.hasFocus) _hideSuggestions();
@@ -320,6 +333,7 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
               ],
             ),
           ),
+          _MarkdownValidationBar(validation: _validation),
         ],
       ),
     );
@@ -329,10 +343,99 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
     setState(() {
       _text.text = widget.controller.codeContent;
       _dirty = false;
+      _validation = _validate(_text.text);
     });
   }
 }
 
+
+/// Validation bar for the Markdown editor.
+class _MarkdownValidationBar extends StatelessWidget {
+  const _MarkdownValidationBar({required this.validation});
+
+  final ValidationResult validation;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final issues = validation.issues;
+
+    if (issues.isEmpty) {
+      final color = theme.colorScheme.primary;
+      return Container(
+        width: double.infinity,
+        color: color.withValues(alpha: 0.08),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+        child: Row(
+          children: <Widget>[
+            Icon(Icons.check_circle_outline, size: 14, color: color),
+            const SizedBox(width: 6),
+            Text(
+              context.tr('No issues found.'),
+              style: TextStyle(fontSize: 11.5, color: color),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final hasErrors = validation.hasErrors;
+    final warnColor = Colors.amber.shade800;
+    final color = hasErrors ? theme.colorScheme.error : warnColor;
+    return Container(
+      width: double.infinity,
+      color: color.withValues(alpha: 0.08),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Row(
+            children: <Widget>[
+              Icon(
+                hasErrors ? Icons.error_outline : Icons.warning_amber_outlined,
+                size: 14,
+                color: color,
+              ),
+              const SizedBox(width: 6),
+              Text(
+                context.l10n.validationSummary(
+                  validation.errorCount,
+                  validation.warningCount,
+                ),
+                style: TextStyle(
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w600,
+                  color: color,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 2),
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxHeight: 80),
+            child: ListView.builder(
+              shrinkWrap: true,
+              padding: EdgeInsets.zero,
+              itemCount: issues.length,
+              itemBuilder: (context, index) {
+                final issue = issues[index];
+                final issueColor =
+                    issue.isError ? theme.colorScheme.error : warnColor;
+                return Padding(
+                  padding: const EdgeInsets.only(left: 20, bottom: 2),
+                  child: Text(
+                    issue.toString(),
+                    style: TextStyle(fontSize: 11.5, color: issueColor),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
 
 /// Widget that renders Markdown source as Flutter widgets.
 class MarkdownPreview extends StatelessWidget {

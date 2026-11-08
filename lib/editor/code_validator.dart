@@ -140,6 +140,30 @@ class CodeValidator {
     return ValidationResult(issues);
   }
 
+  /// Lightweight validation for Markdown sources: an empty file is a warning
+  /// and an unclosed fenced code block is an error.
+  static ValidationResult validateMarkdown(String source) {
+    if (source.trim().isEmpty) {
+      return const ValidationResult(<ValidationIssue>[
+        ValidationIssue(
+          'Markdown source is empty.',
+          severity: ValidationSeverity.warning,
+        ),
+      ]);
+    }
+    final issues = <ValidationIssue>[];
+    final fenceCount = source
+        .split('\\n')
+        .where((line) => line.trimLeft().startsWith('```'))
+        .length;
+    if (fenceCount.isOdd) {
+      issues.add(
+        const ValidationIssue('Unclosed code block (```).'),
+      );
+    }
+    return ValidationResult(issues);
+  }
+
   static String _shorten(Object error) {
     var text = error.toString();
     text = text.replaceFirst(RegExp(r'^Xml\w*Exception: '), '');
