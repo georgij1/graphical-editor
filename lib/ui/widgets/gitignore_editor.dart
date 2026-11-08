@@ -21,9 +21,12 @@ class GitignoreEditor extends StatefulWidget {
 class _GitignoreEditorState extends State<GitignoreEditor> {
   late final TextEditingController _text =
       TextEditingController(text: widget.controller.codeContent);
+  final FocusNode _focusNode = FocusNode();
   bool _dirty = false;
   int _lastEpoch = 0;
   double _previewFraction = 0.5;
+  OverlayEntry? _overlayEntry;
+  List<String> _suggestions = <String>[];
 
   @override
   void initState() {
@@ -31,13 +34,17 @@ class _GitignoreEditorState extends State<GitignoreEditor> {
     _lastEpoch = widget.controller.codeEpoch;
     _text.addListener(_onChanged);
     widget.controller.addListener(_onControllerChanged);
+    _focusNode.addListener(_onFocusChanged);
   }
 
   @override
   void dispose() {
+    _hideSuggestions();
     widget.controller.removeListener(_onControllerChanged);
     _text.removeListener(_onChanged);
+    _focusNode.removeListener(_onFocusChanged);
     _text.dispose();
+    _focusNode.dispose();
     super.dispose();
   }
 
@@ -56,6 +63,7 @@ class _GitignoreEditorState extends State<GitignoreEditor> {
     setState(() {
       _dirty = _text.text != widget.controller.codeContent;
     });
+    _updateSuggestions(_text.text);
   }
 
   bool _apply() {
@@ -81,6 +89,120 @@ class _GitignoreEditorState extends State<GitignoreEditor> {
       ));
   }
 
+  void _onFocusChanged() {
+    if (!_focusNode.hasFocus) _hideSuggestions();
+  }
+
+  void _updateSuggestions(String value) {
+    _hideSuggestions();
+    if (!_focusNode.hasFocus) return;
+    final sel = _text.selection;
+    if (!sel.isValid || sel.baseOffset != sel.extentOffset) return;
+    final cursor = sel.baseOffset;
+    if (cursor <= 0 || cursor > value.length) return;
+    final ch = value[cursor - 1];
+    List<String> suggs;
+    switch (ch) {
+      case '*':
+        suggs = <String>['*', '*.log', '*.class', '*.tmp', '*.iml'];
+        break;
+      case '!':
+        suggs = <String>['!', '!important/', '!*.log'];
+        break;
+      case '.':
+        suggs = <String>['.idea/', '.gradle/', '.DS_Store', '.env'];
+        break;
+      case '/':
+        suggs = <String>['/', '/*.log'];
+        break;
+      default:
+        suggs = <String>[];
+    }
+    if (suggs.isEmpty) return;
+    _suggestions = suggs;
+    _showSuggestions();
+  }
+
+  void _showSuggestions() {
+    _hideSuggestions();
+    final pos = _caretGlobalPosition();
+    if (pos == null) return;
+    _overlayEntry = OverlayEntry(
+      builder: (ctx) => Positioned(
+        left: pos.dx,
+        top: pos.dy + 20,
+        child: Material(
+          elevation: 4,
+          borderRadius: BorderRadius.circular(4),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 220, maxHeight: 200),
+            child: ListView.builder(
+              shrinkWrap: true,
+              padding: EdgeInsets.zero,
+              itemCount: _suggestions.length,
+              itemBuilder: (ctx, i) => InkWell(
+                onTap: () => _applySuggestion(_suggestions[i]),
+                child: Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                  child: Text(
+                    _suggestions[i],
+                    style: const TextStyle(
+                      fontFamily: 'monospace',
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    Overlay.of(context).insert(_overlayEntry!);
+  }
+
+  void _applySuggestion(String snippet) {
+    _hideSuggestions();
+    final sel = _text.selection;
+    final cursor = sel.baseOffset;
+    final text = _text.text;
+    final start = cursor - 1;
+    if (start < 0) return;
+    final newText = text.substring(0, start) + snippet + text.substring(cursor);
+    _text.value = TextEditingValue(
+      text: newText,
+      selection: TextSelection.collapsed(offset: start + snippet.length),
+    );
+    _dirty = true;
+    setState(() {});
+  }
+
+  void _hideSuggestions() {
+    _overlayEntry?.remove();
+    _overlayEntry = null;
+  }
+
+  Offset? _caretGlobalPosition() {
+    final rb = _focusNode.context?.findRenderObject() as RenderBox?;
+    if (rb == null) return null;
+    final sel = _text.selection;
+    if (!sel.isValid) return null;
+    final style = const TextStyle(
+      fontFamily: 'monospace',
+      fontSize: 12.5,
+      height: 1.45,
+      color: Color(0xFFE6E6E6),
+    );
+    final painter = TextPainter(
+      text: TextSpan(text: _text.text, style: style),
+      textDirection: TextDirection.ltr,
+    );
+    painter.layout(maxWidth: rb.size.width - 32);
+    final caret = painter.getOffsetForCaret(sel.base, Rect.zero);
+    return rb.localToGlobal(Offset(16 + caret.dx, 16 + caret.dy));
+  }
+
   @override
   Widget build(BuildContext context) {
     final controller = widget.controller;
@@ -91,6 +213,7 @@ class _GitignoreEditorState extends State<GitignoreEditor> {
     return CallbackShortcuts(
       bindings: <ShortcutActivator, VoidCallback>{
         const SingleActivator(LogicalKeyboardKey.keyS, control: true): _apply,
+        const SingleActivator(LogicalKeyboardKey.escape): _hideSuggestions,
       },
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -171,6 +294,7 @@ class _GitignoreEditorState extends State<GitignoreEditor> {
                               : const Color(0xFFFBFBFB),
                           child: TextField(
                             controller: _text,
+                            focusNode: _focusNode,
                             maxLines: null,
                             expands: true,
                             textAlignVertical: TextAlignVertical.top,
