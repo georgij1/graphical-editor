@@ -164,6 +164,20 @@ class CodeValidator {
     return ValidationResult(issues);
   }
 
+  /// Lightweight validation for `.gitignore` sources: an empty file is a
+  /// warning. Gitignore has no strict syntax, so nothing else is checked.
+  static ValidationResult validateGitignore(String source) {
+    if (source.trim().isEmpty) {
+      return const ValidationResult(<ValidationIssue>[
+        ValidationIssue(
+          'Gitignore source is empty.',
+          severity: ValidationSeverity.warning,
+        ),
+      ]);
+    }
+    return ValidationResult.valid;
+  }
+
   static String _shorten(Object error) {
     var text = error.toString();
     text = text.replaceFirst(RegExp(r'^Xml\w*Exception: '), '');

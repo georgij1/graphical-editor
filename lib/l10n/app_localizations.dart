@@ -214,6 +214,9 @@ class AppLocalizations {
     'Folder name': 'Имя папки',
     'Folder': 'Папка',
     'ignored': 'игнорируется',
+    'Markdown source is empty.': 'Источник Markdown пуст.',
+    'Unclosed code block (```).': 'Незакрытый блок кода (```).',
+    'Gitignore source is empty.': 'Файл .gitignore пуст.',
     'example': 'пример',
     'Examples from rules:': 'Виртуальные пути из правил (примеры):',
     'Gitignore applied.': 'Файл .gitignore применён.',
@@ -288,6 +291,8 @@ class AppLocalizations {
     'Collapse all': 'Свернуть всё',
     'No scenes in the project.': 'В проекте нет сцен.',
     'Markdown file "{0}" is empty.': 'Markdown-файл «{0}» пуст.',
+    'Gitignore file "{0}" is empty.': 'Файл .gitignore «{0}» пуст.',
+    'Fix the .gitignore files listed above.': 'Исправьте указанные выше файлы .gitignore.',
     'Markdown file "{0}": an unclosed code block (```).': 'Markdown-файл «{0}»: незакрытый блок кода (```).',
     'Fix the Markdown files listed above.': 'Исправьте указанные выше Markdown-файлы.',
     'Add at least one scene to the project.':

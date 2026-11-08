@@ -165,6 +165,7 @@ class BuildAnalyzer {
     final controllerIssues = BuildAnalyzer.controllerProblems(project);
     final importIssues = BuildAnalyzer.importProblems(project);
     final markdownIssues = BuildAnalyzer.markdownProblems(project);
+    final gitignoreIssues = BuildAnalyzer.gitignoreProblems(project);
     final hasBuild = build != null;
 
     final inputs = _Inputs(<String, double>{
@@ -298,6 +299,12 @@ class BuildAnalyzer {
       issues.addAll(markdownIssues);
       suggestions.add(
         const ReportLine('Fix the Markdown files listed above.'),
+      );
+    }
+    if (gitignoreIssues.isNotEmpty) {
+      issues.addAll(gitignoreIssues);
+      suggestions.add(
+        const ReportLine('Fix the .gitignore files listed above.'),
       );
     }
 
@@ -491,6 +498,26 @@ class BuildAnalyzer {
             'Markdown file "{0}": an unclosed code block (```).',
             <String>[name],
           ),
+        );
+      }
+    }
+    return problems;
+  }
+
+  // -------------------------------------------------------- gitignore checks
+  static List<ReportLine> gitignoreProblems(Project project) {
+    final problems = <ReportLine>[];
+    for (final entry in project.sourceOverrides.entries) {
+      final path = entry.key;
+      if (!path.toLowerCase().endsWith('.gitignore') &&
+          !path.toLowerCase().endsWith('.gitignore/')) {
+        continue;
+      }
+      final content = entry.value;
+      final name = path.split('/').last;
+      if (content.trim().isEmpty) {
+        problems.add(
+          ReportLine('Gitignore file "{0}" is empty.', <String>[name]),
         );
       }
     }
