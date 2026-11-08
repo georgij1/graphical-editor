@@ -79,6 +79,7 @@ class _ProjectTreePanelState extends State<ProjectTreePanel> {
     final project = controller.currentProject;
     if (project == null) return const SizedBox.shrink();
     return SingleChildScrollView(
+      primary: false,
       padding: const EdgeInsets.only(bottom: 12),
       physics: const ClampingScrollPhysics(),
       child: ListenableBuilder(
