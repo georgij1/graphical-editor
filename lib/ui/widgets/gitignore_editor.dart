@@ -384,16 +384,6 @@ class _GitignoreTreeView extends StatelessWidget {
           if (virtualPaths.isNotEmpty) ...<Widget>[
             const SizedBox(height: 8),
             Divider(color: theme.dividerColor),
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 4),
-              child: Text(
-                context.tr('Examples from rules:'),
-                style: theme.textTheme.labelMedium?.copyWith(
-                  fontWeight: FontWeight.w600,
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ),
             for (final v in virtualPaths)
               _buildVirtualRow(context, theme, v.path, v.isDir, rules),
           ],
@@ -430,26 +420,14 @@ class _GitignoreTreeView extends StatelessWidget {
               path,
               style: TextStyle(
                 fontSize: 12,
-                fontStyle: FontStyle.italic,
                 color: ignored
                     ? theme.colorScheme.onSurfaceVariant
-                    : theme.colorScheme.onSurfaceVariant,
+                    : theme.colorScheme.onSurface,
                 decoration: ignored
                     ? TextDecoration.lineThrough
                     : TextDecoration.none,
               ),
               overflow: TextOverflow.ellipsis,
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.only(left: 4),
-            child: Text(
-              context.tr('example'),
-              style: TextStyle(
-                fontSize: 10,
-                color: theme.colorScheme.onSurfaceVariant,
-                fontStyle: FontStyle.italic,
-              ),
             ),
           ),
           if (ignored)
