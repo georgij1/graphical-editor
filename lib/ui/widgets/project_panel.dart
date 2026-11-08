@@ -31,17 +31,6 @@ class ProjectPanel extends StatefulWidget {
 class _ProjectPanelState extends State<ProjectPanel> {
   EditorController get controller => widget.controller;
 
-  Future<void> _newScene() async {
-    final name = await showPromptDialog(
-      context,
-      title: context.tr('New scene'),
-      initial: 'scene',
-    );
-    if (name != null && name.trim().isNotEmpty) {
-      controller.newScene(name);
-    }
-  }
-
   Future<void> _renameScene(SceneFile scene) async {
     final name = await showPromptDialog(
       context,
@@ -67,7 +56,6 @@ class _ProjectPanelState extends State<ProjectPanel> {
     final project = controller.currentProject;
     if (project == null) return const SizedBox.shrink();
 
-    final theme = Theme.of(context);
     // Own Material so row highlights stay inside this section instead of being
     // painted on the Scaffold's Material, above the clip.
     return Material(
@@ -76,99 +64,6 @@ class _ProjectPanelState extends State<ProjectPanel> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
-        Padding(
-          padding: const EdgeInsets.fromLTRB(10, 6, 6, 6),
-          child: Row(
-            children: <Widget>[
-              Icon(Icons.folder_copy_outlined,
-                  size: 18, color: theme.colorScheme.primary),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: <Widget>[
-                    Text(
-                      project.name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    Text(
-                      '${project.package} · ${context.l10n.scenes(project.scenes.length)}',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.bodySmall?.copyWith(fontSize: 11),
-                    ),
-                  ],
-                ),
-              ),
-              IconButton(
-                tooltip: context.tr('New document'),
-                icon: const Icon(Icons.note_add_outlined, size: 16),
-                onPressed: controller.newDocument,
-                visualDensity: VisualDensity.compact,
-                style: const ButtonStyle(
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                ),
-                constraints:
-                    const BoxConstraints(minWidth: 28, minHeight: 28),
-                padding: EdgeInsets.zero,
-              ),
-              IconButton(
-                tooltip: context.tr('Open FXML…'),
-                icon: const Icon(Icons.folder_open, size: 16),
-                onPressed: widget.onOpen,
-                visualDensity: VisualDensity.compact,
-                style: const ButtonStyle(
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                ),
-                constraints:
-                    const BoxConstraints(minWidth: 28, minHeight: 28),
-                padding: EdgeInsets.zero,
-              ),
-              IconButton(
-                tooltip: context.tr('Save document'),
-                icon: const Icon(Icons.save_outlined, size: 16),
-                onPressed: widget.onSave,
-                visualDensity: VisualDensity.compact,
-                style: const ButtonStyle(
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                ),
-                constraints:
-                    const BoxConstraints(minWidth: 28, minHeight: 28),
-                padding: EdgeInsets.zero,
-              ),
-              IconButton(
-                tooltip: context.tr('Download FXML…'),
-                icon: const Icon(Icons.file_download_outlined, size: 16),
-                onPressed: widget.onDownload,
-                visualDensity: VisualDensity.compact,
-                style: const ButtonStyle(
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                ),
-                constraints:
-                    const BoxConstraints(minWidth: 28, minHeight: 28),
-                padding: EdgeInsets.zero,
-              ),
-              IconButton(
-                tooltip: context.tr('New scene'),
-                icon: const Icon(Icons.add, size: 18),
-                onPressed: _newScene,
-                visualDensity: VisualDensity.compact,
-                style: const ButtonStyle(
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                ),
-                constraints:
-                    const BoxConstraints(minWidth: 30, minHeight: 30),
-                padding: EdgeInsets.zero,
-              ),
-            ],
-          ),
-        ),
-        const Divider(height: 1),
         // Loose so the pane can end right below the last row instead of
         // cutting it with the divider.
         Flexible(
