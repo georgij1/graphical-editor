@@ -467,44 +467,51 @@ String? _virtualPathFromRule(String rule) {
 // ---------- gitignore matching helpers ----------
 
 bool _isIgnored(String relativePath, bool isDir, List<String> rules) {
+  final parts = relativePath.split('/');
   bool ignored = false;
-  for (final raw in rules) {
-    var rule = raw.trim();
-    if (rule.isEmpty || rule.startsWith('#')) continue;
-    bool neg = false;
-    if (rule.startsWith('!')) {
-      neg = true;
-      rule = rule.substring(1);
-    }
-    bool dirOnly = false;
-    if (rule.endsWith('/')) {
-      dirOnly = true;
-      rule = rule.substring(0, rule.length - 1);
-    }
-    if (rule.isEmpty) continue;
-    if (dirOnly && !isDir) continue;
+  String current = '';
+  for (var i = 0; i < parts.length; i++) {
+    current = i == 0 ? parts[i] : '$current/${parts[i]}';
+    final levelIsDir = i < parts.length - 1 || isDir;
+    for (final raw in rules) {
+      var rule = raw.trim();
+      if (rule.isEmpty || rule.startsWith('#')) continue;
+      bool neg = false;
+      if (rule.startsWith('!')) {
+        neg = true;
+        rule = rule.substring(1);
+      }
+      bool dirOnly = false;
+      if (rule.endsWith('/')) {
+        dirOnly = true;
+        rule = rule.substring(0, rule.length - 1);
+      }
+      if (rule.isEmpty) continue;
+      if (dirOnly && !levelIsDir) continue;
 
-    final containsSlash = rule.contains('/');
-    final anchored = rule.startsWith('/');
-    if (anchored) rule = rule.substring(1);
-    final target = containsSlash ? relativePath : relativePath.split('/').last;
-    final pattern = anchored || containsSlash
-        ? (anchored ? '^' : '') + _globToRegex(rule, anchored || containsSlash)
-        : _globToRegex(rule, false);
+      final containsSlash = rule.contains('/');
+      final anchored = rule.startsWith('/');
+      if (anchored) rule = rule.substring(1);
+      final target = containsSlash ? current : current.split('/').last;
+      final pattern = anchored || containsSlash
+          ? (anchored ? '^' : '') + _globToRegex(rule, anchored || containsSlash)
+          : _globToRegex(rule, false);
 
-    // For non-anchored patterns without slash, match against basename in any dir.
-    RegExp re;
-    try {
-      re = RegExp(pattern);
-    } catch (_) {
-      continue;
-    }
-    if (re.hasMatch(target) || (!containsSlash && re.hasMatch(relativePath))) {
-      ignored = !neg;
+      RegExp re;
+      try {
+        re = RegExp(pattern);
+      } catch (_) {
+        continue;
+      }
+      if (re.hasMatch(target) ||
+          (!containsSlash && re.hasMatch(current))) {
+        ignored = !neg;
+      }
     }
   }
   return ignored;
 }
+
 
 String _globToRegex(String pat, bool anchored) {
   final buf = StringBuffer();
