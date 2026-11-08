@@ -382,8 +382,6 @@ class _GitignoreTreeView extends StatelessWidget {
         children: <Widget>[
           for (final r in realRoots) buildNode(r, 0),
           if (virtualPaths.isNotEmpty) ...<Widget>[
-            const SizedBox(height: 8),
-            Divider(color: theme.dividerColor),
             for (final v in virtualPaths)
               _buildVirtualRow(context, theme, v.path, v.isDir, rules),
           ],
