@@ -282,6 +282,7 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
             ),
           ),
           const Divider(height: 1),
+          _MarkdownValidationBar(validation: _validation),
           Expanded(
             child: Row(
               children: <Widget>[
@@ -333,7 +334,6 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
               ],
             ),
           ),
-          _MarkdownValidationBar(validation: _validation),
         ],
       ),
     );
