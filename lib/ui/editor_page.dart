@@ -240,7 +240,8 @@ class _EditorPageState extends State<EditorPage> {
                     // button moves to the far right instead of leading the
                     // actions. On the project list it stays on the left.
                     if (_controller.currentProject != null) ...<Widget>[
-                      _PresenceBar(controller: _controller),
+                      if (_controller.codePath.endsWith('.fxml'))
+                        _PresenceBar(controller: _controller),
                       EditorToolbar(
                         controller: _controller,
                         onShowCode: _showCode,
