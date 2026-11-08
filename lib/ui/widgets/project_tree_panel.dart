@@ -74,33 +74,6 @@ class _ProjectTreePanelState extends State<ProjectTreePanel> {
     });
   }
 
-  void _collectDirs(_DirNode dir, Set<String> out) {
-    out.add(dir.path);
-    for (final child in dir.dirs.values) {
-      _collectDirs(child, out);
-    }
-  }
-
-  void _collapseAll(_DirNode dir) {
-    setState(() {
-      _collectDirs(dir, _collapsed);
-    });
-  }
-
-  void _expandAll(_DirNode dir) {
-    setState(() {
-      _collapsed.clear();
-    });
-  }
-
-  bool _allCollapsed(_DirNode dir, {bool isRoot = false}) {
-    if (!isRoot && !_collapsed.contains(dir.path)) return false;
-    for (final child in dir.dirs.values) {
-      if (!_allCollapsed(child)) return false;
-    }
-    return true;
-  }
-
   @override
   Widget build(BuildContext context) {
     final project = controller.currentProject;
@@ -120,41 +93,6 @@ class _ProjectTreePanelState extends State<ProjectTreePanel> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
-              Builder(
-                builder: (context) {
-                  final allCollapsed = _allCollapsed(root, isRoot: true);
-                  final label = allCollapsed
-                      ? context.tr('Expand all')
-                      : context.tr('Collapse all');
-                  return Padding(
-                    padding: const EdgeInsets.fromLTRB(6, 4, 6, 2),
-                    child: Row(
-                      children: <Widget>[
-                        IconButton(
-                          tooltip: label,
-                          icon: Icon(
-                            allCollapsed
-                                ? Icons.unfold_more
-                                : Icons.unfold_less,
-                            size: 16,
-                          ),
-                          visualDensity: VisualDensity.compact,
-                          onPressed: () {
-                            if (allCollapsed) {
-                              _expandAll(root);
-                            } else {
-                              _collapseAll(root);
-                            }
-                          },
-                        ),
-                        const SizedBox(width: 4),
-                        Text(label, style: const TextStyle(fontSize: 12)),
-                      ],
-                    ),
-                  );
-                },
-              ),
-              const Divider(height: 1),
               // Root project folder tile (renders recursively)
               _directoryTile(context, projectNow, root, 0),
             ],
