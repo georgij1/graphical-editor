@@ -261,7 +261,7 @@ class _ProjectTreePanelState extends State<ProjectTreePanel> {
         // Always provide a non-null onTap so InkWell renders hover effects.
         // For empty folders the tap does nothing; for non-empty it toggles.
         onTap: empty ? null : () => _toggle(dir.path),
-        hoverColor: Theme.of(context).colorScheme.surface.withValues(alpha: 0.12),
+        hoverColor: Theme.of(context).hoverColor,
         child: Padding(
           padding: EdgeInsets.only(
             left: 6 + depth * 14.0,
