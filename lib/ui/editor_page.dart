@@ -225,6 +225,7 @@ class _EditorPageState extends State<EditorPage> {
               return Scaffold(
                 appBar: AppBar(
                   titleSpacing: 12,
+                  scrolledUnderElevation: 0,
                   // Leaving a project belongs to the editor header, next to
                   // the name it applies to.
                   leading: _controller.currentProject != null
