@@ -250,10 +250,11 @@ class EditorController extends ChangeNotifier {
   bool get codeIsJava => _openSource != null && !(_openSource!.isFxml);
 
   /// True when an FXML document is currently open (a scene or an FXML source
-  /// file from the tree). Used to gate canvas-only controls.
+  /// file from the tree) and actually shown. Used to gate canvas-only controls.
   bool get hasOpenFxml =>
-      _activeScene != null ||
-      (_openSource != null && _openSource!.isFxml);
+      _openTabs.isNotEmpty &&
+      (_activeScene != null ||
+          (_openSource != null && _openSource!.isFxml));
 
   /// True when the opened source is a Java file (validated as Java).
   bool get codeIsJavaSource => _openSource?.isJava ?? false;
