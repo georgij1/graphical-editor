@@ -338,7 +338,7 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
                           onHorizontalDragUpdate: (details) {
                             setState(() {
                               _previewFraction =
-                                  ((_previewFraction * usable + details.delta.dx) /
+                                  ((_previewFraction * usable - details.delta.dx) /
                                           usable)
                                       .clamp(0.0, 1.0);
                             });
