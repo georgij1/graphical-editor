@@ -228,6 +228,8 @@ class _EditorPageState extends State<EditorPage> {
                   elevation: 0,
                   scrolledUnderElevation: 0,
                   surfaceTintColor: Colors.transparent,
+                  shadowColor: Colors.transparent,
+                  backgroundColor: Theme.of(context).colorScheme.surface,
                   // Leaving a project belongs to the editor header, next to
                   // the name it applies to.
                   leading: _controller.currentProject != null
