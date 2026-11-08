@@ -281,6 +281,19 @@ class _GitignoreTreeView extends StatelessWidget {
         filePaths.add(key);
       }
     }
+
+    // Virtual paths derived from the gitignore rules themselves, so that
+    // patterns such as `target/` or `*.log` are visible in the preview even
+    // when no matching file exists in the project yet.
+    for (final raw in rulesText.split('\\n')) {
+      final v = _virtualPathFromRule(raw);
+      if (v == null) continue;
+      if (v.endsWith('/')) {
+        dirPaths.add(v.substring(0, v.length - 1));
+      } else {
+        filePaths.add(v);
+      }
+    }
     // Derive directories.
     final allPaths = <String>{...filePaths, ...dirPaths};
     for (final p in [...filePaths, ...dirPaths]) {
@@ -369,6 +382,25 @@ class _GitignoreTreeView extends StatelessWidget {
       ),
     );
   }
+}
+
+// ---------- virtual path helpers ----------
+
+String? _virtualPathFromRule(String rule) {
+  var r = rule.trim();
+  if (r.isEmpty || r.startsWith('#')) return null;
+  if (r.startsWith('!')) return null;
+  final dirOnly = r.endsWith('/');
+  if (dirOnly) r = r.substring(0, r.length - 1);
+  if (r.startsWith('/')) r = r.substring(1);
+  if (r.isEmpty) return null;
+  // Only simple patterns become virtual entries.
+  if (r.contains('[') || r.contains(']') || r.contains('{') || r.contains('}')) {
+    return null;
+  }
+  r = r.replaceAll('*', 'x').replaceAll('?', 'x');
+  if (r.isEmpty) return null;
+  return dirOnly ? '$r/' : r;
 }
 
 // ---------- gitignore matching helpers ----------
