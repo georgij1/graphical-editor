@@ -27,6 +27,7 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
   late ValidationResult _validation = _validate(_text.text);
   OverlayEntry? _overlayEntry;
   List<String> _suggestions = <String>[];
+  double _previewFraction = 0.5;
 
   @override
   void initState() {
@@ -284,54 +285,101 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
           const Divider(height: 1),
           _MarkdownValidationBar(validation: _validation),
           Expanded(
-            child: Row(
-              children: <Widget>[
-                // Editor pane
-                Expanded(
-                  child: Container(
-                    color: dark ? const Color(0xFF1E1E1E) : const Color(0xFFFBFBFB),
-                    child: TextField(
-                      controller: _text,
-                      focusNode: _focusNode,
-                      maxLines: null,
-                      expands: true,
-                      textAlignVertical: TextAlignVertical.top,
-                      style: TextStyle(
-                        fontFamily: 'monospace',
-                        fontSize: 12.5,
-                        height: 1.45,
-                        color: dark
-                            ? const Color(0xFFE6E6E6)
-                            : const Color(0xFF1F1F1F),
-                      ),
-                      decoration: const InputDecoration(
-                        border: InputBorder.none,
-                        contentPadding: EdgeInsets.all(16),
-                      ),
-                    ),
-                  ),
-                ),
-                const VerticalDivider(width: 1),
-                // Preview pane
-                Expanded(
-                  child: Container(
-                    color: theme.colorScheme.surface,
-                    padding: const EdgeInsets.all(16),
-                    child: Align(
-                      alignment: Alignment.topLeft,
-                      child: SingleChildScrollView(
-                        child: SizedBox(
-                          width: double.infinity,
-                          child: MarkdownPreview(
-                            source: _text.text,
-                            theme: theme,
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                const dividerWidth = 8.0;
+                const minEditor = 120.0;
+                const minPreview = 160.0;
+                final usable = (constraints.maxWidth - dividerWidth)
+                    .clamp(0.0, double.infinity);
+                final room = (usable - minPreview).clamp(minEditor, usable);
+                final previewWidth =
+                    (_previewFraction * usable).clamp(minPreview, room);
+                final editorWidth = (usable - previewWidth).clamp(minEditor, usable);
+                bool hovering = false;
+                return StatefulBuilder(
+                  builder: (context, setLocal) => Row(
+                    children: <Widget>[
+                      SizedBox(
+                        width: editorWidth,
+                        child: Container(
+                          color: dark
+                              ? const Color(0xFF1E1E1E)
+                              : const Color(0xFFFBFBFB),
+                          child: TextField(
+                            controller: _text,
+                            focusNode: _focusNode,
+                            maxLines: null,
+                            expands: true,
+                            textAlignVertical: TextAlignVertical.top,
+                            style: TextStyle(
+                              fontFamily: 'monospace',
+                              fontSize: 12.5,
+                              height: 1.45,
+                              color: dark
+                                  ? const Color(0xFFE6E6E6)
+                                  : const Color(0xFF1F1F1F),
+                            ),
+                            decoration: const InputDecoration(
+                              border: InputBorder.none,
+                              contentPadding: EdgeInsets.all(16),
+                            ),
                           ),
                         ),
                       ),
-                    ),
+                      MouseRegion(
+                        cursor: SystemMouseCursors.resizeColumn,
+                        onEnter: (_) => setLocal(() => hovering = true),
+                        onExit: (_) => setLocal(() => hovering = false),
+                        child: GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onDoubleTap: () =>
+                              setState(() => _previewFraction = 0.5),
+                          onHorizontalDragUpdate: (details) {
+                            setState(() {
+                              _previewFraction =
+                                  ((_previewFraction * usable + details.delta.dx) /
+                                          usable)
+                                      .clamp(0.0, 1.0);
+                            });
+                          },
+                          child: Container(
+                            width: dividerWidth,
+                            alignment: Alignment.center,
+                            color: hovering
+                                ? theme.colorScheme.primary
+                                    .withValues(alpha: 0.10)
+                                : null,
+                            child: Container(
+                              width: 1,
+                              color: theme.dividerColor,
+                            ),
+                          ),
+                        ),
+                      ),
+                      SizedBox(
+                        width: previewWidth,
+                        child: Container(
+                          color: theme.colorScheme.surface,
+                          padding: const EdgeInsets.all(16),
+                          child: Align(
+                            alignment: Alignment.topLeft,
+                            child: SingleChildScrollView(
+                              child: SizedBox(
+                                width: double.infinity,
+                                child: MarkdownPreview(
+                                  source: _text.text,
+                                  theme: theme,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-              ],
+                );
+              },
             ),
           ),
         ],
