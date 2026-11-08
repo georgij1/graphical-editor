@@ -462,21 +462,6 @@ return Card(
               // The owner of the project shares the row with the scene count.
               Row(
                 children: <Widget>[
-                  Icon(Icons.layers_outlined,
-                      size: 12, color: theme.colorScheme.onSurfaceVariant),
-                  const SizedBox(width: 4),
-                  Flexible(
-                    child: Text(
-                      context.l10n.scenes(project.scenes.length),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
                   Icon(Icons.person_outline,
                       size: 12, color: theme.colorScheme.onSurfaceVariant),
                   const SizedBox(width: 4),
