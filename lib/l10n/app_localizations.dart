@@ -215,6 +215,7 @@ class AppLocalizations {
     'Folder': 'Папка',
     'ignored': 'игнорируется',
     'example': 'пример',
+    'Examples from rules:': 'Виртуальные пути из правил (примеры):',
     'Gitignore applied.': 'Файл .gitignore применён.',
     'No project open.': 'Проект не открыт.',
     'Cannot delete the project root.': 'Нельзя удалить корень проекта.',
