@@ -50,7 +50,7 @@ class EditorToolbar extends StatelessWidget {
           // switch is hidden while it is shown. No divider after it: every
           // following group starts with its own, and two in a row drew a double
           // bar.
-          if (!controller.codeIsJava)
+          if (!controller.codeIsJava && controller.hasOpenFxml)
             Padding(
               padding: const EdgeInsets.only(right: 4),
               child: _ModeSwitch(controller: controller),
