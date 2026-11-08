@@ -79,7 +79,7 @@ class EditorToolbar extends StatelessWidget {
               onPressed: controller.toggleGrid,
             ),
           ],
-          if (showZoom) ...<Widget>[
+          if (showZoom && controller.codePath.endsWith('.fxml')) ...<Widget>[
             const _Bar(),
             IconButton(
               tooltip: context.tr('Zoom out'),
