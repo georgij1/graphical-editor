@@ -282,8 +282,8 @@ class _GitignoreTreeView extends StatelessWidget {
       }
     }
     // Derive directories.
-    final allPaths = <String>{...filePaths};
-    for (final p in filePaths) {
+    final allPaths = <String>{...filePaths, ...dirPaths};
+    for (final p in [...filePaths, ...dirPaths]) {
       final parts = p.split('/');
       for (var i = 1; i < parts.length; i++) {
         allPaths.add(parts.sublist(0, i).join('/'));
