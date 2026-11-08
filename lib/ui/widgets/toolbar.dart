@@ -57,7 +57,7 @@ class EditorToolbar extends StatelessWidget {
             ),
           // New/open/save/download live in the project tree, next to the files
           // they act on; the header keeps view and edit controls only.
-          if (showHistory && controller.codePath.endsWith('.fxml')) ...<Widget>[
+          if (showHistory && controller.hasOpenFxml) ...<Widget>[
             const _Bar(),
             IconButton(
               tooltip: context.tr('Undo (Ctrl+Z)'),
@@ -70,7 +70,7 @@ class EditorToolbar extends StatelessWidget {
               onPressed: controller.canRedo ? controller.redo : null,
             ),
           ],
-          if (showCanvasTools && controller.codePath.endsWith('.fxml')) ...<Widget>[
+          if (showCanvasTools && controller.hasOpenFxml) ...<Widget>[
             const _Bar(),
             IconButton(
               tooltip: context.tr('Toggle grid'),
@@ -79,7 +79,7 @@ class EditorToolbar extends StatelessWidget {
               onPressed: controller.toggleGrid,
             ),
           ],
-          if (showZoom && controller.codePath.endsWith('.fxml')) ...<Widget>[
+          if (showZoom && controller.hasOpenFxml) ...<Widget>[
             const _Bar(),
             IconButton(
               tooltip: context.tr('Zoom out'),
