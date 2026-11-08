@@ -264,6 +264,7 @@ class _GitignoreTreeView extends StatelessWidget {
     final rules = rulesText.split('\n');
     final filePaths = <String>{};
     final dirPaths = <String>{};
+    final virtualPaths = <String>{};
     // Generated Java sources.
     for (final f in JavaGenerator.generate(project)) {
       filePaths.add(f.path);
@@ -288,10 +289,12 @@ class _GitignoreTreeView extends StatelessWidget {
     for (final raw in rulesText.split('\\n')) {
       final v = _virtualPathFromRule(raw);
       if (v == null) continue;
+      final clean = v.endsWith('/') ? v.substring(0, v.length - 1) : v;
+      virtualPaths.add(clean);
       if (v.endsWith('/')) {
-        dirPaths.add(v.substring(0, v.length - 1));
+        dirPaths.add(clean);
       } else {
-        filePaths.add(v);
+        filePaths.add(clean);
       }
     }
     // Derive directories.
@@ -320,6 +323,7 @@ class _GitignoreTreeView extends StatelessWidget {
       final isDir = dirPaths.contains(path) || !filePaths.contains(path);
       final ignored = _isIgnored(path, isDir, rules);
       final name = path.split('/').last;
+      final isVirtual = virtualPaths.contains(path);
       final kids = childrenOf[path] ?? const <String>[];
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -343,9 +347,12 @@ class _GitignoreTreeView extends StatelessWidget {
                     name,
                     style: TextStyle(
                       fontSize: 12,
+                      fontStyle: isVirtual ? FontStyle.italic : FontStyle.normal,
                       color: ignored
                           ? theme.colorScheme.onSurfaceVariant
-                          : theme.colorScheme.onSurface,
+                          : (isVirtual
+                              ? theme.colorScheme.onSurfaceVariant
+                              : theme.colorScheme.onSurface),
                       decoration: ignored
                           ? TextDecoration.lineThrough
                           : TextDecoration.none,
@@ -353,6 +360,18 @@ class _GitignoreTreeView extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
+                if (isVirtual)
+                  Padding(
+                    padding: const EdgeInsets.only(left: 4),
+                    child: Text(
+                      context.tr('example'),
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: theme.colorScheme.onSurfaceVariant,
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                  ),
                 if (ignored)
                   Padding(
                     padding: const EdgeInsets.only(left: 4),
