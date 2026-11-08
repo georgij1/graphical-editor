@@ -263,6 +263,7 @@ class _GitignoreTreeView extends StatelessWidget {
     final theme = Theme.of(context);
     final rules = rulesText.split('\n');
     final filePaths = <String>{};
+    final dirPaths = <String>{};
     // Generated Java sources.
     for (final f in JavaGenerator.generate(project)) {
       filePaths.add(f.path);
@@ -274,7 +275,11 @@ class _GitignoreTreeView extends StatelessWidget {
     }
     // User-created files/folders.
     for (final key in project.sourceOverrides.keys) {
-      filePaths.add(key.endsWith('/') ? key.substring(0, key.length - 1) : key);
+      if (key.endsWith('/')) {
+        dirPaths.add(key.substring(0, key.length - 1));
+      } else {
+        filePaths.add(key);
+      }
     }
     // Derive directories.
     final allPaths = <String>{...filePaths};
@@ -299,7 +304,7 @@ class _GitignoreTreeView extends StatelessWidget {
     }
 
     Widget buildNode(String path, int depth) {
-      final isDir = !filePaths.contains(path);
+      final isDir = dirPaths.contains(path) || !filePaths.contains(path);
       final ignored = _isIgnored(path, isDir, rules);
       final name = path.split('/').last;
       final kids = childrenOf[path] ?? const <String>[];
