@@ -264,7 +264,7 @@ class _GitignoreTreeView extends StatelessWidget {
     final rules = rulesText.split('\n');
     final filePaths = <String>{};
     final dirPaths = <String>{};
-    final virtualPaths = <String>{};
+    final virtualPaths = <({String path, bool isDir})>[];
     // Generated Java sources.
     for (final f in JavaGenerator.generate(project)) {
       filePaths.add(f.path);
@@ -285,16 +285,15 @@ class _GitignoreTreeView extends StatelessWidget {
 
     // Virtual paths derived from the gitignore rules themselves, so that
     // patterns such as `target/` or `*.log` are visible in the preview even
-    // when no matching file exists in the project yet.
+    // when no matching file exists in the project yet. They are kept separate
+    // from the real project tree to avoid confusing indentation.
     for (final raw in rulesText.split('\\n')) {
       final v = _virtualPathFromRule(raw);
       if (v == null) continue;
-      final clean = v.endsWith('/') ? v.substring(0, v.length - 1) : v;
-      virtualPaths.add(clean);
-      if (v.endsWith('/')) {
-        dirPaths.add(clean);
-      } else {
-        filePaths.add(clean);
+      final isDir = v.endsWith('/');
+      final clean = isDir ? v.substring(0, v.length - 1) : v;
+      if (!virtualPaths.any((e) => e.path == clean)) {
+        virtualPaths.add((path: clean, isDir: isDir));
       }
     }
     // Derive directories.
@@ -323,7 +322,6 @@ class _GitignoreTreeView extends StatelessWidget {
       final isDir = dirPaths.contains(path) || !filePaths.contains(path);
       final ignored = _isIgnored(path, isDir, rules);
       final name = path.split('/').last;
-      final isVirtual = virtualPaths.contains(path);
       final kids = childrenOf[path] ?? const <String>[];
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -347,12 +345,9 @@ class _GitignoreTreeView extends StatelessWidget {
                     name,
                     style: TextStyle(
                       fontSize: 12,
-                      fontStyle: isVirtual ? FontStyle.italic : FontStyle.normal,
                       color: ignored
                           ? theme.colorScheme.onSurfaceVariant
-                          : (isVirtual
-                              ? theme.colorScheme.onSurfaceVariant
-                              : theme.colorScheme.onSurface),
+                          : theme.colorScheme.onSurface,
                       decoration: ignored
                           ? TextDecoration.lineThrough
                           : TextDecoration.none,
@@ -360,18 +355,6 @@ class _GitignoreTreeView extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
-                if (isVirtual)
-                  Padding(
-                    padding: const EdgeInsets.only(left: 4),
-                    child: Text(
-                      context.tr('example'),
-                      style: TextStyle(
-                        fontSize: 10,
-                        color: theme.colorScheme.onSurfaceVariant,
-                        fontStyle: FontStyle.italic,
-                      ),
-                    ),
-                  ),
                 if (ignored)
                   Padding(
                     padding: const EdgeInsets.only(left: 4),
@@ -392,16 +375,99 @@ class _GitignoreTreeView extends StatelessWidget {
       );
     }
 
+    final realRoots = roots;
     return SingleChildScrollView(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          for (final r in roots) buildNode(r, 0),
+          for (final r in realRoots) buildNode(r, 0),
+          if (virtualPaths.isNotEmpty) ...<Widget>[
+            const SizedBox(height: 8),
+            Divider(color: theme.dividerColor),
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Text(
+                context.tr('Examples from rules:'),
+                style: theme.textTheme.labelMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+            for (final v in virtualPaths)
+              _buildVirtualRow(context, theme, v.path, v.isDir, rules),
+          ],
         ],
       ),
     );
   }
 }
+
+  Widget _buildVirtualRow(
+    BuildContext context,
+    ThemeData theme,
+    String path,
+    bool isDir,
+    List<String> rules,
+  ) {
+    final ignored = _isIgnored(path, isDir, rules);
+    return Padding(
+      padding: const EdgeInsets.only(top: 2, bottom: 2),
+      child: Row(
+        children: <Widget>[
+          Icon(
+            isDir ? Icons.folder_outlined : Icons.insert_drive_file_outlined,
+            size: 14,
+            color: ignored
+                ? theme.colorScheme.onSurfaceVariant
+                : (isDir
+                    ? theme.colorScheme.primary
+                    : theme.colorScheme.onSurface),
+          ),
+          const SizedBox(width: 4),
+          Expanded(
+            child: Text(
+              path,
+              style: TextStyle(
+                fontSize: 12,
+                fontStyle: FontStyle.italic,
+                color: ignored
+                    ? theme.colorScheme.onSurfaceVariant
+                    : theme.colorScheme.onSurfaceVariant,
+                decoration: ignored
+                    ? TextDecoration.lineThrough
+                    : TextDecoration.none,
+              ),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.only(left: 4),
+            child: Text(
+              context.tr('example'),
+              style: TextStyle(
+                fontSize: 10,
+                color: theme.colorScheme.onSurfaceVariant,
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+          ),
+          if (ignored)
+            Padding(
+              padding: const EdgeInsets.only(left: 4),
+              child: Text(
+                context.tr('ignored'),
+                style: TextStyle(
+                  fontSize: 10,
+                  color: theme.colorScheme.error,
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
 
 // ---------- virtual path helpers ----------
 
