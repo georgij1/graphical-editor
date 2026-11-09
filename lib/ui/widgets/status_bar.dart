@@ -18,9 +18,9 @@ class StatusBar extends StatelessWidget {
 
     // Hide the bar entirely when there is nothing to show (e.g. no open
     // document and no FXML canvas), so an empty strip is never left behind.
-    final hasContent = controller.hasOpenDocument ||
-        controller.hasOpenFxml ||
-        controller.collaborativeMode;
+    // The saved/unsaved indicator moved to the header, so the bar is only
+    // useful when there is an FXML canvas or a shared-mode indicator.
+    final hasContent = controller.hasOpenFxml || controller.collaborativeMode;
     if (!hasContent) return const SizedBox.shrink();
 
     // Every label is flexible and clips with an ellipsis: the bar must survive
