@@ -245,6 +245,8 @@ class _EditorPageState extends State<EditorPage> {
                     // button moves to the far right instead of leading the
                     // actions. On the project list it stays on the left.
                     if (_controller.currentProject != null) ...<Widget>[
+                      if (_controller.hasOpenDocument)
+                        _SaveStatus(controller: _controller),
                       if (_controller.hasOpenFxml)
                         _PresenceBar(controller: _controller),
                       EditorToolbar(
@@ -798,6 +800,36 @@ class _ShortcutScopeState extends State<_ShortcutScope> {
 }
 
 /// Figma-like presence indicator: shows who is currently in the open project.
+class _SaveStatus extends StatelessWidget {
+  const _SaveStatus({required this.controller});
+
+  final EditorController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final dirty = controller.dirty;
+    final color = dirty ? Colors.orange : Colors.green;
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          Icon(
+            Icons.check_circle_outline,
+            size: 14,
+            color: color,
+          ),
+          const SizedBox(width: 4),
+          Text(
+            dirty ? context.tr('Unsaved changes') : context.tr('Saved'),
+            style: TextStyle(fontSize: 11, color: color),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _PresenceBar extends StatelessWidget {
   const _PresenceBar({required this.controller});
 

@@ -44,23 +44,7 @@ class StatusBar extends StatelessWidget {
             _RunPreview(controller: controller),
             const _Sep(),
           ],
-          // Without an open project there is nothing to save, so the state
-          // indicator stays hidden until a document is actually being edited.
-          if (controller.hasOpenDocument) ...<Widget>[
-            Icon(
-              Icons.check_circle_outline,
-              size: 14,
-              color: controller.dirty ? Colors.orange : Colors.green,
-            ),
-            const SizedBox(width: 4),
-            label(
-              controller.dirty
-                  ? context.tr('Unsaved changes')
-                  : context.tr('Saved'),
-              color: controller.dirty ? Colors.orange : null,
-            ),
-            const _Sep(),
-          ],
+          // Saved/unsaved indicator moved to the header.
           if (controller.hasOpenFxml && selected != null) ...<Widget>[
             label(context.l10n.selected(selected.displayName)),
             const _Sep(),
