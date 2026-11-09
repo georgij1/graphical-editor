@@ -457,26 +457,37 @@ return Card(
                   color: theme.colorScheme.onSurfaceVariant,
                 ),
               ),
-              const SizedBox(height: 4),
               // The whole card opens the project, so it needs no button here.
               // The owner of the project shares the row with the scene count.
-              Row(
-                children: <Widget>[
-                  Icon(Icons.person_outline,
-                      size: 12, color: theme.colorScheme.onSurfaceVariant),
-                  const SizedBox(width: 4),
-                  Flexible(
-                    child: Text(
-                      context.l10n.owner(project.ownerEmail),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                    ),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Container(
+                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 0),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.primaryContainer
+                        .withValues(alpha: 0.5),
+                    borderRadius: BorderRadius.circular(12),
                   ),
-                ],
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: <Widget>[
+                      Icon(Icons.person_outline,
+                          size: 12, color: theme.colorScheme.onPrimaryContainer),
+                      const SizedBox(width: 4),
+                      Flexible(
+                        child: Text(
+                          context.l10n.owner(project.ownerEmail),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: theme.colorScheme.onPrimaryContainer,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
             ],
           ),
