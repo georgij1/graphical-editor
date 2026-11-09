@@ -292,7 +292,8 @@ class _EditorPageState extends State<EditorPage> {
                 // The status bar describes an open document, so it stays hidden on the
                 // project picker. The validation strip above it reports build
                 // problems found by the check that runs on every save.
-                bottomNavigationBar: (_controller.hasOpenDocument &&
+                extendBody: true,
+               bottomNavigationBar: (_controller.hasOpenDocument &&
                         (_controller.hasOpenFxml || _controller.collaborativeMode))
                     ? Column(
                         mainAxisSize: MainAxisSize.min,
