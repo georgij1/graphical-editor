@@ -34,18 +34,19 @@ class StatusBar extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 12),
       child: Row(
         children: <Widget>[
-          Icon(Icons.hub_outlined, size: 14, color: theme.hintColor),
-          const SizedBox(width: 4),
-          label(context.l10n.nodes(controller.nodeCount)),
-          const _Sep(),
-          // The run button lives next to the document summary: it is used
-          // often, and the header is already crowded.
-          _RunPreview(controller: controller),
-          const _Sep(),
+          if (controller.hasOpenFxml) ...<Widget>[
+            Icon(Icons.hub_outlined, size: 14, color: theme.hintColor),
+            const SizedBox(width: 4),
+            label(context.l10n.nodes(controller.nodeCount)),
+            const _Sep(),
+            // The run button lives next to the document summary: it is used
+            // often, and the header is already crowded.
+            _RunPreview(controller: controller),
+            const _Sep(),
+          ],
           // Without an open project there is nothing to save, so the state
           // indicator stays hidden until a document is actually being edited.
           if (controller.hasOpenDocument) ...<Widget>[
-            const _Sep(),
             Icon(
               Icons.check_circle_outline,
               size: 14,
@@ -58,8 +59,9 @@ class StatusBar extends StatelessWidget {
                   : context.tr('Saved'),
               color: controller.dirty ? Colors.orange : null,
             ),
+            const _Sep(),
           ],
-          if (selected != null) ...<Widget>[
+          if (controller.hasOpenFxml && selected != null) ...<Widget>[
             label(context.l10n.selected(selected.displayName)),
             const _Sep(),
           ],
@@ -77,10 +79,12 @@ class StatusBar extends StatelessWidget {
             label('${controller.collaborators.length}'),
             const _Sep(),
           ],
-          label(context.l10n.canvasSize(
-              controller.canvasWidth.round(), controller.canvasHeight.round())),
-          const _Sep(),
-          label('${(controller.zoom * 100).round()}%'),
+          if (controller.hasOpenFxml) ...<Widget>[
+            label(context.l10n.canvasSize(
+                controller.canvasWidth.round(), controller.canvasHeight.round())) ,
+            const _Sep(),
+            label('${(controller.zoom * 100).round()}%'),
+          ],
         ],
       ),
     );
