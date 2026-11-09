@@ -464,7 +464,7 @@ return Card(
               Align(
                 alignment: Alignment.centerLeft,
                 child: Container(
-                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 0),
+                   padding: const EdgeInsets.fromLTRB(2, 0, 8, 0),
                   decoration: BoxDecoration(
                     color: theme.colorScheme.primaryContainer
                         .withValues(alpha: 0.5),
