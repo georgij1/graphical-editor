@@ -450,15 +450,25 @@ return Card(
                   ),
                 ],
               ),
-              Text(
-                project.package,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 11,
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-              ),
+               Align(
+                 alignment: Alignment.centerLeft,
+                 child: Container(
+                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                   decoration: BoxDecoration(
+                     color: theme.colorScheme.secondaryContainer.withValues(alpha: 0.5),
+                     borderRadius: BorderRadius.circular(12),
+                   ),
+                   child: Text(
+                     project.package,
+                     maxLines: 1,
+                     overflow: TextOverflow.ellipsis,
+                     style: TextStyle(
+                       fontSize: 11,
+                       color: theme.colorScheme.onSecondaryContainer,
+                     ),
+                   ),
+                 ),
+               ),
               // The whole card opens the project, so it needs no button here.
               // The owner of the project shares the row with the scene count.
               Align(
