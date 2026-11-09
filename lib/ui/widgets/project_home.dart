@@ -469,6 +469,7 @@ return Card(
                    ),
                  ),
                ),
+               const SizedBox(height: 2),
               // The whole card opens the project, so it needs no button here.
               // The owner of the project shares the row with the scene count.
               Align(
