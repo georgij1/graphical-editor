@@ -486,7 +486,7 @@ return Card(
                       UserAvatar(
                         dataUrl: null,
                         email: project.ownerEmail,
-                        radius: 8,
+                        radius: 6,
                       ),
                       const SizedBox(width: 4),
                       Flexible(
