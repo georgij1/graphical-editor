@@ -2,6 +2,8 @@
 
 import 'package:flutter/material.dart';
 
+import 'user_avatar.dart';
+
 import '../../editor/editor_controller.dart';
 import '../../l10n/app_localizations.dart';
 import '../../project/project.dart';
@@ -471,8 +473,11 @@ return Card(
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: <Widget>[
-                      Icon(Icons.person_outline,
-                          size: 12, color: theme.colorScheme.onPrimaryContainer),
+                      UserAvatar(
+                        dataUrl: null,
+                        email: project.ownerEmail,
+                        radius: 8,
+                      ),
                       const SizedBox(width: 4),
                       Flexible(
                         child: Text(
