@@ -476,7 +476,7 @@ return Card(
                       const SizedBox(width: 4),
                       Flexible(
                         child: Text(
-                          context.l10n.owner(project.ownerEmail),
+                          project.ownerEmail ?? (context.l10n.isRussian ? 'гость' : 'guest'),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
