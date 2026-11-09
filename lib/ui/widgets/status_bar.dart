@@ -16,6 +16,13 @@ class StatusBar extends StatelessWidget {
     final theme = Theme.of(context);
     final style = theme.textTheme.bodySmall;
 
+    // Hide the bar entirely when there is nothing to show (e.g. no open
+    // document and no FXML canvas), so an empty strip is never left behind.
+    final hasContent = controller.hasOpenDocument ||
+        controller.hasOpenFxml ||
+        controller.collaborativeMode;
+    if (!hasContent) return const SizedBox.shrink();
+
     // Every label is flexible and clips with an ellipsis: the bar must survive
     // narrow windows and long scene names instead of overflowing.
     Widget label(String text, {Color? color}) => Flexible(
