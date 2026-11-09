@@ -239,14 +239,22 @@ class _EditorPageState extends State<EditorPage> {
                           onPressed: _controller.backToProjects,
                         )
                       : null,
-                  title: _Title(controller: _controller),
+                  title: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: <Widget>[
+                      _Title(controller: _controller),
+                      if (_controller.currentProject != null &&
+                          _controller.hasOpenDocument) ...<Widget>[
+                        const SizedBox(width: 12),
+                        _SaveStatus(controller: _controller),
+                      ],
+                    ],
+                  ),
                   actions: <Widget>[
                     // Inside a project the header is crowded, so the account
                     // button moves to the far right instead of leading the
                     // actions. On the project list it stays on the left.
                     if (_controller.currentProject != null) ...<Widget>[
-                      if (_controller.hasOpenDocument)
-                        _SaveStatus(controller: _controller),
                       if (_controller.hasOpenFxml)
                         _PresenceBar(controller: _controller),
                       EditorToolbar(
