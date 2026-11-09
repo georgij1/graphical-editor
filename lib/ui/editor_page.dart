@@ -293,9 +293,7 @@ class _EditorPageState extends State<EditorPage> {
                 // project picker. The validation strip above it reports build
                 // problems found by the check that runs on every save.
                 bottomNavigationBar: (_controller.hasOpenDocument &&
-                        (_controller.hasOpenFxml ||
-                            _controller.collaborativeMode ||
-                            (_controller.validation?.issues.isNotEmpty ?? false)))
+                        (_controller.hasOpenFxml || _controller.collaborativeMode))
                     ? Column(
                         mainAxisSize: MainAxisSize.min,
                         children: <Widget>[
