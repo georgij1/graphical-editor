@@ -35,8 +35,7 @@ void main() {
     await tester.pump();
     expect(find.byType(AppBar), findsOneWidget);
 
-    // The document actions live in the project tree, which only exists while a
-    // project is open.
+    // The document actions are no longer shown in the project panel.
     final openButton = find.descendant(
       of: find.byType(ProjectPanel),
       matching: find.byIcon(Icons.folder_open),
@@ -49,7 +48,7 @@ void main() {
       mainClass: 'MainApp',
     );
     await tester.pump();
-    expect(openButton, findsOneWidget);
+    expect(openButton, findsNothing);
     expect(
       find.descendant(
         of: find.byType(AppBar),
@@ -57,27 +56,19 @@ void main() {
       ),
       findsNothing,
     );
-    // The rest of the document actions moved with it.
-    expect(
-      find.descendant(
-        of: find.byType(ProjectPanel),
-        matching: find.byIcon(Icons.save_outlined),
-      ),
-      findsOneWidget,
-    );
     expect(
       find.descendant(
         of: find.byType(ProjectPanel),
         matching: find.byIcon(Icons.file_download_outlined),
       ),
-      findsOneWidget,
+      findsNothing,
     );
     expect(
       find.descendant(
         of: find.byType(ProjectPanel),
         matching: find.byIcon(Icons.note_add_outlined),
       ),
-      findsOneWidget,
+      findsNothing,
     );
   });
 
