@@ -51,7 +51,7 @@ class StatusBar extends StatelessWidget {
           ],
           // The shared mode: the project is worked on by several people and
           // the editor watches the server for their changes.
-          if (controller.collaborativeMode) ...<Widget>[
+          if (controller.hasOpenFxml && controller.collaborativeMode) ...<Widget>[
             Icon(Icons.group_outlined,
                 size: 14, color: theme.colorScheme.primary),
             const SizedBox(width: 4),
