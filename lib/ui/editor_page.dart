@@ -295,7 +295,8 @@ class _EditorPageState extends State<EditorPage> {
                 extendBody: true,
                resizeToAvoidBottomInset: false,
                bottomNavigationBar: (_controller.hasOpenDocument &&
-                        (_controller.hasOpenFxml || _controller.collaborativeMode))
+                        (_controller.hasOpenFxml ||
+                            (_controller.validation?.issues.isNotEmpty ?? false)))
                     ? Column(
                         mainAxisSize: MainAxisSize.min,
                         children: <Widget>[
