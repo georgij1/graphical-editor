@@ -1270,11 +1270,11 @@ class EditorController extends ChangeNotifier {
     _endEditChain();
     // Persist immediately so the attachment survives reload in any save mode.
     final serialized = serialize();
+    final project = _currentProject;
     if (_activeScene != null) {
       _activeScene!.fxml = serialized;
       _dirty = false;
       // Ensure the scene inside the project model is updated too.
-      final project = _currentProject;
       if (project != null) {
         for (final s in project.scenes) {
           if (identical(s, _activeScene) || s.name == _activeScene!.name) {
@@ -1286,6 +1286,11 @@ class EditorController extends ChangeNotifier {
     _flushToScene();
     await _persist(explicit: true);
     await flushAutosave;
+    // In shared/collaborative projects, also publish so other participants and
+    // the server-side shared copy keep the stylesheet attachment.
+    if (project != null && (project.collaborative || project.shared) && signedIn) {
+      await publishSharedProject(project);
+    }
     notifyListeners();
     return true;
   }
