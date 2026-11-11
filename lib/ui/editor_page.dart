@@ -112,14 +112,6 @@ class _EditorPageState extends State<EditorPage> {
     }
   }
 
-  Future<void> _saveByButton() async {
-    final ok = await _controller.saveDocument(trigger: 'button');
-    if (!mounted) return;
-    if (ok) {
-      _showMessage(context.tr('Document saved.'));
-    }
-  }
-
   /// Writes the document to a file the user picks.
   Future<void> _download() async {
     final ok = await _controller.saveFile();
@@ -257,10 +249,7 @@ class _EditorPageState extends State<EditorPage> {
                       if (_controller.currentProject != null &&
                           _controller.hasOpenDocument) ...<Widget>[
                         const SizedBox(width: 12),
-                        _SaveStatus(
-                          controller: _controller,
-                          onSave: _saveByButton,
-                        ),
+                        _SaveStatus(controller: _controller),
                       ],
                     ],
                   ),
@@ -827,10 +816,9 @@ class _ShortcutScopeState extends State<_ShortcutScope> {
 
 /// Save status indicator shown in the header next to the project name.
 class _SaveStatus extends StatelessWidget {
-  const _SaveStatus({required this.controller, required this.onSave});
+  const _SaveStatus({required this.controller});
 
   final EditorController controller;
-  final Future<void> Function() onSave;
 
   Future<void> _showSaveSettings(BuildContext context) async {
     await showDialog<void>(
@@ -839,7 +827,7 @@ class _SaveStatus extends StatelessWidget {
         return ListenableBuilder(
           listenable: controller,
           builder: (dialogContext, _) {
-            final mode = controller.saveMode;
+            final mode = controller.saveMode == 'shortcut' ? 'shortcut' : 'auto';
             return AlertDialog(
               title: Text(context.tr('Save settings')),
               content: RadioGroup<String>(
@@ -854,11 +842,6 @@ class _SaveStatus extends StatelessWidget {
                       value: 'auto',
                       title: Text(context.tr('Automatically')),
                       subtitle: Text(context.tr('Save changes automatically')),
-                    ),
-                    RadioListTile<String>(
-                      value: 'button',
-                      title: Text(context.tr('By button')),
-                      subtitle: Text(context.tr('Save only when you click Save')),
                     ),
                     RadioListTile<String>(
                       value: 'shortcut',
@@ -887,48 +870,32 @@ class _SaveStatus extends StatelessWidget {
     final color = dirty ? Colors.orange : Colors.green;
     return Padding(
       padding: const EdgeInsets.only(right: 8),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: <Widget>[
-          InkWell(
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: () => _showSaveSettings(context),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.12),
             borderRadius: BorderRadius.circular(12),
-            onTap: () => _showSaveSettings(context),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: color.withValues(alpha: 0.35)),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: <Widget>[
-                  Icon(
-                    dirty ? Icons.circle_outlined : Icons.check_circle_outline,
-                    size: 14,
-                    color: color,
-                  ),
-                  const SizedBox(width: 4),
-                  Text(
-                    dirty ? context.tr('Unsaved changes') : context.tr('Saved'),
-                    style: TextStyle(fontSize: 11, color: color),
-                  ),
-                ],
-              ),
-            ),
+            border: Border.all(color: color.withValues(alpha: 0.35)),
           ),
-          if (controller.isButtonSaveMode) ...<Widget>[
-            const SizedBox(width: 4),
-            IconButton(
-              tooltip: context.tr('Save'),
-              icon: const Icon(Icons.save_outlined, size: 18),
-              visualDensity: VisualDensity.compact,
-              padding: EdgeInsets.zero,
-              constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
-              onPressed: dirty ? () => onSave() : null,
-            ),
-          ],
-        ],
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              Icon(
+                dirty ? Icons.circle_outlined : Icons.check_circle_outline,
+                size: 14,
+                color: color,
+              ),
+              const SizedBox(width: 4),
+              Text(
+                dirty ? context.tr('Unsaved changes') : context.tr('Saved'),
+                style: TextStyle(fontSize: 11, color: color),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

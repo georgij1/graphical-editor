@@ -665,16 +665,15 @@ class EditorController extends ChangeNotifier {
 
   // ---------------------------------------------------------------- save mode
 
-  /// How document changes are persisted: `auto`, `button`, or `shortcut`.
+  /// How document changes are persisted: `auto` or `shortcut` (Ctrl+S).
   String _saveMode = 'auto';
   String get saveMode => _saveMode;
 
   bool get isAutoSaveMode => _saveMode == 'auto';
-  bool get isButtonSaveMode => _saveMode == 'button';
   bool get isShortcutSaveMode => _saveMode == 'shortcut';
 
   Future<void> setSaveMode(String value) async {
-    if (value != 'auto' && value != 'button' && value != 'shortcut') return;
+    if (value != 'auto' && value != 'shortcut') return;
     if (_saveMode == value) return;
     _saveMode = value;
     await _tokenStore.write(_saveModeKey, value);
@@ -683,7 +682,12 @@ class EditorController extends ChangeNotifier {
 
   Future<void> _loadSaveMode() async {
     final stored = await _tokenStore.read(_saveModeKey);
-    if (stored != 'auto' && stored != 'button' && stored != 'shortcut') {
+    if (stored == 'button') {
+      _saveMode = 'shortcut';
+      notifyListeners();
+      return;
+    }
+    if (stored != 'auto' && stored != 'shortcut') {
       return;
     }
     _saveMode = stored!;
@@ -738,12 +742,9 @@ class EditorController extends ChangeNotifier {
   /// Inside a project the FXML is written back to the active scene; a document
   /// opened on its own is stored in the workspace so it comes back on reload.
   /// [trigger] enforces the selected save mode: returns `false` if the mode does
-  /// not allow this trigger (`button`/`shortcut`/`auto`).
+  /// not allow this trigger (`shortcut`/`auto`).
   Future<bool> saveDocument({String trigger = 'auto'}) async {
     if (trigger == 'shortcut' && !isAutoSaveMode && !isShortcutSaveMode) {
-      return false;
-    }
-    if (trigger == 'button' && !isAutoSaveMode && !isButtonSaveMode) {
       return false;
     }
     final scene = _activeScene;
