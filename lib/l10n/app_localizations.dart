@@ -209,6 +209,7 @@ class AppLocalizations {
     'No stylesheet files found in the project.': 'В проекте не найдены стилевые файлы.',
     'Stylesheet attached to the scene.': 'Стилевой файл подключён к сцене.',
     'Could not attach stylesheet.': 'Не удалось подключить стилевой файл.',
+    'Connected to this scene': 'Подключён к этой сцене',
     'Save': 'Сохранить',
     'Preview': 'Просмотр',
 

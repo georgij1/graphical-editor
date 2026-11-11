@@ -1272,6 +1272,22 @@ class EditorController extends ChangeNotifier {
     return true;
   }
 
+  /// Returns true if [cssPath] is attached to the currently active FXML scene.
+  bool isStylesheetAttachedToActiveScene(String cssPath) {
+    if (!hasOpenFxml) return false;
+    final ref = _relativeStylesheetRef(cssPath);
+    final current = _document.root.attributes['stylesheets']?.trim() ?? '';
+    if (current.isEmpty) return false;
+    final refs = current
+        .split(RegExp(r'[,\s]+'))
+        .where((s) => s.isNotEmpty)
+        .toSet();
+    if (refs.contains(ref)) return true;
+    // Also accept a match by file name as a fallback.
+    final name = cssPath.split('/').last;
+    return refs.any((r) => r.endsWith('/$name') || r == '@$name' || r == name);
+  }
+
   /// Persists the whole workspace. Concurrent calls are coalesced so only the
   /// latest state is written locally (and pushed to the server when signed in).
   ///
