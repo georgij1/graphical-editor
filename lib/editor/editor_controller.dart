@@ -1268,7 +1268,14 @@ class EditorController extends ChangeNotifier {
     }
     onModelChanged();
     _endEditChain();
-    await saveDocument();
+    // Persist immediately so the attachment survives reload in any save mode.
+    if (_activeScene != null) {
+      _activeScene!.fxml = serialize();
+      _dirty = false;
+    }
+    _flushToScene();
+    await _persist(explicit: true);
+    await flushAutosave;
     notifyListeners();
     return true;
   }
