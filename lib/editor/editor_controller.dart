@@ -1207,6 +1207,15 @@ class EditorController extends ChangeNotifier {
     }
   }
 
+  void _ensureDefaultStylesheet(Project project) {
+    final hasCss = project.sourceOverrides.keys.any(
+      (k) => k.toLowerCase().endsWith('.css') && !k.endsWith('/'),
+    );
+    if (hasCss) return;
+    project.sourceOverrides['src/main/resources/styles.css'] =
+        '/* Application styles */\n.root {\n}\n';
+  }
+
   /// Persists the whole workspace. Concurrent calls are coalesced so only the
   /// latest state is written locally (and pushed to the server when signed in).
   ///
@@ -1332,6 +1341,7 @@ class EditorController extends ChangeNotifier {
         controllerClass: controllerFqn,
       ),
     );
+    _ensureDefaultStylesheet(project);
     _projects.add(project);
     _currentProject = project;
     _openTabs.clear();
@@ -1361,6 +1371,7 @@ class EditorController extends ChangeNotifier {
 
   void openProject(Project project) {
     _flushToScene();
+    _ensureDefaultStylesheet(project);
     _currentProject = project;
     _standaloneOpen = false;
     _openTabs.clear();

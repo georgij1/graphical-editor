@@ -66,8 +66,10 @@ class ProjectExporter {
   Uint8List build(Project project, ExportOptions options) {
     final archive = Archive();
     final root = project.name;
+    final added = <String>{};
 
     void add(String path, String content) {
+      if (!added.add(path)) return;
       final bytes = utf8.encode(content);
       archive.addFile(ArchiveFile(path, bytes.length, bytes));
     }
@@ -90,6 +92,12 @@ class ProjectExporter {
     for (final scene in project.scenes) {
       add('$root/src/main/resources/$packageDir/${scene.name}.fxml',
           scene.fxml);
+    }
+
+    // Extra files stored in sourceOverrides (e.g. CSS, custom files).
+    for (final entry in project.sourceOverrides.entries) {
+      if (entry.key.endsWith('/')) continue;
+      add('$root/${entry.key}', entry.value);
     }
 
     final encoded = switch (options.format) {
