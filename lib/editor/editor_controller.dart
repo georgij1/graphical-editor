@@ -1213,6 +1213,10 @@ class EditorController extends ChangeNotifier {
       try {
         await _projectStorage.save(storageScope, _workspaceJson());
         await _pushWorkingCopyIfSignedIn();
+        if (isAutoSaveMode && _dirty) {
+          _dirty = false;
+          notifyListeners();
+        }
       } catch (_) {}
     });
     return _persistChain;
