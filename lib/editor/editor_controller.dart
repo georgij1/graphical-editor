@@ -758,11 +758,15 @@ class EditorController extends ChangeNotifier {
       return false;
     }
     final scene = _activeScene;
+    final project = _currentProject;
     if (scene != null) {
       scene.fxml = serialize();
       _dirty = false;
       _flushToScene();
       await _persist(explicit: true);
+      if (project != null && (project.collaborative || project.shared) && signedIn) {
+        await publishSharedProject(project);
+      }
       notifyListeners();
       return true;
     }
@@ -770,6 +774,9 @@ class EditorController extends ChangeNotifier {
     _looseDocumentName = _fileName ?? _looseDocumentName;
     _dirty = false;
     await _persist(explicit: true);
+    if (project != null && (project.collaborative || project.shared) && signedIn) {
+      await publishSharedProject(project);
+    }
     notifyListeners();
     return true;
   }
