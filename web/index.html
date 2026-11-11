@@ -44,9 +44,18 @@
     html, body {
       margin: 0;
       padding: 0;
+      width: 100%;
       height: 100%;
+      overflow: hidden;
       background: #039ED3;
       overscroll-behavior: none;
+    }
+
+    flt-glass-pane, flutter-view {
+      position: fixed !important;
+      inset: 0 !important;
+      width: 100% !important;
+      height: 100% !important;
     }
 
     html[data-theme="dark"], html[data-theme="dark"] body {
