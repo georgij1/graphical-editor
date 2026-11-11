@@ -26,7 +26,30 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
   late ValidationResult _validation = _validate(_text.text);
   OverlayEntry? _overlayEntry;
   List<String> _suggestions = <String>[];
+  int _suggestionStart = 0;
   double _previewFraction = 0.5;
+
+  static const List<String> _mdSuggestions = <String>[
+    '# Heading 1',
+    '## Heading 2',
+    '### Heading 3',
+    '#### Heading 4',
+    '- List item',
+    '- [ ] Task item',
+    '- [x] Done item',
+    '1. Numbered item',
+    '> Blockquote',
+    '---',
+    '**bold**',
+    '*italic*',
+    '***bold italic***',
+    '`inline code`',
+    '```\ncode\n```',
+    '[text](url)',
+    '![alt](url)',
+    '| Column | Column |\n| --- | --- |\n| Value | Value |',
+    '<details>\n<summary>Details</summary>\n\n</details>',
+  ];
 
   @override
   void initState() {
@@ -106,6 +129,46 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
     if (!sel.isValid || sel.baseOffset != sel.extentOffset) return;
     final cursor = sel.baseOffset;
     if (cursor <= 0 || cursor > value.length) return;
+
+    // Prefix-based suggestions (typing words).
+    var start = cursor;
+    while (start > 0) {
+      final c = value.codeUnitAt(start - 1);
+      final isAlpha = (c >= 65 && c <= 90) || (c >= 97 && c <= 122);
+      final isDigit = c >= 48 && c <= 57;
+      final isOther = c == 35 || c == 95 || c == 45 || c == 42 || c == 91 || c == 33; // # _ - * [ !
+      if (isAlpha || isDigit || isOther) {
+        start--;
+      } else {
+        break;
+      }
+    }
+    final prefix = value.substring(start, cursor);
+    if (prefix.isNotEmpty) {
+      final lower = prefix.toLowerCase();
+      final matches = <String>[];
+      final seen = <String>{};
+      for (final s in _mdSuggestions) {
+        final sl = s.toLowerCase();
+        if (sl == lower) continue;
+        // Match by prefix or by contained keyword for convenience.
+        if ((sl.startsWith(lower) ||
+                sl.contains(lower) ||
+                s.replaceAll(RegExp(r'[^a-zA-Z]'), '').toLowerCase().startsWith(
+                    lower.replaceAll(RegExp(r'[^a-zA-Z]'), ''))) &&
+            seen.add(s)) {
+          matches.add(s);
+        }
+      }
+      if (matches.isNotEmpty) {
+        _suggestions = matches.take(10).toList();
+        _suggestionStart = start;
+        _showSuggestions();
+        return;
+      }
+    }
+
+    // Fallback: single-character triggers.
     final ch = value[cursor - 1];
     List<String> suggs;
     switch (ch) {
@@ -135,6 +198,7 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
     }
     if (suggs.isEmpty) return;
     _suggestions = suggs;
+    _suggestionStart = cursor - 1;
     _showSuggestions();
   }
 
@@ -179,17 +243,25 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
 
   void _applySuggestion(String snippet) {
     _hideSuggestions();
-    final sel = _text.selection;
-    final cursor = sel.baseOffset;
+    final cursor = _text.selection.baseOffset;
     final text = _text.text;
-    final start = cursor - 1;
-    if (start < 0) return;
-    final newText = text.substring(0, start) + snippet + text.substring(cursor);
+    final start = _suggestionStart.clamp(0, cursor.clamp(0, text.length));
+    final end = cursor.clamp(0, text.length);
+    final newText = text.substring(0, start) + snippet + text.substring(end);
+    var caret = start + snippet.length;
+    // Place caret inside common placeholders for convenience.
+    final placeholders = <String>['text', 'url', 'alt', 'code', 'Heading 1', 'Heading 2', 'Heading 3', 'Heading 4', 'List item', 'Task item', 'Done item', 'Numbered item', 'Blockquote', 'Column', 'Value', 'Details'];
+    for (final p in placeholders) {
+      final idx = snippet.indexOf(p);
+      if (idx >= 0) {
+        caret = start + idx;
+        break;
+      }
+    }
     _text.value = TextEditingValue(
       text: newText,
-      selection: TextSelection.collapsed(offset: start + snippet.length),
+      selection: TextSelection.collapsed(offset: caret),
     );
-    setState(() {});
   }
 
   void _hideSuggestions() {
@@ -215,7 +287,10 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
       textDirection: TextDirection.ltr,
     );
     painter.layout(maxWidth: rb.size.width - 32);
-    final caret = painter.getOffsetForCaret(sel.base, Rect.zero);
+    final caret = painter.getOffsetForCaret(
+      TextPosition(offset: sel.baseOffset),
+      Rect.zero,
+    );
     return rb.localToGlobal(Offset(16 + caret.dx, 16 + caret.dy));
   }
 
