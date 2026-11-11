@@ -261,12 +261,12 @@ class _EditorPageState extends State<EditorPage> {
                       if (_controller.hasOpenFxml)
                         _PresenceBar(controller: _controller),
                       if (_controller.codeMode || _controller.openSource != null)
-                        IconButton(
-                          tooltip: context.tr('Fix with AI'),
+                        TextButton.icon(
                           onPressed: _controller.aiFixHandler == null
                               ? null
                               : () => _controller.aiFixHandler!.call(),
-                          icon: const Icon(Icons.auto_fix_high),
+                          icon: const Icon(Icons.auto_fix_high, size: 18),
+                          label: Text(context.tr('Fix with AI')),
                         ),
                       EditorToolbar(
                         controller: _controller,
