@@ -293,6 +293,7 @@ class _EditorPageState extends State<EditorPage> {
                 // project picker. The validation strip above it reports build
                 // problems found by the check that runs on every save.
                 extendBody: true,
+               resizeToAvoidBottomInset: false,
                bottomNavigationBar: (_controller.hasOpenDocument &&
                         (_controller.hasOpenFxml || _controller.collaborativeMode))
                     ? Column(
