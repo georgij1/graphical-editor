@@ -237,14 +237,7 @@ class _GitignoreEditorState extends State<GitignoreEditor> {
             child: Row(
               children: <Widget>[
                 const Icon(Icons.visibility_off_outlined, size: 16),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Text(
-                    controller.codePath,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontSize: 12),
-                  ),
-                ),
+                const Spacer(),
                 IconButton(
                   tooltip: context.tr('Back to canvas'),
                   onPressed: () => controller.closeSource(),
