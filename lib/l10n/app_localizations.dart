@@ -191,6 +191,14 @@ class AppLocalizations {
     // ------------------------------------------------------------- status bar
     'Unsaved changes': 'Не сохранено',
     'Saved': 'Сохранено',
+    'Save settings': 'Настройки сохранения',
+    'Automatically': 'Автоматически',
+    'Save changes automatically': 'Сохранять изменения автоматически',
+    'By button': 'По кнопке',
+    'Save only when you click Save': 'Сохранять только по нажатию кнопки',
+    'By Ctrl+S': 'По Ctrl+S',
+    'Save only with Ctrl+S': 'Сохранять только по Ctrl+S',
+    'Save': 'Сохранить',
     'Preview': 'Просмотр',
 
     // -------------------------------------------------------------- palette

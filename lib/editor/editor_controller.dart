@@ -51,6 +51,9 @@ class EditorController extends ChangeNotifier {
         await _loadSplit();
       } catch (_) {}
       try {
+        await _loadSaveMode();
+      } catch (_) {}
+      try {
         await initAuth();
       } catch (_) {}
       try {
@@ -631,6 +634,7 @@ class EditorController extends ChangeNotifier {
   }
 
   static const String _themeKey = 'app_theme';
+  static const String _saveModeKey = 'editor_save_mode';
 
   /// Theme preference: `system`, `light` or `dark`.
   String get themeSetting => _themeSetting;
@@ -656,6 +660,33 @@ class EditorController extends ChangeNotifier {
       return;
     }
     _themeSetting = stored;
+    notifyListeners();
+  }
+
+  // ---------------------------------------------------------------- save mode
+
+  /// How document changes are persisted: `auto`, `button`, or `shortcut`.
+  String _saveMode = 'auto';
+  String get saveMode => _saveMode;
+
+  bool get isAutoSaveMode => _saveMode == 'auto';
+  bool get isButtonSaveMode => _saveMode == 'button';
+  bool get isShortcutSaveMode => _saveMode == 'shortcut';
+
+  Future<void> setSaveMode(String value) async {
+    if (value != 'auto' && value != 'button' && value != 'shortcut') return;
+    if (_saveMode == value) return;
+    _saveMode = value;
+    await _tokenStore.write(_saveModeKey, value);
+    notifyListeners();
+  }
+
+  Future<void> _loadSaveMode() async {
+    final stored = await _tokenStore.read(_saveModeKey);
+    if (stored != 'auto' && stored != 'button' && stored != 'shortcut') {
+      return;
+    }
+    _saveMode = stored!;
     notifyListeners();
   }
 
@@ -706,20 +737,28 @@ class EditorController extends ChangeNotifier {
   ///
   /// Inside a project the FXML is written back to the active scene; a document
   /// opened on its own is stored in the workspace so it comes back on reload.
-  Future<bool> saveDocument() async {
+  /// [trigger] enforces the selected save mode: returns `false` if the mode does
+  /// not allow this trigger (`button`/`shortcut`/`auto`).
+  Future<bool> saveDocument({String trigger = 'auto'}) async {
+    if (trigger == 'shortcut' && !isAutoSaveMode && !isShortcutSaveMode) {
+      return false;
+    }
+    if (trigger == 'button' && !isAutoSaveMode && !isButtonSaveMode) {
+      return false;
+    }
     final scene = _activeScene;
     if (scene != null) {
       scene.fxml = serialize();
       _dirty = false;
       _flushToScene();
-      await _persist();
+      await _persist(explicit: true);
       notifyListeners();
       return true;
     }
     _looseDocument = serialize();
     _looseDocumentName = _fileName ?? _looseDocumentName;
     _dirty = false;
-    await _persist();
+    await _persist(explicit: true);
     notifyListeners();
     return true;
   }
@@ -1161,9 +1200,13 @@ class EditorController extends ChangeNotifier {
   /// latest state is written locally (and pushed to the server when signed in).
   ///
   /// Every save also refreshes [validation], so the editor always shows the
-  /// up-to-date state of the project.
-  Future<void> _persist() {
+  /// up-to-date state of the project. In manual save modes, implicit
+  /// (auto-triggered) persists are skipped; only [explicit] saves write.
+  Future<void> _persist({bool explicit = false}) {
     revalidate();
+    if (!isAutoSaveMode && !explicit) {
+      return Future<void>.value();
+    }
     final generation = ++_persistGeneration;
     _persistChain = _persistChain.then((_) async {
       if (generation != _persistGeneration) return;
