@@ -23,7 +23,6 @@ class _CodeViewState extends State<CodeView> {
     text: widget.controller.codeContent,
   );
   late ValidationResult _validation = _validate(_text.text);
-  bool _dirty = false;
   int _lastEpoch = 0;
 
   bool get _isJava => widget.controller.codeIsJavaSource;
@@ -66,7 +65,6 @@ class _CodeViewState extends State<CodeView> {
     if (epoch != _lastEpoch) {
       _lastEpoch = epoch;
       _text.text = widget.controller.codeContent;
-      _dirty = false;
       _validation = _validate(_text.text);
       setState(() {});
     }
@@ -74,15 +72,6 @@ class _CodeViewState extends State<CodeView> {
 
   void _onChanged() {
     setState(() {
-      _dirty = _text.text != widget.controller.codeContent;
-      _validation = _validate(_text.text);
-    });
-  }
-
-  void _reload() {
-    setState(() {
-      _text.text = widget.controller.codeContent;
-      _dirty = false;
       _validation = _validate(_text.text);
     });
   }
@@ -99,7 +88,6 @@ class _CodeViewState extends State<CodeView> {
     }
     final ok = controller.applyCode(_text.text);
     setState(() {
-      _dirty = !ok;
       _validation = _validate(_text.text);
     });
     _showMessage(
@@ -138,7 +126,6 @@ class _CodeViewState extends State<CodeView> {
     if (fixed == null || !mounted) return;
     setState(() {
       _text.text = fixed;
-      _dirty = true;
       _validation = _validate(fixed);
     });
     _showMessage(context.tr('AI suggestion loaded. Review and Apply.'));
@@ -146,10 +133,8 @@ class _CodeViewState extends State<CodeView> {
 
   @override
   Widget build(BuildContext context) {
-    final controller = widget.controller;
     final theme = Theme.of(context);
     final dark = theme.brightness == Brightness.dark;
-    final isJava = controller.codeIsJava;
     return CallbackShortcuts(
       bindings: <ShortcutActivator, VoidCallback>{
         const SingleActivator(LogicalKeyboardKey.keyS, control: true): _apply,
@@ -157,50 +142,6 @@ class _CodeViewState extends State<CodeView> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
-          Container(
-            color: theme.colorScheme.surfaceContainerHighest,
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            child: Row(
-              children: <Widget>[
-                Icon(
-                  isJava ? Icons.data_object : Icons.description_outlined,
-                  size: 16,
-                ),
-                const Spacer(),
-                if (controller.codeIsJava || controller.codeMode)
-                  IconButton(
-                    tooltip: context.tr('Back to canvas'),
-                    onPressed: () {
-                      controller.closeSource();
-                    },
-                    icon: const Icon(Icons.close, size: 18),
-                    visualDensity: VisualDensity.compact,
-                  ),
-                IconButton(
-                  tooltip: context.tr('Reload'),
-                  onPressed: _dirty ? _reload : null,
-                  icon: const Icon(Icons.undo, size: 18),
-                  visualDensity: VisualDensity.compact,
-                ),
-                IconButton(
-                  tooltip: context.tr('Copy'),
-                  onPressed: () {
-                    Clipboard.setData(ClipboardData(text: _text.text));
-                    _showMessage(context.tr('Source copied to clipboard.'));
-                  },
-                  icon: const Icon(Icons.copy, size: 18),
-                  visualDensity: VisualDensity.compact,
-                ),
-                const SizedBox(width: 4),
-                FilledButton.icon(
-                  onPressed: _validation.isValid ? _apply : null,
-                  icon: const Icon(Icons.check, size: 16),
-                  label: Text(context.tr('Apply')),
-                ),
-              ],
-            ),
-          ),
-          const Divider(height: 1),
           _ValidationBar(validation: _validation),
           Expanded(
             child: Container(
