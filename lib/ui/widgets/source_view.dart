@@ -46,10 +46,14 @@ class _CodeViewState extends State<CodeView> {
     _lastEpoch = widget.controller.codeEpoch;
     _text.addListener(_onChanged);
     widget.controller.addListener(_onControllerChanged);
+    widget.controller.aiFixHandler = _fixWithAi;
   }
 
   @override
   void dispose() {
+    if (identical(widget.controller.aiFixHandler, _fixWithAi)) {
+      widget.controller.aiFixHandler = null;
+    }
     widget.controller.removeListener(_onControllerChanged);
     _text.removeListener(_onChanged);
     _text.dispose();
@@ -162,14 +166,7 @@ class _CodeViewState extends State<CodeView> {
                   isJava ? Icons.data_object : Icons.description_outlined,
                   size: 16,
                 ),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Text(
-                    controller.codePath,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontSize: 12),
-                  ),
-                ),
+                const Spacer(),
                 if (controller.codeIsJava || controller.codeMode)
                   IconButton(
                     tooltip: context.tr('Back to canvas'),
@@ -192,12 +189,6 @@ class _CodeViewState extends State<CodeView> {
                     _showMessage(context.tr('Source copied to clipboard.'));
                   },
                   icon: const Icon(Icons.copy, size: 18),
-                  visualDensity: VisualDensity.compact,
-                ),
-                IconButton(
-                  tooltip: context.tr('Fix with AI'),
-                  onPressed: _fixWithAi,
-                  icon: const Icon(Icons.auto_fix_high, size: 18),
                   visualDensity: VisualDensity.compact,
                 ),
                 const SizedBox(width: 4),

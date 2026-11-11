@@ -260,6 +260,14 @@ class _EditorPageState extends State<EditorPage> {
                     if (_controller.currentProject != null) ...<Widget>[
                       if (_controller.hasOpenFxml)
                         _PresenceBar(controller: _controller),
+                      if (_controller.codeMode || _controller.openSource != null)
+                        IconButton(
+                          tooltip: context.tr('Fix with AI'),
+                          onPressed: _controller.aiFixHandler == null
+                              ? null
+                              : () => _controller.aiFixHandler!.call(),
+                          icon: const Icon(Icons.auto_fix_high),
+                        ),
                       EditorToolbar(
                         controller: _controller,
                         onShowCode: _showCode,

@@ -133,6 +133,16 @@ class EditorController extends ChangeNotifier {
   String? _fileName;
   String? _looseDocument;
   String? _looseDocumentName;
+
+  /// Handler registered by the active code editor view to run "Fix with AI"
+  /// against the live (possibly unsaved) editor content.
+  Future<void> Function()? _aiFixHandler;
+  Future<void> Function()? get aiFixHandler => _aiFixHandler;
+  set aiFixHandler(Future<void> Function()? value) {
+    if (identical(_aiFixHandler, value)) return;
+    _aiFixHandler = value;
+    notifyListeners();
+  }
   bool _dirty = false;
   GeneratedFile? _openSource;
   final List<GeneratedFile> _openTabs = <GeneratedFile>[];
