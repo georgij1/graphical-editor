@@ -15,16 +15,26 @@ String buildPreviewHtml(
   String title = 'Preview',
   double width = 800,
   double height = 600,
+  String stylesheetCss = '',
 }) {
-  final _PreviewBuilder builder = _PreviewBuilder(width: width, height: height);
+  final _PreviewBuilder builder = _PreviewBuilder(
+    width: width,
+    height: height,
+    stylesheetCss: stylesheetCss,
+  );
   return builder.page(title, builder.build(document.root));
 }
 
 class _PreviewBuilder {
-  _PreviewBuilder({required this.width, required this.height});
+  _PreviewBuilder({
+    required this.width,
+    required this.height,
+    this.stylesheetCss = '',
+  });
 
   final double width;
   final double height;
+  final String stylesheetCss;
 
   static const List<String> _containerTags = <String>[
     'AnchorPane',
@@ -45,7 +55,9 @@ class _PreviewBuilder {
 
   String build(FxmlNode root) => _control(root);
 
-  String page(String title, String body) => '''
+  String page(String title, String body) {
+    final extraCss = _translateJavaFxStylesheet(stylesheetCss);
+    return '''
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -80,34 +92,36 @@ class _PreviewBuilder {
   #log {
     height: 108px;
     overflow: auto;
-    background: #1f2430;
-    color: #c8d3e0;
-    font: 12px/1.5 ui-monospace, "Cascadia Mono", Consolas, monospace;
+    border-top: 1px solid #c8c8c8;
+    background: #f5f5f5;
+    font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", Menlo, monospace;
+    font-size: 12px;
     padding: 6px 10px;
-    border-top: 1px solid #2f3646;
   }
-  #log div { white-space: pre-wrap; }
-  #log .handler { color: #7fd6a2; }
-  button, input, select, textarea { font: inherit; }
-  .java-label { white-space: pre-wrap; display: inline-block; }
+  .log-item { color: #333333; margin: 2px 0; }
+  .fx-node { position: relative; }
+  .java-label { white-space: pre-wrap; }
   .java-image {
-    border: 1px dashed #9aa4b2;
-    color: #6b7280;
+    background: repeating-linear-gradient(
+      45deg, #e6e6e6, #e6e6e6 10px, #f3f3f3 10px, #f3f3f3 20px
+    );
+    border: 1px solid #cfcfcf;
     display: flex;
     align-items: center;
     justify-content: center;
+    color: #666666;
     font-size: 11px;
-    min-height: 24px;
   }
-  .java-separator { height: 0; border-top: 1px solid #b9c0cc; margin: 6px 0; }
+  .java-separator { height: 1px; background: #c8c8c8; margin: 4px 0; }
   .java-spin {
-    width: 26px; height: 26px;
-    border: 3px solid #c8ced8;
-    border-top-color: #039ec8;
+    width: 22px; height: 22px;
+    border: 3px solid #d1d5db;
+    border-top-color: #039ed3;
     border-radius: 50%;
     animation: fx-spin 1s linear infinite;
   }
   @keyframes fx-spin { to { transform: rotate(360deg); } }
+$extraCss
 </style>
 </head>
 <body>
@@ -116,28 +130,34 @@ class _PreviewBuilder {
 <script>
 (function () {
   var log = document.getElementById('log');
-  function write(message, handler) {
-    var line = document.createElement('div');
-    line.appendChild(document.createTextNode(message));
+  function write(message) {
+    var item = document.createElement('div');
+    item.className = 'log-item';
+    item.textContent = message;
+    log.appendChild(item);
+    log.scrollTop = log.scrollHeight;
+  }
+  function report(target) {
+    if (!target) return;
+    var handler = target.getAttribute('data-handler');
     if (handler) {
-      var tag = document.createElement('span');
-      tag.className = 'handler';
-      tag.textContent = handler;
-      line.appendChild(tag);
+      var id = target.getAttribute('data-fx-id');
+      write('Action ' + (id ? ('#' + id) : target.tagName.toLowerCase()) +
+          ' -> ' + handler + '()');
+    } else {
+      write('Event on ' + describe(target));
     }
-    log.insertBefore(line, log.firstChild);
   }
   function describe(node) {
+    if (!node) return 'element';
     var id = node.getAttribute('data-fx-id');
     return node.tagName.toLowerCase() + (id ? '#' + id : '');
   }
-  function report(node) {
-    var handler = node.getAttribute('data-handler');
-    if (!handler) return;
-    write(describe(node) + '  onAction -> ', handler);
-  }
   document.addEventListener('click', function (event) {
-    var node = event.target.closest('[data-handler]');
+    var node = event.target;
+    while (node && node !== document && !node.getAttribute('data-handler')) {
+      node = node.parentNode;
+    }
     if (!node || node.tagName === 'INPUT' || node.tagName === 'SELECT'
         || node.tagName === 'TEXTAREA') {
       return;
@@ -156,6 +176,7 @@ class _PreviewBuilder {
 </script>
 </body>
 </html>''';
+  }
 
   // --------------------------------------------------------------- containers
 
@@ -652,6 +673,42 @@ String _gridArea(String area) => switch (area) {
       'right' => '2 / 3 / 3 / 4',
       _ => '3 / 1 / 4 / 4',
     };
+
+String _translateJavaFxStylesheet(String css) {
+  if (css.trim().isEmpty) return '';
+  var out = css.replaceAllMapped(
+    RegExp(r'(-fx-[a-zA-Z0-9\-]+)\s*:\s*([^;{}]+)'),
+    (m) => _javaFxDeclaration(m.group(1)!, m.group(2)!.trim()),
+  );
+  out = out.replaceAllMapped(RegExp(r'(^|[,{>\s])\.root\b'), (m) => '${m.group(1)}#scene');
+  out = out.replaceAllMapped(RegExp(r'#([A-Za-z_][A-Za-z0-9_\-]*)'), (m) => '[data-fx-id="${m.group(1)}"]');
+  const tags = <String, String>{
+    'Button': '.fx-button, button',
+    'Label': '.fx-label, .java-label',
+    'TextField': '.fx-textfield, input[type="text"]',
+    'TextArea': '.fx-textarea, textarea',
+    'VBox': '.fx-vbox',
+    'HBox': '.fx-hbox',
+    'StackPane': '.fx-stackpane',
+    'AnchorPane': '.fx-anchorpane',
+    'BorderPane': '.fx-borderpane',
+    'GridPane': '.fx-gridpane',
+    'FlowPane': '.fx-flowpane',
+    'TilePane': '.fx-tilepane',
+    'ScrollPane': '.fx-scrollpane',
+    'Pane': '.fx-pane',
+    'Region': '.fx-region',
+  };
+  tags.forEach((k, v) {
+    out = out.replaceAllMapped(RegExp(r'(^|[,{>\s])' + k + r'\b'), (m) => '${m.group(1)}$v');
+  });
+  return '\n/* Attached scene stylesheet */\n$out\n';
+}
+
+String _javaFxDeclaration(String property, String value) {
+  final translated = _javaFxStyleToCss('$property:$value');
+  return translated.isEmpty ? '$property:$value' : translated;
+}
 
 /// JavaFX CSS uses `-fx-background-color`; CSS needs `background`.
 String _javaFxStyleToCss(String style) {

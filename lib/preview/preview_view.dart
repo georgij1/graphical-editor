@@ -28,6 +28,7 @@ class _PreviewPageState extends State<PreviewPage> {
         title: widget.controller.currentProject?.name ?? context.tr('Preview'),
         width: widget.controller.canvasWidth,
         height: widget.controller.canvasHeight,
+        stylesheetCss: widget.controller.activeSceneStylesheetCss,
       );
 
   @override

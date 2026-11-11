@@ -1311,6 +1311,56 @@ class EditorController extends ChangeNotifier {
     return refs.any((r) => r.endsWith('/$name') || r == '@$name' || r == name);
   }
 
+  String _resolveStylesheetRef(String ref) {
+    final fxmlPath = _activeFxmlResourcePath;
+    var path = ref.trim();
+    if (path.startsWith('@')) path = path.substring(1);
+    if (fxmlPath == null) return path;
+    final base = fxmlPath.split('/')..removeLast();
+    final parts = path.split('/');
+    final out = <String>[...base];
+    for (final part in parts) {
+      if (part.isEmpty || part == '.') continue;
+      if (part == '..') {
+        if (out.isNotEmpty) out.removeLast();
+      } else {
+        out.add(part);
+      }
+    }
+    return out.join('/');
+  }
+
+  /// CSS content of stylesheets attached to the active FXML scene, for preview.
+  String get activeSceneStylesheetCss {
+    final project = _currentProject;
+    if (project == null || !hasOpenFxml) return '';
+    final current = _document.root.attributes['stylesheets']?.trim() ?? '';
+    if (current.isEmpty) return '';
+    final refs = current
+        .split(RegExp(r'[,\s]+'))
+        .where((s) => s.isNotEmpty)
+        .toList();
+    final chunks = <String>[];
+    for (final ref in refs) {
+      final path = _resolveStylesheetRef(ref);
+      final content = project.sourceOverrides[path];
+      if (content != null && content.trim().isNotEmpty) {
+        chunks.add(content);
+        continue;
+      }
+      // Fallback: match by file name in project stylesheets.
+      final name = path.split('/').last;
+      for (final e in project.sourceOverrides.entries) {
+        if (e.key.split('/').last == name &&
+            e.key.toLowerCase().endsWith('.css')) {
+          chunks.add(e.value);
+          break;
+        }
+      }
+    }
+    return chunks.join('\n');
+  }
+
   /// Persists the whole workspace. Concurrent calls are coalesced so only the
   /// latest state is written locally (and pushed to the server when signed in).
   ///
