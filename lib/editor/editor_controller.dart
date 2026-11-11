@@ -1253,7 +1253,7 @@ class EditorController extends ChangeNotifier {
   }
 
   /// Attaches a stylesheet file to the current scene's root FXML element.
-  bool attachStylesheetToScene(String cssPath) {
+  Future<bool> attachStylesheetToScene(String cssPath) async {
     if (!hasOpenFxml) return false;
     final ref = _relativeStylesheetRef(cssPath);
     final root = _document.root;
@@ -1268,6 +1268,7 @@ class EditorController extends ChangeNotifier {
     }
     onModelChanged();
     _endEditChain();
+    await saveDocument();
     notifyListeners();
     return true;
   }

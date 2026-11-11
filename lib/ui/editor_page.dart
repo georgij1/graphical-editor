@@ -192,7 +192,7 @@ class _EditorPageState extends State<EditorPage> {
       ),
     );
     if (selected == null || !mounted) return;
-    final ok = _controller.attachStylesheetToScene(selected);
+    final ok = await _controller.attachStylesheetToScene(selected);
     if (!context.mounted) return;
     _showMessage(
       ok
