@@ -22,8 +22,87 @@ class _CodeViewState extends State<CodeView> {
   late final TextEditingController _text = TextEditingController(
     text: widget.controller.codeContent,
   );
+  final FocusNode _focusNode = FocusNode();
   late ValidationResult _validation = _validate(_text.text);
   int _lastEpoch = 0;
+  OverlayEntry? _overlayEntry;
+  List<String> _suggestions = <String>[];
+
+  static const List<String> _javaSuggestions = <String>[
+    'abstract',
+    'assert',
+    'boolean',
+    'break',
+    'byte',
+    'case',
+    'catch',
+    'char',
+    'class',
+    'continue',
+    'default',
+    'do',
+    'double',
+    'else',
+    'enum',
+    'extends',
+    'final',
+    'finally',
+    'float',
+    'for',
+    'if',
+    'implements',
+    'import',
+    'instanceof',
+    'int',
+    'interface',
+    'long',
+    'new',
+    'null',
+    'package',
+    'private',
+    'protected',
+    'public',
+    'return',
+    'short',
+    'static',
+    'super',
+    'switch',
+    'synchronized',
+    'this',
+    'throw',
+    'throws',
+    'try',
+    'void',
+    'volatile',
+    'while',
+    'true',
+    'false',
+    'String',
+    'Integer',
+    'Long',
+    'Double',
+    'Float',
+    'Boolean',
+    'Object',
+    'List',
+    'Map',
+    'Set',
+    'Optional',
+    'Override',
+    'Deprecated',
+    'SuppressWarnings',
+    '@FXML',
+    '@Override',
+    '@Deprecated',
+    'System.out.println()',
+    'public static void main(String[] args)',
+    'private',
+    'protected',
+    'public class',
+    'public void',
+    'private void',
+    'return;',
+  ];
 
   bool get _isJava => widget.controller.codeIsJavaSource;
   bool get _isXml =>
@@ -45,17 +124,21 @@ class _CodeViewState extends State<CodeView> {
     _lastEpoch = widget.controller.codeEpoch;
     _text.addListener(_onChanged);
     widget.controller.addListener(_onControllerChanged);
+    _focusNode.addListener(_onFocusChanged);
     widget.controller.aiFixHandler = _fixWithAi;
   }
 
   @override
   void dispose() {
+    _hideSuggestions();
     if (identical(widget.controller.aiFixHandler, _fixWithAi)) {
       widget.controller.aiFixHandler = null;
     }
     widget.controller.removeListener(_onControllerChanged);
     _text.removeListener(_onChanged);
+    _focusNode.removeListener(_onFocusChanged);
     _text.dispose();
+    _focusNode.dispose();
     super.dispose();
   }
 
@@ -74,6 +157,7 @@ class _CodeViewState extends State<CodeView> {
     setState(() {
       _validation = _validate(_text.text);
     });
+    _updateSuggestions();
   }
 
   bool _apply() {
@@ -131,6 +215,139 @@ class _CodeViewState extends State<CodeView> {
     _showMessage(context.tr('AI suggestion loaded. Review and Apply.'));
   }
 
+  void _onFocusChanged() {
+    if (!_focusNode.hasFocus) _hideSuggestions();
+  }
+
+  void _updateSuggestions() {
+    _hideSuggestions();
+    if (!_focusNode.hasFocus) return;
+    // Show suggestions only for Java source editing.
+    if (!widget.controller.codeIsJava && !widget.controller.codeIsJavaSource) {
+      // Still allow for generic code if path ends with .java
+      final path = widget.controller.codePath.toLowerCase();
+      if (!path.endsWith('.java')) return;
+    }
+    final text = _text.text;
+    final sel = _text.selection;
+    if (!sel.isValid || sel.baseOffset != sel.extentOffset) return;
+    final cursor = sel.baseOffset;
+    if (cursor <= 0 || cursor > text.length) return;
+
+    var start = cursor;
+    while (start > 0) {
+      final c = text.codeUnitAt(start - 1);
+      final isAlpha = (c >= 65 && c <= 90) || (c >= 97 && c <= 122);
+      final isDigit = c >= 48 && c <= 57;
+      final isOther = c == 95 || c == 36 || c == 64; // _ $ @
+      if (isAlpha || isDigit || isOther) {
+        start--;
+      } else {
+        break;
+      }
+    }
+    final prefix = text.substring(start, cursor);
+    if (prefix.isEmpty) return;
+
+    final lower = prefix.toLowerCase();
+    final matches = <String>[];
+    final seen = <String>{};
+    for (final s in _javaSuggestions) {
+      final sl = s.toLowerCase();
+      if (sl == lower) continue;
+      if (sl.startsWith(lower) && seen.add(s)) {
+        matches.add(s);
+      }
+    }
+    if (matches.isEmpty) return;
+    _suggestions = matches.take(12).toList();
+    _showSuggestions(start, cursor);
+  }
+
+  void _showSuggestions(int wordStart, int cursor) {
+    _hideSuggestions();
+    final pos = _caretGlobalPosition();
+    if (pos == null) return;
+    _overlayEntry = OverlayEntry(
+      builder: (ctx) => Positioned(
+        left: pos.dx,
+        top: pos.dy + 20,
+        child: Material(
+          elevation: 4,
+          borderRadius: BorderRadius.circular(4),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 320, maxHeight: 220),
+            child: ListView.builder(
+              shrinkWrap: true,
+              padding: EdgeInsets.zero,
+              itemCount: _suggestions.length,
+              itemBuilder: (ctx, i) => InkWell(
+                onTap: () => _applySuggestion(_suggestions[i], wordStart, cursor),
+                child: Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  child: Text(
+                    _suggestions[i],
+                    style: const TextStyle(
+                      fontFamily: 'monospace',
+                      fontSize: 12.5,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    Overlay.of(context).insert(_overlayEntry!);
+  }
+
+  void _applySuggestion(String suggestion, int wordStart, int cursor) {
+    _hideSuggestions();
+    final text = _text.text;
+    final newText = text.substring(0, wordStart) + suggestion + text.substring(cursor);
+    var caret = wordStart + suggestion.length;
+    // Place caret inside parentheses when suggestion ends with ()
+    if (suggestion.endsWith('()')) {
+      caret = wordStart + suggestion.length - 1;
+    }
+    _text.value = TextEditingValue(
+      text: newText,
+      selection: TextSelection.collapsed(offset: caret),
+    );
+  }
+
+  void _hideSuggestions() {
+    _overlayEntry?.remove();
+    _overlayEntry = null;
+  }
+
+  Offset? _caretGlobalPosition() {
+    final rb = _focusNode.context?.findRenderObject() as RenderBox?;
+    if (rb == null) return null;
+    final sel = _text.selection;
+    if (!sel.isValid) return null;
+    final style = TextStyle(
+      fontFamily: 'monospace',
+      fontSize: 12.5,
+      height: 1.45,
+      color: Theme.of(context).brightness == Brightness.dark
+          ? const Color(0xFFE6E6E6)
+          : const Color(0xFF1F1F1F),
+    );
+    final painter = TextPainter(
+      text: TextSpan(text: _text.text, style: style),
+      textDirection: TextDirection.ltr,
+    );
+    painter.layout(maxWidth: (rb.size.width - 32).clamp(0.0, double.infinity));
+    final caret = painter.getOffsetForCaret(
+      TextPosition(offset: sel.baseOffset),
+      Rect.zero,
+    );
+    return rb.localToGlobal(Offset(16 + caret.dx, 16 + caret.dy));
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -138,6 +355,7 @@ class _CodeViewState extends State<CodeView> {
     return CallbackShortcuts(
       bindings: <ShortcutActivator, VoidCallback>{
         const SingleActivator(LogicalKeyboardKey.keyS, control: true): _apply,
+        const SingleActivator(LogicalKeyboardKey.escape): _hideSuggestions,
       },
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -148,6 +366,7 @@ class _CodeViewState extends State<CodeView> {
               color: dark ? const Color(0xFF1E1E1E) : const Color(0xFFFBFBFB),
               child: TextField(
                 controller: _text,
+                focusNode: _focusNode,
                 maxLines: null,
                 expands: true,
                 textAlignVertical: TextAlignVertical.top,
