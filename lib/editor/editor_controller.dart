@@ -1269,9 +1269,19 @@ class EditorController extends ChangeNotifier {
     onModelChanged();
     _endEditChain();
     // Persist immediately so the attachment survives reload in any save mode.
+    final serialized = serialize();
     if (_activeScene != null) {
-      _activeScene!.fxml = serialize();
+      _activeScene!.fxml = serialized;
       _dirty = false;
+      // Ensure the scene inside the project model is updated too.
+      final project = _currentProject;
+      if (project != null) {
+        for (final s in project.scenes) {
+          if (identical(s, _activeScene) || s.name == _activeScene!.name) {
+            s.fxml = serialized;
+          }
+        }
+      }
     }
     _flushToScene();
     await _persist(explicit: true);
