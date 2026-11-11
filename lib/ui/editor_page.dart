@@ -811,7 +811,7 @@ class _ShortcutScopeState extends State<_ShortcutScope> {
   }
 }
 
-/// Figma-like presence indicator: shows who is currently in the open project.
+/// Save status indicator shown in the header next to the project name.
 class _SaveStatus extends StatelessWidget {
   const _SaveStatus({required this.controller});
 
@@ -823,20 +823,28 @@ class _SaveStatus extends StatelessWidget {
     final color = dirty ? Colors.orange : Colors.green;
     return Padding(
       padding: const EdgeInsets.only(right: 8),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: <Widget>[
-          Icon(
-            Icons.check_circle_outline,
-            size: 14,
-            color: color,
-          ),
-          const SizedBox(width: 4),
-          Text(
-            dirty ? context.tr('Unsaved changes') : context.tr('Saved'),
-            style: TextStyle(fontSize: 11, color: color),
-          ),
-        ],
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: color.withValues(alpha: 0.35)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            Icon(
+              Icons.check_circle_outline,
+              size: 14,
+              color: color,
+            ),
+            const SizedBox(width: 4),
+            Text(
+              dirty ? context.tr('Unsaved changes') : context.tr('Saved'),
+              style: TextStyle(fontSize: 11, color: color),
+            ),
+          ],
+        ),
       ),
     );
   }
