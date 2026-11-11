@@ -2,7 +2,6 @@
 
 import '../../editor/editor_controller.dart';
 import '../../l10n/app_localizations.dart';
-import '../../preview/preview_view.dart';
 
 /// Bottom status bar summarising the current document state.
 class StatusBar extends StatelessWidget {
@@ -45,10 +44,6 @@ class StatusBar extends StatelessWidget {
             const SizedBox(width: 4),
             label(context.l10n.nodes(controller.nodeCount)),
             const _Sep(),
-            // The run button lives next to the document summary: it is used
-            // often, and the header is already crowded.
-            _RunPreview(controller: controller),
-            const _Sep(),
           ],
           // Saved/unsaved indicator moved to the header.
           if (controller.hasOpenFxml && selected != null) ...<Widget>[
@@ -76,33 +71,6 @@ class StatusBar extends StatelessWidget {
             label('${(controller.zoom * 100).round()}%'),
           ],
         ],
-      ),
-    );
-  }
-}
-
-
-/// Opens the browser preview of the current scene.
-class _RunPreview extends StatelessWidget {
-  const _RunPreview({required this.controller});
-
-  final EditorController controller;
-
-  @override
-  Widget build(BuildContext context) {
-    return TextButton.icon(
-      onPressed: () => showPreview(context, controller),
-      icon: const Icon(Icons.play_arrow_outlined, size: 14),
-      label: Text(
-        context.tr('Run preview'),
-        style: const TextStyle(fontSize: 11),
-      ),
-      style: TextButton.styleFrom(
-        visualDensity: VisualDensity.compact,
-        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-        padding: const EdgeInsets.symmetric(horizontal: 6),
-        minimumSize: Size.zero,
-        foregroundColor: Theme.of(context).colorScheme.primary,
       ),
     );
   }
