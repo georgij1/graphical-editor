@@ -582,14 +582,20 @@ class _ProjectTreePanelState extends State<ProjectTreePanel> {
     final padding = EdgeInsets.only(left: 6 + depth * 14.0, right: 6);
     final isCss = file.path.toLowerCase().endsWith('.css');
     final attached = isCss && controller.isStylesheetAttachedToActiveScene(file.path);
+    final active = controller.openSource?.path == file.path;
     final tile = ListTile(
       dense: true,
       visualDensity: VisualDensity.compact,
       contentPadding: padding,
+      selected: active,
+      selectedTileColor: Theme.of(context)
+          .colorScheme
+          .primaryContainer
+          .withValues(alpha: 0.4),
       leading: Icon(
         isCss ? Icons.style_outlined : Icons.insert_drive_file,
         size: 16,
-        color: attached ? Theme.of(context).colorScheme.primary : null,
+        color: attached || active ? Theme.of(context).colorScheme.primary : null,
       ),
       title: Text(file.name, style: const TextStyle(fontSize: 12)),
       subtitle: attached
