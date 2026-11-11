@@ -148,10 +148,46 @@ class _EditorPageState extends State<EditorPage> {
         title: Text(context.tr('Attach stylesheet')),
         children: <Widget>[
           for (final p in paths)
-            SimpleDialogOption(
-              onPressed: () => Navigator.of(dialogContext).pop(p),
-              child: Text(p, style: const TextStyle(fontFamily: 'monospace')),
-            ),
+            () {
+              final attached =
+                  _controller.isStylesheetAttachedToActiveScene(p);
+              return SimpleDialogOption(
+                onPressed: () => Navigator.of(dialogContext).pop(p),
+                child: Row(
+                  children: <Widget>[
+                    Icon(
+                      attached ? Icons.link : Icons.style_outlined,
+                      size: 18,
+                      color: attached
+                          ? Theme.of(dialogContext).colorScheme.primary
+                          : Theme.of(dialogContext)
+                              .colorScheme
+                              .onSurfaceVariant,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        p,
+                        style: TextStyle(
+                          fontFamily: 'monospace',
+                          color: attached
+                              ? Theme.of(dialogContext).colorScheme.primary
+                              : null,
+                        ),
+                      ),
+                    ),
+                    if (attached) ...<Widget>[
+                      const SizedBox(width: 8),
+                      Icon(
+                        Icons.check_circle,
+                        size: 16,
+                        color: Theme.of(dialogContext).colorScheme.primary,
+                      ),
+                    ],
+                  ],
+                ),
+              );
+            }(),
         ],
       ),
     );
