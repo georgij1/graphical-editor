@@ -205,6 +205,10 @@ class AppLocalizations {
     'Apply failed.': 'Не удалось применить.',
     'Access denied': 'Доступ запрещён',
     'project.json is an internal project file and cannot be edited.': 'project.json — внутренний файл проекта, его нельзя редактировать.',
+    'Attach stylesheet': 'Подключить стилевой файл',
+    'No stylesheet files found in the project.': 'В проекте не найдены стилевые файлы.',
+    'Stylesheet attached to the scene.': 'Стилевой файл подключён к сцене.',
+    'Could not attach stylesheet.': 'Не удалось подключить стилевой файл.',
     'Save': 'Сохранить',
     'Preview': 'Просмотр',
 

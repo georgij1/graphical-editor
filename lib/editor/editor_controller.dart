@@ -1216,6 +1216,62 @@ class EditorController extends ChangeNotifier {
         '/* Application styles */\n.root {\n}\n';
   }
 
+  /// Returns all CSS stylesheet paths available in the current project.
+  List<String> get projectStylesheetPaths {
+    final project = _currentProject;
+    if (project == null) return const <String>[];
+    final paths = project.sourceOverrides.keys
+        .where((k) => k.toLowerCase().endsWith('.css') && !k.endsWith('/'))
+        .toList()
+      ..sort();
+    return paths;
+  }
+
+  String? get _activeFxmlResourcePath {
+    final project = _currentProject;
+    final scene = _activeScene;
+    if (project == null || scene == null) return null;
+    return 'src/main/resources/${JavaGenerator.packageDir(project)}/${scene.name}.fxml';
+  }
+
+  String _relativeStylesheetRef(String cssPath) {
+    final fxmlPath = _activeFxmlResourcePath;
+    if (fxmlPath == null) {
+      final name = cssPath.split('/').last;
+      return '@$name';
+    }
+    final fromParts = fxmlPath.split('/')..removeLast();
+    final toParts = cssPath.split('/');
+    var i = 0;
+    while (i < fromParts.length && i < toParts.length && fromParts[i] == toParts[i]) {
+      i++;
+    }
+    final up = List<String>.filled(fromParts.length - i, '..');
+    final down = toParts.sublist(i);
+    final rel = [...up, ...down].join('/');
+    return '@$rel';
+  }
+
+  /// Attaches a stylesheet file to the current scene's root FXML element.
+  bool attachStylesheetToScene(String cssPath) {
+    if (!hasOpenFxml) return false;
+    final ref = _relativeStylesheetRef(cssPath);
+    final root = _document.root;
+    beginEdit('stylesheets:${identityHashCode(root)}');
+    final current = root.attributes['stylesheets']?.trim() ?? '';
+    final refs = current.isEmpty
+        ? <String>[]
+        : current.split(RegExp(r'[,\s]+')).where((s) => s.isNotEmpty).toList();
+    if (!refs.contains(ref)) {
+      refs.add(ref);
+      root.attributes['stylesheets'] = refs.join(', ');
+    }
+    onModelChanged();
+    _endEditChain();
+    notifyListeners();
+    return true;
+  }
+
   /// Persists the whole workspace. Concurrent calls are coalesced so only the
   /// latest state is written locally (and pushed to the server when signed in).
   ///

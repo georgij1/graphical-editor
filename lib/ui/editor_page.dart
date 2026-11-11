@@ -136,6 +136,35 @@ class _EditorPageState extends State<EditorPage> {
 
   void _showCode() => _controller.editSceneSource();
 
+  Future<void> _attachStylesheet(BuildContext context) async {
+    final paths = _controller.projectStylesheetPaths;
+    if (paths.isEmpty) {
+      _showMessage(context.tr('No stylesheet files found in the project.'));
+      return;
+    }
+    final selected = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => SimpleDialog(
+        title: Text(context.tr('Attach stylesheet')),
+        children: <Widget>[
+          for (final p in paths)
+            SimpleDialogOption(
+              onPressed: () => Navigator.of(dialogContext).pop(p),
+              child: Text(p, style: const TextStyle(fontFamily: 'monospace')),
+            ),
+        ],
+      ),
+    );
+    if (selected == null || !mounted) return;
+    final ok = _controller.attachStylesheetToScene(selected);
+    if (!context.mounted) return;
+    _showMessage(
+      ok
+          ? context.tr('Stylesheet attached to the scene.')
+          : context.tr('Could not attach stylesheet.'),
+    );
+  }
+
   List<Widget> _accountActions() {
     return <Widget>[
       PopupMenuButton<String>(
@@ -260,6 +289,12 @@ class _EditorPageState extends State<EditorPage> {
                     if (_controller.currentProject != null) ...<Widget>[
                       if (_controller.hasOpenFxml)
                         _PresenceBar(controller: _controller),
+                      if (_controller.hasOpenFxml)
+                        TextButton.icon(
+                          onPressed: () => _attachStylesheet(context),
+                          icon: const Icon(Icons.style_outlined, size: 18),
+                          label: Text(context.tr('Attach stylesheet')),
+                        ),
                       if (_controller.codeMode || _controller.openSource != null)
                         TextButton.icon(
                           onPressed: _controller.aiFixHandler == null
