@@ -6,6 +6,8 @@ import 'canvas_view.dart';
 import 'project_home.dart';
 import 'source_view.dart';
 import 'markdown_editor.dart';
+import 'gitignore_editor.dart';
+import 'pom_editor.dart';
 
 /// The central editing surface. "Code" shows an editable text editor for the
 /// selected file (scene FXML or a generated Java source); "Canvas" shows the
@@ -78,6 +80,17 @@ class CanvasArea extends StatelessWidget {
     // Markdown files get a dedicated editor with live preview.
     if (controller.codePath.endsWith('.md')) {
       return MarkdownEditor(controller: controller);
+    }
+
+    // .gitignore files get a dedicated editor with an ignored-files preview.
+    if (controller.codePath.endsWith('.gitignore')) {
+      return GitignoreEditor(controller: controller);
+    }
+
+    // Maven pom.xml gets a dedicated editor with a dependencies list.
+    final codeName = controller.codePath.split('/').last.toLowerCase();
+    if (codeName == 'pom.xml') {
+      return PomEditor(controller: controller);
     }
 
     // A generated Java source has no visual representation: show the editor

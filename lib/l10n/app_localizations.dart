@@ -198,6 +198,11 @@ class AppLocalizations {
     'Save only when you click Save': 'Сохранять только по нажатию кнопки',
     'By Ctrl+S': 'По Ctrl+S',
     'Save only with Ctrl+S': 'Сохранять только по Ctrl+S',
+    'Dependencies': 'Зависимости',
+    'No dependencies found.': 'Зависимости не найдены.',
+    'dependencyManagement': 'dependencyManagement',
+    'Source applied.': 'Исходный код применён.',
+    'Apply failed.': 'Не удалось применить.',
     'Save': 'Сохранить',
     'Preview': 'Просмотр',
 
