@@ -93,6 +93,39 @@ class CanvasArea extends StatelessWidget {
       return PomEditor(controller: controller);
     }
 
+    // project.json is an internal editor manifest and must not be edited.
+    if (controller.codePath == 'project.json' ||
+        controller.codePath.endsWith('/project.json')) {
+      final theme = Theme.of(context);
+      return Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 420),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              Icon(Icons.lock_outline,
+                  size: 56, color: theme.colorScheme.error),
+              const SizedBox(height: 16),
+              Text(
+                context.tr('Access denied'),
+                style: theme.textTheme.headlineSmall,
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                context.tr(
+                    'project.json is an internal project file and cannot be edited.'),
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     // A generated Java source has no visual representation: show the editor
     // alone.
     if (controller.codeIsJava) {

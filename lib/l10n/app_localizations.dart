@@ -203,6 +203,8 @@ class AppLocalizations {
     'dependencyManagement': 'dependencyManagement',
     'Source applied.': 'Исходный код применён.',
     'Apply failed.': 'Не удалось применить.',
+    'Access denied': 'Доступ запрещён',
+    'project.json is an internal project file and cannot be edited.': 'project.json — внутренний файл проекта, его нельзя редактировать.',
     'Save': 'Сохранить',
     'Preview': 'Просмотр',
 
