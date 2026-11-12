@@ -1120,7 +1120,7 @@ class _ResizableRightPanelState extends State<_ResizableRightPanel> {
             ),
             if (showAi)
               SizedBox(
-                width: 360,
+                width: 460,
                 child: AiChatPanel(
                   controller: controller,
                   onClose: controller.closeAiChatPanel,

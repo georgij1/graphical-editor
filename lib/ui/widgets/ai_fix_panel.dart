@@ -263,12 +263,6 @@ class _AiChatPanelState extends State<AiChatPanel> {
                   ),
                 ),
                 IconButton(
-                  tooltip: context.tr('New chat'),
-                  icon: const Icon(Icons.add_comment_outlined, size: 18),
-                  visualDensity: VisualDensity.compact,
-                  onPressed: _newChat,
-                ),
-                IconButton(
                   tooltip: context.tr('Close'),
                   icon: const Icon(Icons.close, size: 18),
                   visualDensity: VisualDensity.compact,
@@ -277,136 +271,202 @@ class _AiChatPanelState extends State<AiChatPanel> {
               ],
             ),
           ),
-          if (chats.length > 1 || chats.isNotEmpty)
-            Container(
-              height: 40,
-              decoration: BoxDecoration(
-                border: Border(bottom: BorderSide(color: theme.dividerColor)),
-              ),
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-                itemCount: chats.length,
-                separatorBuilder: (context, index) => const SizedBox(width: 4),
-                itemBuilder: (context, i) {
-                  final chat = chats[i];
-                  final selected = chat.id == active?.id;
-                  return InputChip(
-                    label: SizedBox(
-                      width: 110,
-                      child: Text(chat.title, overflow: TextOverflow.ellipsis),
-                    ),
-                    selected: selected,
-                    onPressed: () => setState(() => controller.selectAiChat(chat.id)),
-                    onDeleted: () => setState(() => controller.deleteAiChat(chat.id)),
-                    deleteIcon: const Icon(Icons.close, size: 14),
-                    visualDensity: VisualDensity.compact,
-                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  );
-                },
-              ),
-            ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(8, 6, 8, 0),
-            child: Row(
-              children: <Widget>[
-                Text(context.tr('Model:'), style: const TextStyle(fontSize: 12)),
-                const SizedBox(width: 6),
-                Expanded(child: _modelPicker()),
-              ],
-            ),
-          ),
-          if (_error != null)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(8, 6, 8, 0),
-              child: Text(
-                _error!,
-                style: TextStyle(color: theme.colorScheme.error, fontSize: 12),
-              ),
-            ),
           Expanded(
-            child: active == null
-                ? Center(child: Text(context.tr('No chat selected')))
-                : ListView.builder(
-                    controller: _scroll,
-                    padding: const EdgeInsets.all(8),
-                    itemCount: active.messages.length +
-                        (_busy &&
-                                (active.messages.isEmpty ||
-                                    active.messages.last.role == AiChatRole.user)
-                            ? 1
-                            : 0),
-                    itemBuilder: (context, index) {
-                      final showPending = _busy &&
-                          (active.messages.isEmpty ||
-                              active.messages.last.role == AiChatRole.user);
-                      if (showPending && index == active.messages.length) {
-                        return Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 8),
-                          child: Row(
-                            children: <Widget>[
-                              const SizedBox(
-                                width: 16,
-                                height: 16,
-                                child: CircularProgressIndicator(strokeWidth: 2),
-                              ),
-                              const SizedBox(width: 8),
-                              Text('${context.tr('Thinking...')} ${_elapsedSeconds}s',
-                                  style: const TextStyle(fontSize: 12)),
-                            ],
-                          ),
-                        );
-                      }
-                      final msg = active.messages[index];
-                      return _buildMessage(context, msg);
-                    },
-                  ),
-          ),
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              border: Border(top: BorderSide(color: theme.dividerColor)),
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: <Widget>[
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: <Widget>[
-                    Expanded(
-                      child: TextField(
-                        controller: _input,
-                        minLines: 1,
-                        maxLines: 5,
-                        decoration: InputDecoration(
-                          hintText: context.tr('Message AI...'),
-                          border: const OutlineInputBorder(),
-                          isDense: true,
-                          contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 10, vertical: 10),
-                        ),
-                        onSubmitted: (_) => _send(),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    IconButton.filled(
-                      onPressed: _busy || _selectedModel == null ? null : _send,
-                      icon: const Icon(Icons.send, size: 18),
-                      tooltip: context.tr('Send'),
-                    ),
-                  ],
-                ),
-                if (controller.aiChatApply != null)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 6),
-                    child: Align(
-                      alignment: Alignment.centerLeft,
-                      child: Text(
-                        context.tr('Tip: you can apply code blocks from replies to the editor.'),
-                        style: const TextStyle(fontSize: 11),
-                      ),
-                    ),
+                Container(
+                  width: 150,
+                  decoration: BoxDecoration(
+                    border: Border(right: BorderSide(color: theme.dividerColor)),
                   ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: <Widget>[
+                      Padding(
+                        padding: const EdgeInsets.all(6),
+                        child: OutlinedButton.icon(
+                          onPressed: _newChat,
+                          icon: const Icon(Icons.add, size: 16),
+                          label: Text(
+                            context.tr('New chat'),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            visualDensity: VisualDensity.compact,
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                          ),
+                        ),
+                      ),
+                      const Divider(height: 1),
+                      Expanded(
+                        child: chats.isEmpty
+                            ? Center(
+                                child: Padding(
+                                  padding: const EdgeInsets.all(8),
+                                  child: Text(
+                                    context.tr('No chat selected'),
+                                    style: const TextStyle(fontSize: 12),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                ),
+                              )
+                            : ListView.builder(
+                                itemCount: chats.length,
+                                itemBuilder: (context, i) {
+                                  final chat = chats[i];
+                                  final selected = chat.id == active?.id;
+                                  return Material(
+                                    color: selected
+                                        ? theme.colorScheme.primaryContainer.withValues(alpha: 0.45)
+                                        : Colors.transparent,
+                                    child: InkWell(
+                                      onTap: () => setState(() => controller.selectAiChat(chat.id)),
+                                      child: Padding(
+                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+                                        child: Row(
+                                          children: <Widget>[
+                                            Expanded(
+                                              child: Text(
+                                                chat.title,
+                                                maxLines: 2,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: TextStyle(
+                                                  fontSize: 12,
+                                                  fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
+                                                ),
+                                              ),
+                                            ),
+                                            IconButton(
+                                              tooltip: context.tr('Close'),
+                                              icon: const Icon(Icons.close, size: 14),
+                                              visualDensity: VisualDensity.compact,
+                                              padding: EdgeInsets.zero,
+                                              constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
+                                              onPressed: () => setState(() => controller.deleteAiChat(chat.id)),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                      ),
+                    ],
+                  ),
+                ),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: <Widget>[
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(8, 6, 8, 0),
+                        child: Row(
+                          children: <Widget>[
+                            Text(context.tr('Model:'), style: const TextStyle(fontSize: 12)),
+                            const SizedBox(width: 6),
+                            Expanded(child: _modelPicker()),
+                          ],
+                        ),
+                      ),
+                      if (_error != null)
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(8, 6, 8, 0),
+                          child: Text(
+                            _error!,
+                            style: TextStyle(color: theme.colorScheme.error, fontSize: 12),
+                          ),
+                        ),
+                      Expanded(
+                        child: active == null
+                            ? Center(child: Text(context.tr('No chat selected')))
+                            : ListView.builder(
+                                controller: _scroll,
+                                padding: const EdgeInsets.all(8),
+                                itemCount: active.messages.length +
+                                    (_busy &&
+                                            (active.messages.isEmpty ||
+                                                active.messages.last.role == AiChatRole.user)
+                                        ? 1
+                                        : 0),
+                                itemBuilder: (context, index) {
+                                  final showPending = _busy &&
+                                      (active.messages.isEmpty ||
+                                          active.messages.last.role == AiChatRole.user);
+                                  if (showPending && index == active.messages.length) {
+                                    return Padding(
+                                      padding: const EdgeInsets.symmetric(vertical: 8),
+                                      child: Row(
+                                        children: <Widget>[
+                                          const SizedBox(
+                                            width: 16,
+                                            height: 16,
+                                            child: CircularProgressIndicator(strokeWidth: 2),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Text('${context.tr('Thinking...')} ${_elapsedSeconds}s',
+                                              style: const TextStyle(fontSize: 12)),
+                                        ],
+                                      ),
+                                    );
+                                  }
+                                  final msg = active.messages[index];
+                                  return _buildMessage(context, msg);
+                                },
+                              ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          border: Border(top: BorderSide(color: theme.dividerColor)),
+                        ),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: <Widget>[
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.end,
+                              children: <Widget>[
+                                Expanded(
+                                  child: TextField(
+                                    controller: _input,
+                                    minLines: 1,
+                                    maxLines: 5,
+                                    decoration: InputDecoration(
+                                      hintText: context.tr('Message AI...'),
+                                      border: const OutlineInputBorder(),
+                                      isDense: true,
+                                      contentPadding: const EdgeInsets.symmetric(
+                                          horizontal: 10, vertical: 10),
+                                    ),
+                                    onSubmitted: (_) => _send(),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                IconButton.filled(
+                                  onPressed: _busy || _selectedModel == null ? null : _send,
+                                  icon: const Icon(Icons.send, size: 18),
+                                  tooltip: context.tr('Send'),
+                                ),
+                              ],
+                            ),
+                            if (controller.aiChatApply != null)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 6),
+                                child: Align(
+                                  alignment: Alignment.centerLeft,
+                                  child: Text(
+                                    context.tr('Tip: you can apply code blocks from replies to the editor.'),
+                                    style: const TextStyle(fontSize: 11),
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ],
             ),
           ),
