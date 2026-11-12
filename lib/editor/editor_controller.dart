@@ -715,7 +715,33 @@ class EditorController extends ChangeNotifier {
   }
 
   /// Opens the active scene's FXML source for editing in the code editor.
-  void editSceneSource() => setCodeMode(true);
+  void editSceneSource() {
+    final project = _currentProject;
+    final scene = _activeScene;
+    if (project != null && scene != null) {
+      final path = 'src/main/resources/${JavaGenerator.packageDir(project)}/${scene.name}.fxml';
+      final file = GeneratedFile(
+        path: path,
+        content: serialize(),
+        isXml: true,
+        isFxml: true,
+      );
+      final idx = _openTabs.indexWhere((f) => f.path == path);
+      if (idx >= 0) {
+        _openTabs[idx] = file;
+        _activeTabIndex = idx;
+      } else {
+        _openTabs.add(file);
+        _activeTabIndex = _openTabs.length - 1;
+      }
+      _openSource = _openTabs[_activeTabIndex];
+      _codeMode = true;
+      _codeEpoch++;
+      notifyListeners();
+      return;
+    }
+    setCodeMode(true);
+  }
 
   /// Stops showing a generated Java file (the code editor falls back to the
   /// active scene's FXML).
@@ -755,8 +781,31 @@ class EditorController extends ChangeNotifier {
     if (index < 0 || index >= _openTabs.length) return;
     _activeTabIndex = index;
     final tab = _openTabs[index];
-    // Refresh FXML tab content from the live document.
     if (tab.isFxml) {
+      // If this FXML tab belongs to a project scene, switch to that scene first.
+      final project = _currentProject;
+      if (project != null) {
+        SceneFile? scene;
+        final pkgDir = JavaGenerator.packageDir(project);
+        for (final s in project.scenes) {
+          final scenePath = 'src/main/resources/$pkgDir/${s.name}.fxml';
+          if (scenePath == tab.path) {
+            scene = s;
+            break;
+          }
+        }
+        if (scene != null && !identical(scene, _activeScene)) {
+          _flushToScene();
+          _undoStack.clear();
+          _redoStack.clear();
+          _document = _parser.parse(scene.fxml);
+          _activeScene = scene;
+          _fileName = scene.name;
+          _selected = null;
+          _dirty = false;
+          _endEditChain();
+        }
+      }
       final refreshed = GeneratedFile(
         path: tab.path,
         content: serialize(),
