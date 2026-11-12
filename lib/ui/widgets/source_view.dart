@@ -134,7 +134,7 @@ class _CodeViewState extends State<CodeView> {
 
   @override
   void dispose() {
-    _autoApplyTimer?.cancel();
+    _flushAutoApply();
     _hideSuggestions();
     if (identical(widget.controller.aiFixHandler, _fixWithAi)) {
       widget.controller.aiFixHandler = null;
@@ -147,10 +147,20 @@ class _CodeViewState extends State<CodeView> {
     super.dispose();
   }
 
+  void _flushAutoApply() {
+    _autoApplyTimer?.cancel();
+    _autoApplyTimer = null;
+    if (!widget.controller.isAutoSaveMode) return;
+    if (_text.text == widget.controller.codeContent) return;
+    if (!_validation.isValid) return;
+    widget.controller.applyCode(_text.text);
+  }
+
   void _onControllerChanged() {
     if (!mounted) return;
     final epoch = widget.controller.codeEpoch;
     if (epoch != _lastEpoch) {
+      _flushAutoApply();
       _lastEpoch = epoch;
       _suppressChange = true;
       _text.text = widget.controller.codeContent;
@@ -241,7 +251,10 @@ class _CodeViewState extends State<CodeView> {
   }
 
   void _onFocusChanged() {
-    if (!_focusNode.hasFocus) _hideSuggestions();
+    if (!_focusNode.hasFocus) {
+      _hideSuggestions();
+      _flushAutoApply();
+    }
   }
 
   void _updateSuggestions() {
