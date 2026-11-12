@@ -338,7 +338,7 @@ class _EditorPageState extends State<EditorPage> {
                               ? null
                               : () => _controller.aiFixHandler!.call(),
                           icon: const Icon(Icons.auto_fix_high, size: 18),
-                          label: Text(context.tr('Fix with AI')),
+                          label: Text(context.tr('AI chat')),
                         ),
                       EditorToolbar(
                         controller: _controller,
@@ -1121,13 +1121,9 @@ class _ResizableRightPanelState extends State<_ResizableRightPanel> {
             if (showAi)
               SizedBox(
                 width: 360,
-                child: AiFixPanel(
+                child: AiChatPanel(
                   controller: controller,
-                  path: controller.aiFixPath,
-                  source: controller.aiFixSource,
-                  errors: controller.aiFixErrors,
-                  onApply: controller.applyAiFixResult,
-                  onClose: controller.closeAiFixPanel,
+                  onClose: controller.closeAiChatPanel,
                 ),
               ),
             if (showAi) const VerticalDivider(width: 1),

@@ -144,43 +144,145 @@ class EditorController extends ChangeNotifier {
     notifyListeners();
   }
 
-  // Embedded AI fix panel state (shown left of the project tree).
-  bool get aiFixPanelOpen => _aiFixPanelOpen;
-  bool _aiFixPanelOpen = false;
-  String get aiFixPath => _aiFixPath;
-  String _aiFixPath = '';
-  String get aiFixSource => _aiFixSource;
-  String _aiFixSource = '';
-  List<String> get aiFixErrors => List<String>.unmodifiable(_aiFixErrors);
-  List<String> _aiFixErrors = const <String>[];
-  void Function(String fixed)? _aiFixApply;
-  void Function(String fixed)? get aiFixApply => _aiFixApply;
+  // Embedded AI chat panel state (shown left of the project tree).
+  bool get aiFixPanelOpen => _aiChatPanelOpen;
+  bool get aiChatPanelOpen => _aiChatPanelOpen;
+  bool _aiChatPanelOpen = false;
+
+  String? _aiChatContextPath;
+  String? get aiChatContextPath => _aiChatContextPath;
+  String? _aiChatContextSource;
+  String? get aiChatContextSource => _aiChatContextSource;
+  List<String> _aiChatContextErrors = const <String>[];
+  List<String> get aiChatContextErrors =>
+      List<String>.unmodifiable(_aiChatContextErrors);
+  void Function(String fixed)? _aiChatApply;
+  void Function(String fixed)? get aiChatApply => _aiChatApply;
+
+  final List<AiChatSession> _aiChats = <AiChatSession>[];
+  List<AiChatSession> get aiChats => List<AiChatSession>.unmodifiable(_aiChats);
+  String? _activeAiChatId;
+  String? get activeAiChatId => _activeAiChatId;
+  AiChatSession? get activeAiChat {
+    final id = _activeAiChatId;
+    if (id == null) return null;
+    for (final chat in _aiChats) {
+      if (chat.id == id) return chat;
+    }
+    return null;
+  }
 
   void openAiFixPanel({
-    required String path,
-    required String source,
-    required List<String> errors,
-    required void Function(String fixed) onApply,
+    String? path,
+    String? source,
+    List<String>? errors,
+    void Function(String fixed)? onApply,
   }) {
-    _aiFixPath = path;
-    _aiFixSource = source;
-    _aiFixErrors = List<String>.from(errors);
-    _aiFixApply = onApply;
-    _aiFixPanelOpen = true;
+    openAiChatPanel(
+      contextPath: path,
+      contextSource: source,
+      contextErrors: errors,
+      onApply: onApply,
+    );
+  }
+
+  void openAiChatPanel({
+    String? contextPath,
+    String? contextSource,
+    List<String>? contextErrors,
+    void Function(String fixed)? onApply,
+  }) {
+    _aiChatContextPath = contextPath;
+    _aiChatContextSource = contextSource;
+    _aiChatContextErrors = contextErrors == null
+        ? const <String>[]
+        : List<String>.from(contextErrors);
+    _aiChatApply = onApply;
+    if (_aiChats.isEmpty) {
+      createAiChat(seedFromContext: contextPath != null || (contextSource ?? '').isNotEmpty);
+    }
+    _aiChatPanelOpen = true;
     notifyListeners();
   }
 
-  void closeAiFixPanel() {
-    if (!_aiFixPanelOpen) return;
-    _aiFixPanelOpen = false;
-    _aiFixApply = null;
+  void closeAiFixPanel() => closeAiChatPanel();
+
+  void closeAiChatPanel() {
+    if (!_aiChatPanelOpen) return;
+    _aiChatPanelOpen = false;
     notifyListeners();
   }
 
   void applyAiFixResult(String fixed) {
-    final apply = _aiFixApply;
+    final apply = _aiChatApply;
     if (apply != null) apply(fixed);
   }
+
+  AiChatSession createAiChat({bool seedFromContext = false}) {
+    final id = 'chat_${DateTime.now().microsecondsSinceEpoch}_${_aiChats.length}';
+    final session = AiChatSession(id: id, title: 'New chat', messages: <AiChatMessage>[]);
+    _aiChats.insert(0, session);
+    _activeAiChatId = id;
+    if (seedFromContext && (_aiChatContextSource ?? '').isNotEmpty) {
+      final buf = StringBuffer()
+        ..writeln('Help me with file: ${_aiChatContextPath ?? '(unknown)'}');
+      if (_aiChatContextErrors.isNotEmpty) {
+        buf.writeln('Issues:');
+        for (final e in _aiChatContextErrors.take(10)) {
+          buf.writeln('- $e');
+        }
+      }
+      buf
+        ..writeln()
+        ..writeln('Current content:')
+        ..writeln('```')
+        ..writeln(_aiChatContextSource)
+        ..writeln('```');
+      session.messages.add(AiChatMessage(
+        role: AiChatRole.user,
+        content: buf.toString(),
+        timestamp: DateTime.now(),
+      ));
+      final name = _aiChatContextPath?.split(RegExp(r'[\\/]')).last ?? 'file';
+      session.title = 'Fix: $name';
+    }
+    notifyListeners();
+    return session;
+  }
+
+  void selectAiChat(String id) {
+    if (_activeAiChatId == id) return;
+    _activeAiChatId = id;
+    notifyListeners();
+  }
+
+  void deleteAiChat(String id) {
+    _aiChats.removeWhere((c) => c.id == id);
+    if (_activeAiChatId == id) {
+      _activeAiChatId = _aiChats.isNotEmpty ? _aiChats.first.id : null;
+    }
+    notifyListeners();
+  }
+
+  void addAiChatMessage(String chatId, AiChatMessage message) {
+    for (final chat in _aiChats) {
+      if (chat.id == chatId) {
+        chat.messages.add(message);
+        if (chat.title == 'New chat' && message.role == AiChatRole.user) {
+          final firstLine = message.content.trim().split('\n').first.trim();
+          if (firstLine.isNotEmpty) {
+            chat.title = firstLine.length > 42
+                ? '${firstLine.substring(0, 39)}...'
+                : firstLine;
+          }
+        }
+        notifyListeners();
+        return;
+      }
+    }
+  }
+
+  void notifyAiChatsChanged() => notifyListeners();
   bool _dirty = false;
   GeneratedFile? _openSource;
   final List<GeneratedFile> _openTabs = <GeneratedFile>[];
@@ -3097,3 +3199,20 @@ const String _emptySceneFxml = '''<?xml version="1.0" encoding="UTF-8"?>
 <AnchorPane xmlns="http://javafx.com/javafx/17.0.2" xmlns:fx="http://javafx.com/fxml/1" prefWidth="800.0" prefHeight="600.0">
 </AnchorPane>
 ''';
+
+
+enum AiChatRole { user, assistant }
+
+class AiChatMessage {
+  AiChatMessage({required this.role, required this.content, required this.timestamp});
+  final AiChatRole role;
+  final String content;
+  final DateTime timestamp;
+}
+
+class AiChatSession {
+  AiChatSession({required this.id, required this.title, required this.messages});
+  final String id;
+  String title;
+  final List<AiChatMessage> messages;
+}
