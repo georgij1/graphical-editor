@@ -143,6 +143,44 @@ class EditorController extends ChangeNotifier {
     _aiFixHandler = value;
     notifyListeners();
   }
+
+  // Embedded AI fix panel state (shown left of the project tree).
+  bool get aiFixPanelOpen => _aiFixPanelOpen;
+  bool _aiFixPanelOpen = false;
+  String get aiFixPath => _aiFixPath;
+  String _aiFixPath = '';
+  String get aiFixSource => _aiFixSource;
+  String _aiFixSource = '';
+  List<String> get aiFixErrors => List<String>.unmodifiable(_aiFixErrors);
+  List<String> _aiFixErrors = const <String>[];
+  void Function(String fixed)? _aiFixApply;
+  void Function(String fixed)? get aiFixApply => _aiFixApply;
+
+  void openAiFixPanel({
+    required String path,
+    required String source,
+    required List<String> errors,
+    required void Function(String fixed) onApply,
+  }) {
+    _aiFixPath = path;
+    _aiFixSource = source;
+    _aiFixErrors = List<String>.from(errors);
+    _aiFixApply = onApply;
+    _aiFixPanelOpen = true;
+    notifyListeners();
+  }
+
+  void closeAiFixPanel() {
+    if (!_aiFixPanelOpen) return;
+    _aiFixPanelOpen = false;
+    _aiFixApply = null;
+    notifyListeners();
+  }
+
+  void applyAiFixResult(String fixed) {
+    final apply = _aiFixApply;
+    if (apply != null) apply(fixed);
+  }
   bool _dirty = false;
   GeneratedFile? _openSource;
   final List<GeneratedFile> _openTabs = <GeneratedFile>[];

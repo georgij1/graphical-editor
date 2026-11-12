@@ -6,6 +6,7 @@ import '../editor/editor_controller.dart';
 import '../l10n/app_localizations.dart';
 import 'widgets/canvas_area.dart';
 import 'widgets/downloads_dialog.dart';
+import 'widgets/ai_fix_panel.dart';
 import 'widgets/inspector_panel.dart';
 import 'widgets/outline_panel.dart';
 import 'widgets/palette_panel.dart';
@@ -1085,6 +1086,7 @@ class _ResizableRightPanelState extends State<_ResizableRightPanel> {
     return ListenableBuilder(
       listenable: controller,
       builder: (context, _) {
+        final showAi = controller.aiFixPanelOpen;
         return Row(
           children: <Widget>[
             MouseRegion(
@@ -1116,6 +1118,19 @@ class _ResizableRightPanelState extends State<_ResizableRightPanel> {
                 ),
               ),
             ),
+            if (showAi)
+              SizedBox(
+                width: 360,
+                child: AiFixPanel(
+                  controller: controller,
+                  path: controller.aiFixPath,
+                  source: controller.aiFixSource,
+                  errors: controller.aiFixErrors,
+                  onApply: controller.applyAiFixResult,
+                  onClose: controller.closeAiFixPanel,
+                ),
+              ),
+            if (showAi) const VerticalDivider(width: 1),
             SizedBox(
               width: controller.rightPanelWidth,
               child: VerticalSplitView(

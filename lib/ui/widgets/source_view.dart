@@ -5,7 +5,6 @@ import 'package:flutter/services.dart';
 
 import '../../editor/code_validator.dart';
 import '../../editor/editor_controller.dart';
-import 'ai_fix_dialog.dart';
 import '../../l10n/app_localizations.dart';
 import 'highlighting_text_controller.dart';
 
@@ -287,19 +286,20 @@ class _CodeViewState extends State<CodeView> {
 
   Future<void> _fixWithAi() async {
     final controller = widget.controller;
-    final fixed = await showAiFixDialog(
-      context,
-      controller: controller,
+    controller.openAiFixPanel(
       path: controller.codePath,
       source: _text.text,
       errors: _validation.issues.map((i) => i.toString()).toList(),
+      onApply: (fixed) {
+        if (!mounted) return;
+        setState(() {
+          _text.text = fixed;
+          _validation = _validate(fixed);
+        });
+        controller.closeAiFixPanel();
+        _showMessage(context.tr('AI suggestion loaded. Review and Apply.'));
+      },
     );
-    if (fixed == null || !mounted) return;
-    setState(() {
-      _text.text = fixed;
-      _validation = _validate(fixed);
-    });
-    _showMessage(context.tr('AI suggestion loaded. Review and Apply.'));
   }
 
   void _onFocusChanged() {
