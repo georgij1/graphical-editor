@@ -706,11 +706,15 @@ class EditorController extends ChangeNotifier {
   }
 
   static const String _splitKey = 'project_split_v2';
+  static const String _rightPanelWidthKey = 'right_panel_width';
 
   /// Share of the right column given to the project tree, or null while the
   /// divider has not been dragged and the pane should fit its content.
   double? get treeFraction => _treeFraction;
   double? _treeFraction;
+
+  double get rightPanelWidth => _rightPanelWidth;
+  double _rightPanelWidth = 320;
 
   /// Remembers how the project tree and the canvas properties are split.
   void setTreeFraction(double value) {
@@ -731,11 +735,25 @@ class EditorController extends ChangeNotifier {
     notifyListeners();
   }
 
+  void setRightPanelWidth(double value) {
+    final clamped = value.clamp(240.0, 720.0);
+    if ((clamped - _rightPanelWidth).abs() < 0.5) return;
+    _rightPanelWidth = clamped;
+    _tokenStore.write(_rightPanelWidthKey, clamped.toString());
+    notifyListeners();
+  }
+
   Future<void> _loadSplit() async {
     final stored = await _tokenStore.read(_splitKey);
     final value = double.tryParse(stored ?? '');
-    if (value == null) return;
-    _treeFraction = value.clamp(0.05, 0.95);
+    if (value != null) {
+      _treeFraction = value.clamp(0.05, 0.95);
+    }
+    final widthStored = await _tokenStore.read(_rightPanelWidthKey);
+    final width = double.tryParse(widthStored ?? '');
+    if (width != null) {
+      _rightPanelWidth = width.clamp(240.0, 720.0);
+    }
   }
 
   // -------------------------------------------------------------------------- ai

@@ -680,20 +680,11 @@ class _WideLayout extends StatelessWidget {
           ),
         ),
         const VerticalDivider(width: 1),
-        SizedBox(
-          width: 320,
-          child: VerticalSplitView(
-            fraction: controller.treeFraction,
-            onChanged: controller.setTreeFraction,
-            onReset: controller.clearTreeFraction,
-            top: ProjectPanel(
-              controller: controller,
-              onOpen: onOpen,
-              onSave: onSave,
-              onDownload: onDownload,
-            ),
-            bottom: InspectorPanel(controller: controller),
-          ),
+        _ResizableRightPanel(
+          controller: controller,
+          onOpen: onOpen,
+          onSave: onSave,
+          onDownload: onDownload,
         ),
       ],
     );
@@ -1063,5 +1054,86 @@ class _PresenceBar extends StatelessWidget {
   String _initial(String? email) {
     if (email == null || email.isEmpty) return '?';
     return email[0].toUpperCase();
+  }
+}
+
+class _ResizableRightPanel extends StatefulWidget {
+  const _ResizableRightPanel({
+    required this.controller,
+    required this.onOpen,
+    required this.onSave,
+    required this.onDownload,
+  });
+
+  final EditorController controller;
+  final Future<void> Function() onOpen;
+  final Future<void> Function() onSave;
+  final Future<void> Function() onDownload;
+
+  @override
+  State<_ResizableRightPanel> createState() => _ResizableRightPanelState();
+}
+
+class _ResizableRightPanelState extends State<_ResizableRightPanel> {
+  bool _hovering = false;
+  double? _dragBase;
+  double _dragDelta = 0;
+
+  @override
+  Widget build(BuildContext context) {
+    final controller = widget.controller;
+    return ListenableBuilder(
+      listenable: controller,
+      builder: (context, _) {
+        return Row(
+          children: <Widget>[
+            MouseRegion(
+              cursor: SystemMouseCursors.resizeColumn,
+              onEnter: (_) => setState(() => _hovering = true),
+              onExit: (_) => setState(() => _hovering = false),
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onHorizontalDragStart: (_) {
+                  _dragBase = controller.rightPanelWidth;
+                  _dragDelta = 0;
+                },
+                onHorizontalDragUpdate: (details) {
+                  _dragDelta += details.delta.dx;
+                  final base = _dragBase ?? controller.rightPanelWidth;
+                  controller.setRightPanelWidth(base - _dragDelta);
+                },
+                child: Container(
+                  width: 6,
+                  alignment: Alignment.center,
+                  color: _hovering
+                      ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.10)
+                      : Colors.transparent,
+                  child: Container(
+                    width: 1,
+                    height: double.infinity,
+                    color: Theme.of(context).dividerColor,
+                  ),
+                ),
+              ),
+            ),
+            SizedBox(
+              width: controller.rightPanelWidth,
+              child: VerticalSplitView(
+                fraction: controller.treeFraction,
+                onChanged: controller.setTreeFraction,
+                onReset: controller.clearTreeFraction,
+                top: ProjectPanel(
+                  controller: controller,
+                  onOpen: widget.onOpen,
+                  onSave: widget.onSave,
+                  onDownload: widget.onDownload,
+                ),
+                bottom: InspectorPanel(controller: controller),
+              ),
+            ),
+          ],
+        );
+      },
+    );
   }
 }
