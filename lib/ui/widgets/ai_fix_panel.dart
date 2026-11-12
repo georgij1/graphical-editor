@@ -28,6 +28,7 @@ class _AiChatPanelState extends State<AiChatPanel> {
   final ScrollController _scroll = ScrollController();
 
   List<String> _models = const <String>[];
+  List<String> _customModels = const <String>[];
   String? _selectedModel;
   bool _loadingModels = true;
   bool _busy = false;
@@ -50,35 +51,97 @@ class _AiChatPanelState extends State<AiChatPanel> {
   }
 
   Future<void> _loadModels() async {
+    List<String> models = const <String>[];
+    String? loadError;
     try {
-      final models = await widget.client.listModels();
-      final saved = await widget.controller.readAiModel();
-      if (!mounted) return;
-      setState(() {
-        _models = models;
-        _loadingModels = false;
-        if (saved != null && models.contains(saved)) {
-          _selectedModel = saved;
-        } else if (models.isNotEmpty) {
-          _selectedModel = models.first;
-        }
-      });
-      if (_selectedModel != null) {
-        await widget.controller.writeAiModel(_selectedModel!);
-      }
+      models = await widget.client.listModels();
     } on AiException catch (error) {
-      if (!mounted) return;
-      setState(() {
-        _loadingModels = false;
-        _error = error.message;
-      });
+      loadError = error.message;
     } catch (error) {
-      if (!mounted) return;
-      setState(() {
-        _loadingModels = false;
-        _error = error.toString();
-      });
+      loadError = error.toString();
     }
+    final custom = await widget.controller.readCustomAiModels();
+    final saved = await widget.controller.readAiModel();
+    if (!mounted) return;
+    final all = _mergeModels(models, custom, saved);
+    setState(() {
+      _models = models;
+      _customModels = custom;
+      _loadingModels = false;
+      _error = loadError != null && all.isEmpty ? loadError : _error;
+      if (saved != null && all.contains(saved)) {
+        _selectedModel = saved;
+      } else if (all.isNotEmpty) {
+        _selectedModel = all.first;
+      } else {
+        _selectedModel = saved;
+      }
+    });
+    if (_selectedModel != null) {
+      await widget.controller.writeAiModel(_selectedModel!);
+    }
+  }
+
+  List<String> _mergeModels(List<String> remote, List<String> custom, String? saved) {
+    final out = <String>[];
+    final seen = <String>{};
+    void add(String? v) {
+      final s = (v ?? '').trim();
+      if (s.isEmpty || !seen.add(s)) return;
+      out.add(s);
+    }
+    for (final m in custom) {
+      add(m);
+    }
+    for (final m in remote) {
+      add(m);
+    }
+    add(saved);
+    return out;
+  }
+
+  List<String> get _allModels => _mergeModels(_models, _customModels, _selectedModel);
+
+  Future<void> _addCustomModel() async {
+    final textController = TextEditingController();
+    final name = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(ctx.tr('Add model')),
+        content: TextField(
+          controller: textController,
+          autofocus: true,
+          decoration: InputDecoration(
+            labelText: ctx.tr('Model name'),
+            hintText: 'e.g. llama3.1:8b',
+            border: const OutlineInputBorder(),
+            isDense: true,
+          ),
+          onSubmitted: (v) => Navigator.of(ctx).pop(v.trim()),
+        ),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text(ctx.tr('Cancel')),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(textController.text.trim()),
+            child: Text(ctx.tr('Add')),
+          ),
+        ],
+      ),
+    );
+    textController.dispose();
+    if (name == null || name.trim().isEmpty) return;
+    await widget.controller.addCustomAiModel(name.trim());
+    final custom = await widget.controller.readCustomAiModels();
+    if (!mounted) return;
+    setState(() {
+      _customModels = custom;
+      _selectedModel = name.trim();
+      _error = null;
+    });
+    await widget.controller.writeAiModel(name.trim());
   }
 
   void _scrollToBottom() {
@@ -557,24 +620,53 @@ class _AiChatPanelState extends State<AiChatPanel> {
         ),
       );
     }
-    if (_models.isEmpty) {
-      return Text(
-        context.tr('No models found. Is Ollama running?'),
-        style: const TextStyle(fontSize: 12),
+    final all = _allModels;
+    if (all.isEmpty) {
+      return Row(
+        children: <Widget>[
+          Expanded(
+            child: Text(
+              context.tr('No models found. Is Ollama running?'),
+              style: const TextStyle(fontSize: 12),
+            ),
+          ),
+          IconButton(
+            tooltip: context.tr('Add model'),
+            icon: const Icon(Icons.add, size: 18),
+            visualDensity: VisualDensity.compact,
+            onPressed: _addCustomModel,
+          ),
+        ],
       );
     }
-    return DropdownButton<String>(
-      value: _selectedModel,
-      isExpanded: true,
-      isDense: true,
-      items: <DropdownMenuItem<String>>[
-        for (final model in _models)
-          DropdownMenuItem<String>(value: model, child: Text(model, overflow: TextOverflow.ellipsis)),
+    final value = all.contains(_selectedModel) ? _selectedModel : all.first;
+    return Row(
+      children: <Widget>[
+        Expanded(
+          child: DropdownButton<String>(
+            value: value,
+            isExpanded: true,
+            isDense: true,
+            items: <DropdownMenuItem<String>>[
+              for (final model in all)
+                DropdownMenuItem<String>(
+                  value: model,
+                  child: Text(model, overflow: TextOverflow.ellipsis),
+                ),
+            ],
+            onChanged: (v) {
+              setState(() => _selectedModel = v);
+              if (v != null) widget.controller.writeAiModel(v);
+            },
+          ),
+        ),
+        IconButton(
+          tooltip: context.tr('Add model'),
+          icon: const Icon(Icons.add, size: 18),
+          visualDensity: VisualDensity.compact,
+          onPressed: _addCustomModel,
+        ),
       ],
-      onChanged: (value) {
-        setState(() => _selectedModel = value);
-        if (value != null) widget.controller.writeAiModel(value);
-      },
     );
   }
 }

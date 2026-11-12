@@ -939,6 +939,7 @@ class EditorController extends ChangeNotifier {
   static const String _splitKey = 'project_split_v2';
   static const String _rightPanelWidthKey = 'right_panel_width';
   static const String _aiChatsKey = 'ai_chats_v1';
+  static const String _aiCustomModelsKey = 'ai_custom_models_v1';
 
   /// Share of the right column given to the project tree, or null while the
   /// divider has not been dragged and the pane should fit its content.
@@ -997,6 +998,34 @@ class EditorController extends ChangeNotifier {
 
   Future<void> writeAiModel(String model) =>
       _tokenStore.write(_aiModelKey, model);
+
+  Future<List<String>> readCustomAiModels() async {
+    final raw = await _tokenStore.read(_aiCustomModelsKey);
+    if (raw == null || raw.isEmpty) return const <String>[];
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is! List) return const <String>[];
+      final out = <String>[];
+      final seen = <String>{};
+      for (final item in decoded) {
+        final s = item?.toString().trim() ?? '';
+        if (s.isEmpty || !seen.add(s)) continue;
+        out.add(s);
+      }
+      return out;
+    } catch (_) {
+      return const <String>[];
+    }
+  }
+
+  Future<void> addCustomAiModel(String model) async {
+    final name = model.trim();
+    if (name.isEmpty) return;
+    final current = await readCustomAiModels();
+    if (current.contains(name)) return;
+    final next = <String>[name, ...current];
+    await _tokenStore.write(_aiCustomModelsKey, jsonEncode(next));
+  }
 
   /// Persists the open document into the workspace: no file is downloaded.
   ///
