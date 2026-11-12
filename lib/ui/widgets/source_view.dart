@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
+
 import 'package:flutter/services.dart';
 
 import '../../editor/code_validator.dart';
@@ -27,6 +29,8 @@ class _CodeViewState extends State<CodeView> {
   int _lastEpoch = 0;
   OverlayEntry? _overlayEntry;
   List<String> _suggestions = <String>[];
+  Timer? _autoApplyTimer;
+  bool _suppressChange = false;
 
   static const List<String> _javaSuggestions = <String>[
     'abstract',
@@ -130,6 +134,7 @@ class _CodeViewState extends State<CodeView> {
 
   @override
   void dispose() {
+    _autoApplyTimer?.cancel();
     _hideSuggestions();
     if (identical(widget.controller.aiFixHandler, _fixWithAi)) {
       widget.controller.aiFixHandler = null;
@@ -147,17 +152,37 @@ class _CodeViewState extends State<CodeView> {
     final epoch = widget.controller.codeEpoch;
     if (epoch != _lastEpoch) {
       _lastEpoch = epoch;
+      _suppressChange = true;
       _text.text = widget.controller.codeContent;
+      _suppressChange = false;
       _validation = _validate(_text.text);
       setState(() {});
     }
   }
 
   void _onChanged() {
+    if (_suppressChange) return;
     setState(() {
       _validation = _validate(_text.text);
     });
     _updateSuggestions();
+    _scheduleAutoApply();
+  }
+
+  void _scheduleAutoApply() {
+    _autoApplyTimer?.cancel();
+    if (!widget.controller.isAutoSaveMode) return;
+    final text = _text.text;
+    final current = widget.controller.codeContent;
+    if (text == current) return;
+    _autoApplyTimer = Timer(const Duration(milliseconds: 700), () {
+      if (!mounted) return;
+      if (!widget.controller.isAutoSaveMode) return;
+      if (_text.text != text) return;
+      if (_text.text == widget.controller.codeContent) return;
+      if (!_validation.isValid) return;
+      widget.controller.applyCode(_text.text);
+    });
   }
 
   bool _apply() {
