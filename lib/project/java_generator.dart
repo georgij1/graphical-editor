@@ -80,6 +80,12 @@ class JavaGenerator {
         isJava: true,
       ));
     }
+    final testPath = 'src/test/java/${packageDir(p)}/${p.mainClass}Test.java';
+    files.add(GeneratedFile(
+      path: testPath,
+      content: _resolve(p, testPath, _appTest(p), applyOverrides: applyOverrides),
+      isJava: true,
+    ));
     return files;
   }
 
@@ -174,6 +180,22 @@ class JavaGenerator {
         '    @Override\n'
         '    public void initialize(URL location, ResourceBundle resources) {\n'
         '        // Wire up UI controls here.\n'
+        '    }\n'
+        '}\n';
+  }
+
+  static String _appTest(Project p) {
+    return 'package ${p.package};\n'
+        '\n'
+        'import org.junit.jupiter.api.Test;\n'
+        '\n'
+        'import static org.junit.jupiter.api.Assertions.assertTrue;\n'
+        '\n'
+        'class ${p.mainClass}Test {\n'
+        '\n'
+        '    @Test\n'
+        '    void applicationStarts() {\n'
+        '        assertTrue(true);\n'
         '    }\n'
         '}\n';
   }

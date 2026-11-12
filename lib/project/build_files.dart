@@ -88,6 +88,12 @@ class BuildFiles {
         '            <artifactId>javafx-fxml</artifactId>\n'
         '            <version>\${javafx.version}</version>\n'
         '        </dependency>\n'
+        '        <dependency>\n'
+        '            <groupId>org.junit.jupiter</groupId>\n'
+        '            <artifactId>junit-jupiter</artifactId>\n'
+        '            <version>5.10.2</version>\n'
+        '            <scope>test</scope>\n'
+        '        </dependency>\n'
         '    </dependencies>\n'
         '\n'
         '    <build>\n'
@@ -105,7 +111,17 @@ class BuildFiles {
         '                    <mainClass>\${main.class}</mainClass>\n'
         '                </configuration>\n'
         '            </plugin>\n'
-        '        </plugins>\n'
+
+        '            <plugin>
+'
+        '                <groupId>org.apache.maven.plugins</groupId>
+'
+        '                <artifactId>maven-surefire-plugin</artifactId>
+'
+        '                <version>3.2.5</version>
+'
+        '            </plugin>
+'        '        </plugins>\n'
         '    </build>\n'
         '</project>\n';
   }
@@ -127,10 +143,20 @@ class BuildFiles {
       '    mavenCentral()\n'
       '}\n'
       '\n'
+      'dependencies {\n'
+      "    testImplementation platform('org.junit:junit-bom:5.10.2')\n"
+      "    testImplementation 'org.junit.jupiter:junit-jupiter'\n"
+      "    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'\n"
+      '}\n'
+      '\n'
       'java {\n'
       '    toolchain {\n'
       '        languageVersion = JavaLanguageVersion.of(21)\n'
       '    }\n'
+      '}\n'
+      '\n'
+      'test {\n'
+      '    useJUnitPlatform()\n'
       '}\n'
       '\n'
       'javafx {\n'
