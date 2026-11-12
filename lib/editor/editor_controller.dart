@@ -2031,12 +2031,11 @@ class EditorController extends ChangeNotifier {
     } else {
       _openTabs.add(file);
     }
-    // Keep _openSource in sync only while in code mode.
     final i = _openTabs.indexWhere((f) => f.path == path);
     _activeTabIndex = i >= 0 ? i : _openTabs.length - 1;
-    if (_codeMode) {
-      _openSource = _openTabs[_activeTabIndex];
-    }
+    // Keep the scene's FXML tab selected as the active source so switching to
+    // code view (or opening FXML while a Java tab is open) shows this scene.
+    _openSource = _openTabs[_activeTabIndex];
     _selected = null;
     _dirty = false;
     _endEditChain();
