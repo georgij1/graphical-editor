@@ -27,9 +27,9 @@ class _AiChatPanelState extends State<AiChatPanel> {
   final TextEditingController _input = TextEditingController();
   final ScrollController _scroll = ScrollController();
 
-  List<String> _models = const <String>[];
-  List<String> _customModels = const <String>[];
-  String? _selectedModel;
+  List<String> _remoteModels = const <String>[];
+  List<AiModelConfig> _customModels = const <AiModelConfig>[];
+  String? _selectedModelId;
   bool _loadingModels = true;
   bool _busy = false;
   String? _error;
@@ -51,10 +51,10 @@ class _AiChatPanelState extends State<AiChatPanel> {
   }
 
   Future<void> _loadModels() async {
-    List<String> models = const <String>[];
+    List<String> remote = const <String>[];
     String? loadError;
     try {
-      models = await widget.client.listModels();
+      remote = await widget.client.listModels();
     } on AiException catch (error) {
       loadError = error.message;
     } catch (error) {
@@ -63,61 +63,104 @@ class _AiChatPanelState extends State<AiChatPanel> {
     final custom = await widget.controller.readCustomAiModels();
     final saved = await widget.controller.readAiModel();
     if (!mounted) return;
-    final all = _mergeModels(models, custom, saved);
+    final allIds = _allModelIds(remote: remote, custom: custom, savedId: saved);
+    String? selected = saved;
+    if (selected == null || (allIds.isNotEmpty && !allIds.contains(selected))) {
+      selected = allIds.isNotEmpty ? allIds.first : saved;
+    }
     setState(() {
-      _models = models;
+      _remoteModels = remote;
       _customModels = custom;
       _loadingModels = false;
-      _error = loadError != null && all.isEmpty ? loadError : _error;
-      if (saved != null && all.contains(saved)) {
-        _selectedModel = saved;
-      } else if (all.isNotEmpty) {
-        _selectedModel = all.first;
-      } else {
-        _selectedModel = saved;
-      }
+      _error = loadError != null && allIds.isEmpty ? loadError : _error;
+      _selectedModelId = selected;
     });
-    if (_selectedModel != null) {
-      await widget.controller.writeAiModel(_selectedModel!);
+    if (_selectedModelId != null) {
+      await widget.controller.writeAiModel(_selectedModelId!);
     }
   }
 
-  List<String> _mergeModels(List<String> remote, List<String> custom, String? saved) {
+  String _modelId({required String name, String? baseUrl}) =>
+      EditorController.aiModelSelectionId(name: name, baseUrl: baseUrl);
+
+  List<String> _allModelIds({
+    required List<String> remote,
+    required List<AiModelConfig> custom,
+    String? savedId,
+  }) {
     final out = <String>[];
     final seen = <String>{};
-    void add(String? v) {
-      final s = (v ?? '').trim();
+    void addId(String? id) {
+      final s = (id ?? '').trim();
       if (s.isEmpty || !seen.add(s)) return;
       out.add(s);
     }
     for (final m in custom) {
-      add(m);
+      addId(_modelId(name: m.name, baseUrl: m.baseUrl));
     }
-    for (final m in remote) {
-      add(m);
+    for (final name in remote) {
+      addId(_modelId(name: name));
     }
-    add(saved);
+    addId(savedId);
     return out;
   }
 
-  List<String> get _allModels => _mergeModels(_models, _customModels, _selectedModel);
+  List<String> get _allModelIdsCurrent =>
+      _allModelIds(remote: _remoteModels, custom: _customModels, savedId: _selectedModelId);
+
+  String _modelLabel(String id) {
+    final parsed = EditorController.parseAiModelSelection(id);
+    final base = (parsed.baseUrl ?? '').trim();
+    if (base.isEmpty) return parsed.name.isEmpty ? id : parsed.name;
+    final short = base.replaceFirst(RegExp(r'^https?://'), '');
+    return '${parsed.name} ($short)';
+  }
+
+  String? _modelBaseUrl(String? id) {
+    final parsed = EditorController.parseAiModelSelection(id);
+    final b = (parsed.baseUrl ?? '').trim();
+    return b.isEmpty ? null : b;
+  }
+
+  String _modelName(String? id) {
+    final parsed = EditorController.parseAiModelSelection(id);
+    return parsed.name.isEmpty ? (id ?? '') : parsed.name;
+  }
 
   Future<void> _addCustomModel() async {
-    final textController = TextEditingController();
-    final name = await showDialog<String>(
+    final nameController = TextEditingController();
+    final urlController = TextEditingController();
+    final result = await showDialog<({String name, String url})>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(ctx.tr('Add model')),
-        content: TextField(
-          controller: textController,
-          autofocus: true,
-          decoration: InputDecoration(
-            labelText: ctx.tr('Model name'),
-            hintText: 'e.g. llama3.1:8b',
-            border: const OutlineInputBorder(),
-            isDense: true,
+        content: SizedBox(
+          width: 420,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              TextField(
+                controller: nameController,
+                autofocus: true,
+                decoration: InputDecoration(
+                  labelText: ctx.tr('Model name'),
+                  hintText: 'e.g. llama3.1:8b',
+                  border: const OutlineInputBorder(),
+                  isDense: true,
+                ),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: urlController,
+                decoration: InputDecoration(
+                  labelText: ctx.tr('Server URL (optional)'),
+                  hintText: 'e.g. http://localhost:11434',
+                  border: const OutlineInputBorder(),
+                  isDense: true,
+                ),
+              ),
+            ],
           ),
-          onSubmitted: (v) => Navigator.of(ctx).pop(v.trim()),
         ),
         actions: <Widget>[
           TextButton(
@@ -125,23 +168,29 @@ class _AiChatPanelState extends State<AiChatPanel> {
             child: Text(ctx.tr('Cancel')),
           ),
           FilledButton(
-            onPressed: () => Navigator.of(ctx).pop(textController.text.trim()),
+            onPressed: () => Navigator.of(ctx).pop((
+              name: nameController.text.trim(),
+              url: urlController.text.trim(),
+            )),
             child: Text(ctx.tr('Add')),
           ),
         ],
       ),
     );
-    textController.dispose();
-    if (name == null || name.trim().isEmpty) return;
-    await widget.controller.addCustomAiModel(name.trim());
+    nameController.dispose();
+    urlController.dispose();
+    if (result == null || result.name.trim().isEmpty) return;
+    final baseUrl = result.url.trim().isEmpty ? null : result.url.trim();
+    await widget.controller.addCustomAiModel(name: result.name.trim(), baseUrl: baseUrl);
     final custom = await widget.controller.readCustomAiModels();
     if (!mounted) return;
+    final id = _modelId(name: result.name.trim(), baseUrl: baseUrl);
     setState(() {
       _customModels = custom;
-      _selectedModel = name.trim();
+      _selectedModelId = id;
       _error = null;
     });
-    await widget.controller.writeAiModel(name.trim());
+    await widget.controller.writeAiModel(id);
   }
 
   void _scrollToBottom() {
@@ -188,9 +237,11 @@ class _AiChatPanelState extends State<AiChatPanel> {
   }
 
   Future<void> _send() async {
-    final model = _selectedModel;
+    final modelId = _selectedModelId;
     final text = _input.text.trim();
-    if (model == null || text.isEmpty || _busy) return;
+    if (modelId == null || text.isEmpty || _busy) return;
+    final model = _modelName(modelId);
+    final baseUrl = _modelBaseUrl(modelId);
     final chat = widget.controller.activeAiChat;
     if (chat == null) return;
     setState(() {
@@ -220,6 +271,7 @@ class _AiChatPanelState extends State<AiChatPanel> {
       await for (final chunk in widget.client.generateStream(
         model: model,
         prompt: prompt,
+        baseUrl: baseUrl,
         system:
             'You are a helpful coding assistant inside a graphical editor. '
             'Answer clearly. When providing corrected or example code, include it in fenced code blocks.',
@@ -507,7 +559,7 @@ class _AiChatPanelState extends State<AiChatPanel> {
                                 ),
                                 const SizedBox(width: 8),
                                 IconButton.filled(
-                                  onPressed: _busy || _selectedModel == null ? null : _send,
+                                  onPressed: _busy || _selectedModelId == null ? null : _send,
                                   icon: const Icon(Icons.send, size: 18),
                                   tooltip: context.tr('Send'),
                                 ),
@@ -620,7 +672,7 @@ class _AiChatPanelState extends State<AiChatPanel> {
         ),
       );
     }
-    final all = _allModels;
+    final all = _allModelIdsCurrent;
     if (all.isEmpty) {
       return Row(
         children: <Widget>[
@@ -639,7 +691,7 @@ class _AiChatPanelState extends State<AiChatPanel> {
         ],
       );
     }
-    final value = all.contains(_selectedModel) ? _selectedModel : all.first;
+    final value = all.contains(_selectedModelId) ? _selectedModelId : all.first;
     return Row(
       children: <Widget>[
         Expanded(
@@ -648,14 +700,14 @@ class _AiChatPanelState extends State<AiChatPanel> {
             isExpanded: true,
             isDense: true,
             items: <DropdownMenuItem<String>>[
-              for (final model in all)
+              for (final id in all)
                 DropdownMenuItem<String>(
-                  value: model,
-                  child: Text(model, overflow: TextOverflow.ellipsis),
+                  value: id,
+                  child: Text(_modelLabel(id), overflow: TextOverflow.ellipsis),
                 ),
             ],
             onChanged: (v) {
-              setState(() => _selectedModel = v);
+              setState(() => _selectedModelId = v);
               if (v != null) widget.controller.writeAiModel(v);
             },
           ),

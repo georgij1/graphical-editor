@@ -999,32 +999,79 @@ class EditorController extends ChangeNotifier {
   Future<void> writeAiModel(String model) =>
       _tokenStore.write(_aiModelKey, model);
 
-  Future<List<String>> readCustomAiModels() async {
+  static String aiModelSelectionId({required String name, String? baseUrl}) {
+    final n = name.trim();
+    final b = (baseUrl ?? '').trim();
+    if (b.isEmpty) return n;
+    return 'url:$n@@$b';
+  }
+
+  static ({String name, String? baseUrl}) parseAiModelSelection(String? id) {
+    final raw = (id ?? '').trim();
+    if (raw.isEmpty) return (name: '', baseUrl: null);
+    if (raw.startsWith('url:')) {
+      final rest = raw.substring(4);
+      final idx = rest.indexOf('@@');
+      if (idx >= 0) {
+        return (name: rest.substring(0, idx), baseUrl: rest.substring(idx + 2));
+      }
+    }
+    return (name: raw, baseUrl: null);
+  }
+
+  Future<List<AiModelConfig>> readCustomAiModels() async {
     final raw = await _tokenStore.read(_aiCustomModelsKey);
-    if (raw == null || raw.isEmpty) return const <String>[];
+    if (raw == null || raw.isEmpty) return const <AiModelConfig>[];
     try {
       final decoded = jsonDecode(raw);
-      if (decoded is! List) return const <String>[];
-      final out = <String>[];
+      if (decoded is! List) return const <AiModelConfig>[];
+      final out = <AiModelConfig>[];
       final seen = <String>{};
       for (final item in decoded) {
-        final s = item?.toString().trim() ?? '';
-        if (s.isEmpty || !seen.add(s)) continue;
-        out.add(s);
+        String name = '';
+        String? baseUrl;
+        if (item is String) {
+          name = item.trim();
+        } else if (item is Map) {
+          final m = Map<String, dynamic>.from(item);
+          name = (m['name'] ?? '').toString().trim();
+          final b = (m['baseUrl'] ?? m['url'] ?? '').toString().trim();
+          if (b.isNotEmpty) baseUrl = b;
+        }
+        if (name.isEmpty) continue;
+        final id = aiModelSelectionId(name: name, baseUrl: baseUrl);
+        if (!seen.add(id)) continue;
+        out.add(AiModelConfig(name: name, baseUrl: baseUrl));
       }
       return out;
     } catch (_) {
-      return const <String>[];
+      return const <AiModelConfig>[];
     }
   }
 
-  Future<void> addCustomAiModel(String model) async {
-    final name = model.trim();
-    if (name.isEmpty) return;
+  Future<void> addCustomAiModel({required String name, String? baseUrl}) async {
+    final n = name.trim();
+    final b = (baseUrl ?? '').trim();
+    if (n.isEmpty) return;
     final current = await readCustomAiModels();
-    if (current.contains(name)) return;
-    final next = <String>[name, ...current];
-    await _tokenStore.write(_aiCustomModelsKey, jsonEncode(next));
+    final id = aiModelSelectionId(name: n, baseUrl: b.isEmpty ? null : b);
+    if (current.any((m) => aiModelSelectionId(name: m.name, baseUrl: m.baseUrl) == id)) {
+      return;
+    }
+    final next = <AiModelConfig>[
+      AiModelConfig(name: n, baseUrl: b.isEmpty ? null : b),
+      ...current,
+    ];
+    await _tokenStore.write(
+      _aiCustomModelsKey,
+      jsonEncode(<Map<String, dynamic>>[
+        for (final m in next)
+          <String, dynamic>{
+            'name': m.name,
+            if ((m.baseUrl ?? '').trim().isNotEmpty) 'baseUrl': m.baseUrl!.trim(),
+          },
+      ]),
+    );
   }
 
   /// Persists the open document into the workspace: no file is downloaded.
@@ -3336,4 +3383,11 @@ class AiChatSession {
   final String id;
   String title;
   final List<AiChatMessage> messages;
+}
+
+
+class AiModelConfig {
+  const AiModelConfig({required this.name, this.baseUrl});
+  final String name;
+  final String? baseUrl;
 }

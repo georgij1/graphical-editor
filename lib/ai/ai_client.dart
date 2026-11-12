@@ -28,9 +28,16 @@ class AiClient {
   static String _normalize(String value) =>
       value.trim().replaceAll(RegExp(r'/+$'), '');
 
+  String _resolveBaseUrl(String? override) {
+    final v = (override ?? '').trim();
+    if (v.isEmpty) return baseUrl;
+    return _normalize(v);
+  }
+
   /// Names of the models installed on the Ollama server.
-  Future<List<String>> listModels() async {
-    final response = await _get('$baseUrl/api/tags');
+  Future<List<String>> listModels({String? baseUrl}) async {
+    final root = _resolveBaseUrl(baseUrl);
+    final response = await _get('$root/api/tags', root: root);
     final decoded = jsonDecode(response) as Map<String, dynamic>;
     final models = decoded['models'] as List? ?? const [];
     return <String>[
@@ -45,12 +52,14 @@ class AiClient {
     required String model,
     required String prompt,
     String? system,
+    String? baseUrl,
   }) async {
     final buffer = StringBuffer();
     await for (final chunk in generateStream(
       model: model,
       prompt: prompt,
       system: system,
+      baseUrl: baseUrl,
     )) {
       buffer.write(chunk);
     }
@@ -62,8 +71,10 @@ class AiClient {
     required String model,
     required String prompt,
     String? system,
+    String? baseUrl,
   }) async* {
-    final uri = Uri.parse('$baseUrl/api/generate');
+    final root = _resolveBaseUrl(baseUrl);
+    final uri = Uri.parse('$root/api/generate');
     final request = http.Request('POST', uri)
       ..headers['Content-Type'] = 'application/json'
       ..body = jsonEncode(<String, dynamic>{
@@ -76,7 +87,7 @@ class AiClient {
     try {
       response = await _client.send(request);
     } catch (error) {
-      throw AiException('Cannot reach the AI server at $baseUrl.\n$error');
+      throw AiException('Cannot reach the AI server at $root.\n$error');
     }
     if (response.statusCode != 200) {
       final body = await response.stream.bytesToString();
@@ -100,12 +111,12 @@ class AiClient {
     }
   }
 
-  Future<String> _get(String url) async {
+  Future<String> _get(String url, {String? root}) async {
     final http.Response response;
     try {
       response = await _client.get(Uri.parse(url)).timeout(_timeout);
     } catch (error) {
-      throw AiException('Cannot reach the AI server at $baseUrl.\n$error');
+      throw AiException('Cannot reach the AI server at ${root ?? baseUrl}.\n$error');
     }
     if (response.statusCode != 200) {
       throw AiException('AI server returned ${response.statusCode}.');
