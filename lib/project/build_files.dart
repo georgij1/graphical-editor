@@ -111,17 +111,12 @@ class BuildFiles {
         '                    <mainClass>\${main.class}</mainClass>\n'
         '                </configuration>\n'
         '            </plugin>\n'
-
-        '            <plugin>
-'
-        '                <groupId>org.apache.maven.plugins</groupId>
-'
-        '                <artifactId>maven-surefire-plugin</artifactId>
-'
-        '                <version>3.2.5</version>
-'
-        '            </plugin>
-'        '        </plugins>\n'
+        '            <plugin>\n'
+        '                <groupId>org.apache.maven.plugins</groupId>\n'
+        '                <artifactId>maven-surefire-plugin</artifactId>\n'
+        '                <version>3.2.5</version>\n'
+        '            </plugin>\n'
+        '        </plugins>\n'
         '    </build>\n'
         '</project>\n';
   }
