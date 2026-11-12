@@ -591,6 +591,7 @@ class EditorController extends ChangeNotifier {
       _openTabs[_activeTabIndex] = _openSource!;
     }
     _persist();
+    _scheduleSharedPublish();
     notifyListeners();
     return true;
   }
@@ -1596,6 +1597,7 @@ class EditorController extends ChangeNotifier {
   // ------------------------------------------------------------- collaboration
 
   Timer? _collabTimer;
+  Timer? _sharedPublishTimer;
 
   /// Revision of the shared copy that the editor knows about.
   int _collabRevision = 0;
@@ -1701,6 +1703,8 @@ class EditorController extends ChangeNotifier {
   void _stopCollaboration() {
     _collabTimer?.cancel();
     _collabTimer = null;
+    _sharedPublishTimer?.cancel();
+    _sharedPublishTimer = null;
     _collabRevision = 0;
   }
 
@@ -1756,6 +1760,7 @@ class EditorController extends ChangeNotifier {
   void dispose() {
     _presenceTimer?.cancel();
     _collabTimer?.cancel();
+    _sharedPublishTimer?.cancel();
     super.dispose();
   }
 
@@ -1815,6 +1820,20 @@ class EditorController extends ChangeNotifier {
     collaborationNotice =
         'The project has been updated by another participant.';
     notifyListeners();
+  }
+
+  void _scheduleSharedPublish() {
+    final project = _currentProject;
+    if (project == null || !(project.collaborative || project.shared) || !signedIn) {
+      return;
+    }
+    _sharedPublishTimer?.cancel();
+    _sharedPublishTimer = Timer(const Duration(seconds: 2), () async {
+      _sharedPublishTimer = null;
+      final p = _currentProject;
+      if (p == null || !(p.collaborative || p.shared) || !signedIn) return;
+      await publishSharedProject(p);
+    });
   }
 
   /// Uploads the project to the server, so the other participants see the
