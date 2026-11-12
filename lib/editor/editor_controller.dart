@@ -54,6 +54,9 @@ class EditorController extends ChangeNotifier {
         await _loadSaveMode();
       } catch (_) {}
       try {
+        await _loadAiChats();
+      } catch (_) {}
+      try {
         await initAuth();
       } catch (_) {}
       try {
@@ -246,6 +249,7 @@ class EditorController extends ChangeNotifier {
       final name = _aiChatContextPath?.split(RegExp(r'[\\/]')).last ?? 'file';
       session.title = 'Fix: $name';
     }
+    _saveAiChats();
     notifyListeners();
     return session;
   }
@@ -253,6 +257,7 @@ class EditorController extends ChangeNotifier {
   void selectAiChat(String id) {
     if (_activeAiChatId == id) return;
     _activeAiChatId = id;
+    _saveAiChats();
     notifyListeners();
   }
 
@@ -261,6 +266,7 @@ class EditorController extends ChangeNotifier {
     if (_activeAiChatId == id) {
       _activeAiChatId = _aiChats.isNotEmpty ? _aiChats.first.id : null;
     }
+    _saveAiChats();
     notifyListeners();
   }
 
@@ -276,6 +282,7 @@ class EditorController extends ChangeNotifier {
                 : firstLine;
           }
         }
+        _saveAiChats();
         notifyListeners();
         return;
       }
@@ -283,6 +290,90 @@ class EditorController extends ChangeNotifier {
   }
 
   void notifyAiChatsChanged() => notifyListeners();
+
+  void persistAiChats() => _saveAiChats();
+
+  void _saveAiChats() {
+    try {
+      final data = <String, dynamic>{
+        'activeId': _activeAiChatId,
+        'chats': <Map<String, dynamic>>[
+          for (final chat in _aiChats)
+            <String, dynamic>{
+              'id': chat.id,
+              'title': chat.title,
+              'messages': <Map<String, dynamic>>[
+                for (final m in chat.messages)
+                  <String, dynamic>{
+                    'role': m.role == AiChatRole.user ? 'user' : 'assistant',
+                    'content': m.content,
+                    'ts': m.timestamp.millisecondsSinceEpoch,
+                  },
+              ],
+            },
+        ],
+      };
+      _tokenStore.write(_aiChatsKey, jsonEncode(data));
+    } catch (_) {}
+  }
+
+  Future<void> _loadAiChats() async {
+    final raw = await _tokenStore.read(_aiChatsKey);
+    if (raw == null || raw.isEmpty) return;
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is! Map) return;
+      final map = Map<String, dynamic>.from(decoded);
+      final chatsRaw = map['chats'];
+      if (chatsRaw is! List) return;
+      final loaded = <AiChatSession>[];
+      for (final item in chatsRaw) {
+        if (item is! Map) continue;
+        final cm = Map<String, dynamic>.from(item);
+        final id = cm['id']?.toString();
+        if (id == null || id.isEmpty) continue;
+        final title = (cm['title']?.toString().trim().isNotEmpty ?? false)
+            ? cm['title'].toString()
+            : 'New chat';
+        final messages = <AiChatMessage>[];
+        final msgsRaw = cm['messages'];
+        if (msgsRaw is List) {
+          for (final m in msgsRaw) {
+            if (m is! Map) continue;
+            final mm = Map<String, dynamic>.from(m);
+            final roleStr = mm['role']?.toString();
+            final content = mm['content']?.toString() ?? '';
+            final tsVal = mm['ts'];
+            int ts;
+            if (tsVal is int) {
+              ts = tsVal;
+            } else if (tsVal is num) {
+              ts = tsVal.toInt();
+            } else {
+              ts = int.tryParse(tsVal?.toString() ?? '') ??
+                  DateTime.now().millisecondsSinceEpoch;
+            }
+            messages.add(AiChatMessage(
+              role: roleStr == 'assistant' ? AiChatRole.assistant : AiChatRole.user,
+              content: content,
+              timestamp: DateTime.fromMillisecondsSinceEpoch(ts),
+            ));
+          }
+        }
+        loaded.add(AiChatSession(id: id, title: title, messages: messages));
+      }
+      if (loaded.isEmpty) return;
+      _aiChats
+        ..clear()
+        ..addAll(loaded);
+      final active = map['activeId']?.toString();
+      if (active != null && _aiChats.any((c) => c.id == active)) {
+        _activeAiChatId = active;
+      } else {
+        _activeAiChatId = _aiChats.first.id;
+      }
+    } catch (_) {}
+  }
   bool _dirty = false;
   GeneratedFile? _openSource;
   final List<GeneratedFile> _openTabs = <GeneratedFile>[];
@@ -847,6 +938,7 @@ class EditorController extends ChangeNotifier {
 
   static const String _splitKey = 'project_split_v2';
   static const String _rightPanelWidthKey = 'right_panel_width';
+  static const String _aiChatsKey = 'ai_chats_v1';
 
   /// Share of the right column given to the project tree, or null while the
   /// divider has not been dragged and the pane should fit its content.

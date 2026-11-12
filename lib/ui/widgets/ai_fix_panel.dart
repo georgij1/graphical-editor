@@ -174,6 +174,7 @@ class _AiChatPanelState extends State<AiChatPanel> {
       if (!received && assistant.content.trim().isEmpty) {
         assistant.content = '(empty response)';
       }
+      widget.controller.persistAiChats();
       widget.controller.notifyAiChatsChanged();
       setState(() => _busy = false);
       _scrollToBottom();
@@ -186,6 +187,7 @@ class _AiChatPanelState extends State<AiChatPanel> {
       } else {
         _error = e.message;
       }
+      widget.controller.persistAiChats();
       widget.controller.notifyAiChatsChanged();
       setState(() => _busy = false);
     } catch (e) {
@@ -197,6 +199,7 @@ class _AiChatPanelState extends State<AiChatPanel> {
       } else {
         _error = e.toString();
       }
+      widget.controller.persistAiChats();
       widget.controller.notifyAiChatsChanged();
       setState(() => _busy = false);
     }
