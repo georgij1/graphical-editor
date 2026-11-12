@@ -127,6 +127,35 @@ class _AiChatPanelState extends State<AiChatPanel> {
     return parsed.name.isEmpty ? (id ?? '') : parsed.name;
   }
 
+  bool _isCustomModelId(String? id) {
+    if (id == null) return false;
+    for (final m in _customModels) {
+      if (_modelId(name: m.name, baseUrl: m.baseUrl) == id) return true;
+    }
+    return false;
+  }
+
+  Future<void> _removeSelectedCustomModel() async {
+    final id = _selectedModelId;
+    if (!_isCustomModelId(id)) return;
+    final parsed = EditorController.parseAiModelSelection(id);
+    await widget.controller.removeCustomAiModel(name: parsed.name, baseUrl: parsed.baseUrl);
+    final custom = await widget.controller.readCustomAiModels();
+    if (!mounted) return;
+    final allIds = _allModelIds(remote: _remoteModels, custom: custom, savedId: null);
+    String? next;
+    if (allIds.isNotEmpty) {
+      next = allIds.first;
+    }
+    setState(() {
+      _customModels = custom;
+      _selectedModelId = next;
+    });
+    if (next != null) {
+      await widget.controller.writeAiModel(next);
+    }
+  }
+
   Future<void> _addCustomModel() async {
     final nameController = TextEditingController();
     final urlController = TextEditingController();
@@ -718,6 +747,13 @@ class _AiChatPanelState extends State<AiChatPanel> {
           visualDensity: VisualDensity.compact,
           onPressed: _addCustomModel,
         ),
+        if (_isCustomModelId(value))
+          IconButton(
+            tooltip: context.tr('Delete model'),
+            icon: const Icon(Icons.delete_outline, size: 18),
+            visualDensity: VisualDensity.compact,
+            onPressed: _removeSelectedCustomModel,
+          ),
       ],
     );
   }

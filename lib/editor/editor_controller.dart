@@ -1074,6 +1074,25 @@ class EditorController extends ChangeNotifier {
     );
   }
 
+  Future<void> removeCustomAiModel({required String name, String? baseUrl}) async {
+    final id = aiModelSelectionId(name: name, baseUrl: baseUrl);
+    final current = await readCustomAiModels();
+    final next = <AiModelConfig>[
+      for (final m in current)
+        if (aiModelSelectionId(name: m.name, baseUrl: m.baseUrl) != id) m,
+    ];
+    await _tokenStore.write(
+      _aiCustomModelsKey,
+      jsonEncode(<Map<String, dynamic>>[
+        for (final m in next)
+          <String, dynamic>{
+            'name': m.name,
+            if ((m.baseUrl ?? '').trim().isNotEmpty) 'baseUrl': m.baseUrl!.trim(),
+          },
+      ]),
+    );
+  }
+
   /// Persists the open document into the workspace: no file is downloaded.
   ///
   /// Inside a project the FXML is written back to the active scene; a document

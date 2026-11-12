@@ -459,6 +459,7 @@ class AppLocalizations {
     'Reload': 'Перезагрузить',
     'Copy': 'Копировать',
     'Fix with AI': 'Исправить с помощью ИИ',
+    'Server URL (optional)': 'URL сервера (необязательно)',
     'Add model': 'Добавить модель',
     'Model name': 'Название модели',
     'Add': 'Добавить',
