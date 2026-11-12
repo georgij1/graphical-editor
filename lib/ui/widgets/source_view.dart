@@ -7,6 +7,7 @@ import '../../editor/code_validator.dart';
 import '../../editor/editor_controller.dart';
 import 'ai_fix_dialog.dart';
 import '../../l10n/app_localizations.dart';
+import 'highlighting_text_controller.dart';
 
 /// Editable text editor for the file currently selected in the project tree:
 /// the active scene's FXML or a generated Java source. Replaces the canvas
@@ -21,7 +22,8 @@ class CodeView extends StatefulWidget {
 }
 
 class _CodeViewState extends State<CodeView> {
-  late final TextEditingController _text = TextEditingController(
+  late final HighlightingTextEditingController _text =
+      HighlightingTextEditingController(
     text: widget.controller.codeContent,
   );
   final FocusNode _focusNode = FocusNode();
@@ -122,6 +124,21 @@ class _CodeViewState extends State<CodeView> {
     return ValidationResult.valid;
   }
 
+  HighlightLanguage get _highlightLanguage {
+    final path = widget.controller.codePath.toLowerCase();
+    if (_isJava || path.endsWith('.java')) return HighlightLanguage.java;
+    if (_isXml || path.endsWith('.xml') || path.endsWith('.fxml')) {
+      return HighlightLanguage.xml;
+    }
+    if (path.endsWith('.css')) return HighlightLanguage.css;
+    return HighlightLanguage.plain;
+  }
+
+  void _syncHighlighting() {
+    _text.language = _highlightLanguage;
+    _text.dark = Theme.of(context).brightness == Brightness.dark;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -130,6 +147,12 @@ class _CodeViewState extends State<CodeView> {
     widget.controller.addListener(_onControllerChanged);
     _focusNode.addListener(_onFocusChanged);
     widget.controller.aiFixHandler = _fixWithAi;
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _syncHighlighting();
   }
 
   @override
@@ -166,7 +189,10 @@ class _CodeViewState extends State<CodeView> {
       _text.text = widget.controller.codeContent;
       _suppressChange = false;
       _validation = _validate(_text.text);
+      _syncHighlighting();
       setState(() {});
+    } else {
+      _syncHighlighting();
     }
   }
 
