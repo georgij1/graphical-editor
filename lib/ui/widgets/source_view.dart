@@ -27,12 +27,15 @@ class _CodeViewState extends State<CodeView> {
     text: widget.controller.codeContent,
   );
   final FocusNode _focusNode = FocusNode();
+  final ScrollController _editorScrollController = ScrollController();
+  final ScrollController _gutterScrollController = ScrollController();
   late ValidationResult _validation = _validate(_text.text);
   int _lastEpoch = 0;
   OverlayEntry? _overlayEntry;
   List<String> _suggestions = <String>[];
   Timer? _autoApplyTimer;
   bool _suppressChange = false;
+  bool _syncingScroll = false;
 
   static const List<String> _javaSuggestions = <String>[
     'abstract',
@@ -146,6 +149,7 @@ class _CodeViewState extends State<CodeView> {
     _text.addListener(_onChanged);
     widget.controller.addListener(_onControllerChanged);
     _focusNode.addListener(_onFocusChanged);
+    _editorScrollController.addListener(_onEditorScroll);
     widget.controller.aiFixHandler = _fixWithAi;
   }
 
@@ -162,11 +166,14 @@ class _CodeViewState extends State<CodeView> {
     if (identical(widget.controller.aiFixHandler, _fixWithAi)) {
       widget.controller.aiFixHandler = null;
     }
+    _editorScrollController.removeListener(_onEditorScroll);
     widget.controller.removeListener(_onControllerChanged);
     _text.removeListener(_onChanged);
     _focusNode.removeListener(_onFocusChanged);
     _text.dispose();
     _focusNode.dispose();
+    _editorScrollController.dispose();
+    _gutterScrollController.dispose();
     super.dispose();
   }
 
@@ -194,6 +201,19 @@ class _CodeViewState extends State<CodeView> {
     } else {
       _syncHighlighting();
     }
+  }
+
+  void _onEditorScroll() {
+    if (_syncingScroll) return;
+    if (!_gutterScrollController.hasClients) return;
+    _syncingScroll = true;
+    _gutterScrollController.jumpTo(
+      _editorScrollController.offset.clamp(
+        0.0,
+        _gutterScrollController.position.maxScrollExtent,
+      ),
+    );
+    _syncingScroll = false;
   }
 
   void _onChanged() {
@@ -416,6 +436,17 @@ class _CodeViewState extends State<CodeView> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final dark = theme.brightness == Brightness.dark;
+    final lineCount = '\n'.allMatches(_text.text).length + 1;
+    final lineNumbers = List<String>.generate(lineCount, (i) => '${i + 1}').join('\n');
+    final textStyle = TextStyle(
+      fontFamily: 'monospace',
+      fontSize: 12.5,
+      height: 1.45,
+      color: dark ? const Color(0xFFE6E6E6) : const Color(0xFF1F1F1F),
+    );
+    final gutterStyle = textStyle.copyWith(
+      color: dark ? const Color(0xFF858585) : const Color(0xFF8A8A8A),
+    );
     return CallbackShortcuts(
       bindings: <ShortcutActivator, VoidCallback>{
         const SingleActivator(LogicalKeyboardKey.keyS, control: true): _apply,
@@ -428,24 +459,43 @@ class _CodeViewState extends State<CodeView> {
           Expanded(
             child: Container(
               color: dark ? const Color(0xFF1E1E1E) : const Color(0xFFFBFBFB),
-              child: TextField(
-                controller: _text,
-                focusNode: _focusNode,
-                maxLines: null,
-                expands: true,
-                textAlignVertical: TextAlignVertical.top,
-                style: TextStyle(
-                  fontFamily: 'monospace',
-                  fontSize: 12.5,
-                  height: 1.45,
-                  color: dark
-                      ? const Color(0xFFE6E6E6)
-                      : const Color(0xFF1F1F1F),
-                ),
-                decoration: const InputDecoration(
-                  border: InputBorder.none,
-                  contentPadding: EdgeInsets.all(16),
-                ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: <Widget>[
+                  Container(
+                    width: 52,
+                    color: dark ? const Color(0xFF252526) : const Color(0xFFF0F0F0),
+                    child: SingleChildScrollView(
+                      controller: _gutterScrollController,
+                      physics: const NeverScrollableScrollPhysics(),
+                      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
+                      child: Text(
+                        lineNumbers,
+                        textAlign: TextAlign.right,
+                        style: gutterStyle,
+                      ),
+                    ),
+                  ),
+                  Container(
+                    width: 1,
+                    color: dark ? const Color(0xFF3C3C3C) : const Color(0xFFE0E0E0),
+                  ),
+                  Expanded(
+                    child: TextField(
+                      controller: _text,
+                      focusNode: _focusNode,
+                      scrollController: _editorScrollController,
+                      maxLines: null,
+                      expands: true,
+                      textAlignVertical: TextAlignVertical.top,
+                      style: textStyle,
+                      decoration: const InputDecoration(
+                        border: InputBorder.none,
+                        contentPadding: EdgeInsets.all(16),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
