@@ -150,6 +150,7 @@ class _CodeViewState extends State<CodeView> {
     widget.controller.addListener(_onControllerChanged);
     _focusNode.addListener(_onFocusChanged);
     _editorScrollController.addListener(_onEditorScroll);
+    _editorScrollController.addListener(_onEditorViewportChanged);
     widget.controller.aiFixHandler = _fixWithAi;
   }
 
@@ -167,6 +168,7 @@ class _CodeViewState extends State<CodeView> {
       widget.controller.aiFixHandler = null;
     }
     _editorScrollController.removeListener(_onEditorScroll);
+    _editorScrollController.removeListener(_onEditorViewportChanged);
     widget.controller.removeListener(_onControllerChanged);
     _text.removeListener(_onChanged);
     _focusNode.removeListener(_onFocusChanged);
@@ -223,6 +225,10 @@ class _CodeViewState extends State<CodeView> {
     });
     _updateSuggestions();
     _scheduleAutoApply();
+  }
+
+  void _onEditorViewportChanged() {
+    if (mounted) setState(() {});
   }
 
   void _scheduleAutoApply() {
@@ -301,6 +307,7 @@ class _CodeViewState extends State<CodeView> {
       _hideSuggestions();
       _flushAutoApply();
     }
+    if (mounted) setState(() {});
   }
 
   void _updateSuggestions() {
@@ -481,18 +488,73 @@ class _CodeViewState extends State<CodeView> {
                     color: dark ? const Color(0xFF3C3C3C) : const Color(0xFFE0E0E0),
                   ),
                   Expanded(
-                    child: TextField(
-                      controller: _text,
-                      focusNode: _focusNode,
-                      scrollController: _editorScrollController,
-                      maxLines: null,
-                      expands: true,
-                      textAlignVertical: TextAlignVertical.top,
-                      style: textStyle,
-                      decoration: const InputDecoration(
-                        border: InputBorder.none,
-                        contentPadding: EdgeInsets.all(16),
-                      ),
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        final selection = _text.selection;
+                        Rect? lineRect;
+                        if (selection.isValid && _focusNode.hasFocus) {
+                          final painter = TextPainter(
+                            text: TextSpan(text: _text.text, style: textStyle),
+                            textDirection: TextDirection.ltr,
+                          );
+                          final maxWidth = (constraints.maxWidth - 32).clamp(0.0, double.infinity);
+                          painter.layout(maxWidth: maxWidth);
+                          final caretOffset = painter.getOffsetForCaret(
+                            TextPosition(offset: selection.baseOffset.clamp(0, _text.text.length)),
+                            Rect.zero,
+                          );
+                          final boxes = painter.getBoxesForSelection(
+                            TextSelection(
+                              baseOffset: selection.baseOffset.clamp(0, _text.text.length),
+                              extentOffset: selection.baseOffset.clamp(0, _text.text.length),
+                            ),
+                          );
+                          final lineHeight = painter.preferredLineHeight;
+                          final top = 16 + caretOffset.dy - _editorScrollController.offset;
+                          lineRect = Rect.fromLTWH(0, top, constraints.maxWidth, lineHeight);
+                          // if selection has boxes, use their top/bottom for better accuracy
+                          if (boxes.isNotEmpty) {
+                            final b = boxes.first;
+                            lineRect = Rect.fromLTWH(
+                              0,
+                              16 + b.top - _editorScrollController.offset,
+                              constraints.maxWidth,
+                              b.bottom - b.top,
+                            );
+                          }
+                        }
+                        return Stack(
+                          children: <Widget>[
+                            if (lineRect != null)
+                              Positioned(
+                                left: 0,
+                                right: 0,
+                                top: lineRect.top,
+                                height: lineRect.height,
+                                child: IgnorePointer(
+                                  child: Container(
+                                    color: dark
+                                        ? const Color(0xFF2A2D2E)
+                                        : const Color(0xFFEAEAF2),
+                                  ),
+                                ),
+                              ),
+                            TextField(
+                              controller: _text,
+                              focusNode: _focusNode,
+                              scrollController: _editorScrollController,
+                              maxLines: null,
+                              expands: true,
+                              textAlignVertical: TextAlignVertical.top,
+                              style: textStyle,
+                              decoration: const InputDecoration(
+                                border: InputBorder.none,
+                                contentPadding: EdgeInsets.all(16),
+                              ),
+                            ),
+                          ],
+                        );
+                      },
                     ),
                   ),
                 ],
