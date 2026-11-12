@@ -1093,6 +1093,62 @@ class EditorController extends ChangeNotifier {
     );
   }
 
+  Future<void> updateCustomAiModel({
+    required String oldName,
+    String? oldBaseUrl,
+    required String newName,
+    String? newBaseUrl,
+  }) async {
+    final oldId = aiModelSelectionId(name: oldName, baseUrl: oldBaseUrl);
+    final nn = newName.trim();
+    final nb = (newBaseUrl ?? '').trim();
+    if (nn.isEmpty) return;
+    final newId = aiModelSelectionId(name: nn, baseUrl: nb.isEmpty ? null : nb);
+    final current = await readCustomAiModels();
+    var replaced = false;
+    final next = <AiModelConfig>[];
+    for (final m in current) {
+      final id = aiModelSelectionId(name: m.name, baseUrl: m.baseUrl);
+      if (id == oldId) {
+        if (!replaced) {
+          next.add(AiModelConfig(name: nn, baseUrl: nb.isEmpty ? null : nb));
+          replaced = true;
+        }
+      } else if (id == newId) {
+        // avoid duplicates; if renaming into existing, drop old and keep existing/new target once
+        if (!replaced) {
+          // drop old occurrence later? we'll skip old when seen and ensure target present
+        }
+        if (!next.any((x) => aiModelSelectionId(name: x.name, baseUrl: x.baseUrl) == newId)) {
+          next.add(AiModelConfig(name: nn, baseUrl: nb.isEmpty ? null : nb));
+        }
+        replaced = true;
+      } else {
+        next.add(m);
+      }
+    }
+    if (!replaced) {
+      next.insert(0, AiModelConfig(name: nn, baseUrl: nb.isEmpty ? null : nb));
+    }
+    // dedupe preserving order
+    final deduped = <AiModelConfig>[];
+    final seen = <String>{};
+    for (final m in next) {
+      final id = aiModelSelectionId(name: m.name, baseUrl: m.baseUrl);
+      if (seen.add(id)) deduped.add(m);
+    }
+    await _tokenStore.write(
+      _aiCustomModelsKey,
+      jsonEncode(<Map<String, dynamic>>[
+        for (final m in deduped)
+          <String, dynamic>{
+            'name': m.name,
+            if ((m.baseUrl ?? '').trim().isNotEmpty) 'baseUrl': m.baseUrl!.trim(),
+          },
+      ]),
+    );
+  }
+
   /// Persists the open document into the workspace: no file is downloaded.
   ///
   /// Inside a project the FXML is written back to the active scene; a document

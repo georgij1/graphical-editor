@@ -156,6 +156,78 @@ class _AiChatPanelState extends State<AiChatPanel> {
     }
   }
 
+  Future<void> _editSelectedCustomModel() async {
+    final id = _selectedModelId;
+    if (!_isCustomModelId(id)) return;
+    final parsed = EditorController.parseAiModelSelection(id);
+    final nameController = TextEditingController(text: parsed.name);
+    final urlController = TextEditingController(text: parsed.baseUrl ?? '');
+    final result = await showDialog<({String name, String url})>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(ctx.tr('Edit model')),
+        content: SizedBox(
+          width: 420,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              TextField(
+                controller: nameController,
+                autofocus: true,
+                decoration: InputDecoration(
+                  labelText: ctx.tr('Model name'),
+                  border: const OutlineInputBorder(),
+                  isDense: true,
+                ),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: urlController,
+                decoration: InputDecoration(
+                  labelText: ctx.tr('Server URL (optional)'),
+                  hintText: 'e.g. http://localhost:11434',
+                  border: const OutlineInputBorder(),
+                  isDense: true,
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text(ctx.tr('Cancel')),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop((
+              name: nameController.text.trim(),
+              url: urlController.text.trim(),
+            )),
+            child: Text(ctx.tr('Save')),
+          ),
+        ],
+      ),
+    );
+    nameController.dispose();
+    urlController.dispose();
+    if (result == null || result.name.trim().isEmpty) return;
+    final newBaseUrl = result.url.trim().isEmpty ? null : result.url.trim();
+    await widget.controller.updateCustomAiModel(
+      oldName: parsed.name,
+      oldBaseUrl: parsed.baseUrl,
+      newName: result.name.trim(),
+      newBaseUrl: newBaseUrl,
+    );
+    final custom = await widget.controller.readCustomAiModels();
+    if (!mounted) return;
+    final newId = _modelId(name: result.name.trim(), baseUrl: newBaseUrl);
+    setState(() {
+      _customModels = custom;
+      _selectedModelId = newId;
+    });
+    await widget.controller.writeAiModel(newId);
+  }
+
   Future<void> _addCustomModel() async {
     final nameController = TextEditingController();
     final urlController = TextEditingController();
@@ -747,6 +819,13 @@ class _AiChatPanelState extends State<AiChatPanel> {
           visualDensity: VisualDensity.compact,
           onPressed: _addCustomModel,
         ),
+        if (_isCustomModelId(value))
+          IconButton(
+            tooltip: context.tr('Edit model'),
+            icon: const Icon(Icons.edit_outlined, size: 18),
+            visualDensity: VisualDensity.compact,
+            onPressed: _editSelectedCustomModel,
+          ),
         if (_isCustomModelId(value))
           IconButton(
             tooltip: context.tr('Delete model'),
