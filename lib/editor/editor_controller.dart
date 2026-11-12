@@ -3206,7 +3206,7 @@ enum AiChatRole { user, assistant }
 class AiChatMessage {
   AiChatMessage({required this.role, required this.content, required this.timestamp});
   final AiChatRole role;
-  final String content;
+  String content;
   final DateTime timestamp;
 }
 

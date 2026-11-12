@@ -140,6 +140,12 @@ class _AiChatPanelState extends State<AiChatPanel> {
       chat.id,
       AiChatMessage(role: AiChatRole.user, content: text, timestamp: DateTime.now()),
     );
+    final assistant = AiChatMessage(
+      role: AiChatRole.assistant,
+      content: '',
+      timestamp: DateTime.now(),
+    );
+    widget.controller.addAiChatMessage(chat.id, assistant);
     _scrollToBottom();
     _timer?.cancel();
     _timer = Timer.periodic(const Duration(seconds: 1), (_) {
@@ -147,42 +153,52 @@ class _AiChatPanelState extends State<AiChatPanel> {
     });
     try {
       final prompt = _buildPrompt(chat, text);
-      final reply = await widget.client.generate(
+      var received = false;
+      await for (final chunk in widget.client.generateStream(
         model: model,
         prompt: prompt,
         system:
             'You are a helpful coding assistant inside a graphical editor. '
             'Answer clearly. When providing corrected or example code, include it in fenced code blocks.',
-      );
+      )) {
+        if (!mounted) return;
+        received = true;
+        assistant.content += chunk;
+        widget.controller.notifyAiChatsChanged();
+        setState(() {});
+        _scrollToBottom();
+      }
       _timer?.cancel();
       _timer = null;
       if (!mounted) return;
-      widget.controller.addAiChatMessage(
-        chat.id,
-        AiChatMessage(
-          role: AiChatRole.assistant,
-          content: reply.trim().isEmpty ? '(empty response)' : reply.trim(),
-          timestamp: DateTime.now(),
-        ),
-      );
+      if (!received && assistant.content.trim().isEmpty) {
+        assistant.content = '(empty response)';
+      }
+      widget.controller.notifyAiChatsChanged();
       setState(() => _busy = false);
       _scrollToBottom();
     } on AiException catch (e) {
       _timer?.cancel();
       _timer = null;
       if (!mounted) return;
-      setState(() {
-        _busy = false;
+      if (assistant.content.trim().isEmpty) {
+        assistant.content = 'Error: ${e.message}';
+      } else {
         _error = e.message;
-      });
+      }
+      widget.controller.notifyAiChatsChanged();
+      setState(() => _busy = false);
     } catch (e) {
       _timer?.cancel();
       _timer = null;
       if (!mounted) return;
-      setState(() {
-        _busy = false;
+      if (assistant.content.trim().isEmpty) {
+        assistant.content = 'Error: $e';
+      } else {
         _error = e.toString();
-      });
+      }
+      widget.controller.notifyAiChatsChanged();
+      setState(() => _busy = false);
     }
   }
 
@@ -311,9 +327,17 @@ class _AiChatPanelState extends State<AiChatPanel> {
                 : ListView.builder(
                     controller: _scroll,
                     padding: const EdgeInsets.all(8),
-                    itemCount: active.messages.length + (_busy ? 1 : 0),
+                    itemCount: active.messages.length +
+                        (_busy &&
+                                (active.messages.isEmpty ||
+                                    active.messages.last.role == AiChatRole.user)
+                            ? 1
+                            : 0),
                     itemBuilder: (context, index) {
-                      if (_busy && index == active.messages.length) {
+                      final showPending = _busy &&
+                          (active.messages.isEmpty ||
+                              active.messages.last.role == AiChatRole.user);
+                      if (showPending && index == active.messages.length) {
                         return Padding(
                           padding: const EdgeInsets.symmetric(vertical: 8),
                           child: Row(

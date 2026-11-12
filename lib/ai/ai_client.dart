@@ -46,40 +46,64 @@ class AiClient {
     required String prompt,
     String? system,
   }) async {
-    final body = jsonEncode(<String, dynamic>{
-      'model': model,
-      'prompt': prompt,
-      if (system != null && system.isNotEmpty) 'system': system,
-      'stream': false,
-    });
-    final response = await _post('$baseUrl/api/generate', body);
-    final decoded = jsonDecode(response) as Map<String, dynamic>;
-    return (decoded['response'] as String?) ?? '';
+    final buffer = StringBuffer();
+    await for (final chunk in generateStream(
+      model: model,
+      prompt: prompt,
+      system: system,
+    )) {
+      buffer.write(chunk);
+    }
+    return buffer.toString();
+  }
+
+  /// Streams generated text chunks from Ollama as they arrive.
+  Stream<String> generateStream({
+    required String model,
+    required String prompt,
+    String? system,
+  }) async* {
+    final uri = Uri.parse('$baseUrl/api/generate');
+    final request = http.Request('POST', uri)
+      ..headers['Content-Type'] = 'application/json'
+      ..body = jsonEncode(<String, dynamic>{
+        'model': model,
+        'prompt': prompt,
+        if (system != null && system.isNotEmpty) 'system': system,
+        'stream': true,
+      });
+    final http.StreamedResponse response;
+    try {
+      response = await _client.send(request);
+    } catch (error) {
+      throw AiException('Cannot reach the AI server at $baseUrl.\n$error');
+    }
+    if (response.statusCode != 200) {
+      final body = await response.stream.bytesToString();
+      throw AiException('AI server returned ${response.statusCode}. ${body.trim()}');
+    }
+    await for (final line
+        in response.stream.transform(utf8.decoder).transform(const LineSplitter())) {
+      if (line.trim().isEmpty) continue;
+      try {
+        final decoded = jsonDecode(line) as Map<String, dynamic>;
+        final chunk = decoded['response'] as String?;
+        if (chunk != null && chunk.isNotEmpty) {
+          yield chunk;
+        }
+        if (decoded['done'] == true) {
+          break;
+        }
+      } catch (_) {
+        // Ignore malformed partial lines.
+      }
+    }
   }
 
   Future<String> _get(String url) async {
     final http.Response response;
     try {
       response = await _client.get(Uri.parse(url)).timeout(_timeout);
-    } catch (error) {
-      throw AiException('Cannot reach the AI server at $baseUrl.\n$error');
-    }
-    if (response.statusCode != 200) {
-      throw AiException('AI server returned ${response.statusCode}.');
-    }
-    return response.body;
-  }
-
-  Future<String> _post(String url, String body) async {
-    final http.Response response;
-    try {
-      response = await _client
-          .post(
-            Uri.parse(url),
-            headers: const {'Content-Type': 'application/json'},
-            body: body,
-          )
-          .timeout(_timeout);
     } catch (error) {
       throw AiException('Cannot reach the AI server at $baseUrl.\n$error');
     }
