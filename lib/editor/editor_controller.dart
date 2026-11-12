@@ -199,7 +199,7 @@ class EditorController extends ChangeNotifier {
         : List<String>.from(contextErrors);
     _aiChatApply = onApply;
     if (_aiChats.isEmpty) {
-      createAiChat(seedFromContext: contextPath != null || (contextSource ?? '').isNotEmpty);
+      createAiChat();
     }
     _aiChatPanelOpen = true;
     notifyListeners();
