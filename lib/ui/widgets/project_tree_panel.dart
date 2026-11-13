@@ -543,13 +543,8 @@ class _ProjectTreePanelState extends State<ProjectTreePanel> {
                 overflow: TextOverflow.ellipsis,
               ),
         onTap: () {
-          if (controller.codeMode) {
-            controller.openScene(scene);
-            controller.editSceneSource();
-          } else {
-            controller.openScene(scene);
-            controller.setCodeMode(false);
-          }
+          controller.openScene(scene);
+          controller.setCodeMode(false);
         },
       );
       return _contextMenu(
