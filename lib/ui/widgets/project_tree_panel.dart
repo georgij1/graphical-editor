@@ -543,8 +543,13 @@ class _ProjectTreePanelState extends State<ProjectTreePanel> {
                 overflow: TextOverflow.ellipsis,
               ),
         onTap: () {
-          controller.openScene(scene);
-          controller.setCodeMode(false);
+          if (controller.codeMode) {
+            controller.openScene(scene);
+            controller.editSceneSource();
+          } else {
+            controller.openScene(scene);
+            controller.setCodeMode(false);
+          }
         },
       );
       return _contextMenu(
@@ -552,6 +557,7 @@ class _ProjectTreePanelState extends State<ProjectTreePanel> {
         tile,
         <PopupMenuEntry<int>>[
           PopupMenuItem<int>(value: 1, child: Text(context.tr('Open in editor'))),
+          PopupMenuItem<int>(value: 4, child: Text(context.tr('Open source'))),
           const PopupMenuDivider(),
           PopupMenuItem<int>(value: 2, child: Text(context.tr('Rename'))),
           PopupMenuItem<int>(value: 3, child: Text(context.tr('Delete'))),
@@ -560,6 +566,9 @@ class _ProjectTreePanelState extends State<ProjectTreePanel> {
           if (value == 1) {
             controller.openScene(scene);
             controller.setCodeMode(false);
+          } else if (value == 4) {
+            controller.openScene(scene);
+            controller.editSceneSource();
           } else if (value == 2) {
             widget.onRenameScene(scene);
           } else if (value == 3) {
