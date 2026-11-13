@@ -782,10 +782,9 @@ class EditorController extends ChangeNotifier {
     _activeTabIndex = index;
     final tab = _openTabs[index];
     if (tab.isFxml) {
-      // If this FXML tab belongs to a project scene, switch to that scene first.
       final project = _currentProject;
+      SceneFile? scene;
       if (project != null) {
-        SceneFile? scene;
         final pkgDir = JavaGenerator.packageDir(project);
         for (final s in project.scenes) {
           final scenePath = 'src/main/resources/$pkgDir/${s.name}.fxml';
@@ -794,7 +793,9 @@ class EditorController extends ChangeNotifier {
             break;
           }
         }
-        if (scene != null && !identical(scene, _activeScene)) {
+      }
+      if (scene != null) {
+        if (!identical(scene, _activeScene)) {
           _flushToScene();
           _undoStack.clear();
           _redoStack.clear();
@@ -805,15 +806,33 @@ class EditorController extends ChangeNotifier {
           _dirty = false;
           _endEditChain();
         }
+        var content = serialize();
+        if (content.trim().isEmpty) {
+          content = scene.fxml;
+        }
+        if (content.trim().isEmpty) {
+          content = tab.content;
+        }
+        final refreshed = GeneratedFile(
+          path: tab.path,
+          content: content,
+          isXml: true,
+          isFxml: true,
+        );
+        _openTabs[index] = refreshed;
+        _openSource = refreshed;
+      } else {
+        // Non-scene FXML file: keep its own content.
+        final content = tab.content.isNotEmpty ? tab.content : _openTabs[index].content;
+        final refreshed = GeneratedFile(
+          path: tab.path,
+          content: content,
+          isXml: true,
+          isFxml: true,
+        );
+        _openTabs[index] = refreshed;
+        _openSource = refreshed;
       }
-      final refreshed = GeneratedFile(
-        path: tab.path,
-        content: serialize(),
-        isXml: true,
-        isFxml: true,
-      );
-      _openTabs[index] = refreshed;
-      _openSource = refreshed;
     } else {
       _openSource = tab;
     }
