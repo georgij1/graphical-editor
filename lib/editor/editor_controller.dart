@@ -2041,7 +2041,10 @@ class EditorController extends ChangeNotifier {
     _fileName = scene.name;
     // Register an FXML tab for this scene so it is visible from the start,
     // even before switching to code mode.
-    final path = codePath;
+    final project = _currentProject;
+    final path = project != null
+        ? 'src/main/resources/${JavaGenerator.packageDir(project)}/${scene.name}.fxml'
+        : '${scene.name}.fxml';
     final content = scene.fxml;
     final file = GeneratedFile(path: path, content: content, isXml: true, isFxml: true);
     final idx = _openTabs.indexWhere((f) => f.path == path);
