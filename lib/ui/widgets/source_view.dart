@@ -148,6 +148,7 @@ class _CodeViewState extends State<CodeView> {
     _text.addListener(_onChanged);
     widget.controller.addListener(_onControllerChanged);
     _focusNode.addListener(_onFocusChanged);
+    _focusNode.onKeyEvent = _handleKeyEvent;
     _editorScrollController.addListener(_onEditorScroll);
     _editorScrollController.addListener(_onEditorViewportChanged);
     widget.controller.aiFixHandler = _fixWithAi;
@@ -202,6 +203,62 @@ class _CodeViewState extends State<CodeView> {
     } else {
       _syncHighlighting();
     }
+  }
+
+  KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
+    if (event is! KeyDownEvent && event is! KeyRepeatEvent) {
+      return KeyEventResult.ignored;
+    }
+    final key = event.logicalKey;
+    if (key == LogicalKeyboardKey.tab) {
+      if (HardwareKeyboard.instance.isShiftPressed) {
+        _unindentSelection();
+      } else {
+        _insertTextAtSelection('    ');
+      }
+      return KeyEventResult.handled;
+    }
+    return KeyEventResult.ignored;
+  }
+
+  void _insertTextAtSelection(String insert) {
+    final value = _text.value;
+    final selection = value.selection;
+    if (!selection.isValid) return;
+    final start = selection.start;
+    final end = selection.end;
+    final newText = value.text.replaceRange(start, end, insert);
+    _text.value = TextEditingValue(
+      text: newText,
+      selection: TextSelection.collapsed(offset: start + insert.length),
+    );
+  }
+
+  void _unindentSelection() {
+    final value = _text.value;
+    final selection = value.selection;
+    if (!selection.isValid || !selection.isCollapsed) return;
+    final offset = selection.baseOffset;
+    final text = value.text;
+    final lineStart = text.lastIndexOf('\n', offset - 1) + 1;
+    if (lineStart < 0 || lineStart >= text.length) return;
+    int remove = 0;
+    if (text.startsWith('    ', lineStart)) {
+      remove = 4;
+    } else if (text.startsWith('\t', lineStart)) {
+      remove = 1;
+    } else if (text.startsWith('  ', lineStart)) {
+      remove = 2;
+    } else if (text.startsWith(' ', lineStart)) {
+      remove = 1;
+    }
+    if (remove == 0) return;
+    final newText = text.replaceRange(lineStart, lineStart + remove, '');
+    final newOffset = (offset - remove).clamp(lineStart, newText.length);
+    _text.value = TextEditingValue(
+      text: newText,
+      selection: TextSelection.collapsed(offset: newOffset),
+    );
   }
 
   void _onEditorScroll() {
