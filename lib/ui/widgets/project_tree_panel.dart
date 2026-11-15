@@ -586,7 +586,7 @@ class _ProjectTreePanelState extends State<ProjectTreePanel> {
     final padding = EdgeInsets.only(left: 6 + depth * 14.0, right: 6);
     final isCss = file.path.toLowerCase().endsWith('.css');
     final attached = isCss && controller.isStylesheetAttachedToActiveScene(file.path);
-    final active = controller.openSource?.path == file.path;
+    final active = controller.codeMode && controller.openSource?.path == file.path;
     final tile = ListTile(
       dense: true,
       visualDensity: VisualDensity.compact,
