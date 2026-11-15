@@ -126,9 +126,9 @@ class CanvasArea extends StatelessWidget {
       );
     }
 
-    // A generated Java source has no visual representation: show the editor
-    // alone.
-    if (controller.codeIsJava) {
+    // Any opened non-FXML source (Java, CSS, config, etc.) has no visual canvas
+    // representation: show the code editor.
+    if (controller.openSource != null && !controller.openSource!.isFxml) {
       return codeView;
     }
 

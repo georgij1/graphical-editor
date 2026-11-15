@@ -614,14 +614,17 @@ class _ProjectTreePanelState extends State<ProjectTreePanel> {
       trailing: attached
           ? Icon(Icons.link, size: 14, color: Theme.of(context).colorScheme.primary)
           : null,
-      onTap: () => controller.showSource(
-        GeneratedFile(
-          path: file.path,
-          content: file.content ?? '',
-          isJava: file.path.endsWith('.java'),
-          isXml: file.path.endsWith('.xml') || file.path.endsWith('.fxml'),
-        ),
-      ),
+      onTap: () {
+        controller.showSource(
+          GeneratedFile(
+            path: file.path,
+            content: file.content ?? '',
+            isJava: file.path.endsWith('.java'),
+            isXml: file.path.endsWith('.xml') || file.path.endsWith('.fxml'),
+          ),
+        );
+        controller.setCodeMode(true);
+      },
     );
     return _contextMenu(
       context,
