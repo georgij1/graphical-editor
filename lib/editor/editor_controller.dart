@@ -808,10 +808,7 @@ class EditorController extends ChangeNotifier {
         }
         var content = serialize();
         if (content.trim().isEmpty) {
-          content = scene.fxml;
-        }
-        if (content.trim().isEmpty) {
-          content = tab.content;
+          content = scene.fxml.trim().isNotEmpty ? scene.fxml : tab.content;
         }
         final refreshed = GeneratedFile(
           path: tab.path,
@@ -822,19 +819,27 @@ class EditorController extends ChangeNotifier {
         _openTabs[index] = refreshed;
         _openSource = refreshed;
       } else {
-        // Non-scene FXML file: keep its own content.
-        final content = tab.content.isNotEmpty ? tab.content : _openTabs[index].content;
         final refreshed = GeneratedFile(
           path: tab.path,
-          content: content,
-          isXml: true,
-          isFxml: true,
+          content: tab.content,
+          isXml: tab.isXml,
+          isFxml: tab.isFxml,
+          isJava: tab.isJava,
         );
         _openTabs[index] = refreshed;
         _openSource = refreshed;
       }
     } else {
-      _openSource = tab;
+      // Use the tab's own stored content; do not derive from current FXML scene.
+      final refreshed = GeneratedFile(
+        path: tab.path,
+        content: tab.content,
+        isJava: tab.isJava,
+        isXml: tab.isXml,
+        isFxml: tab.isFxml,
+      );
+      _openTabs[index] = refreshed;
+      _openSource = refreshed;
     }
     _codeMode = true;
     _codeEpoch++;
