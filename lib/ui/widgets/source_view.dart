@@ -371,10 +371,9 @@ class _CodeViewState extends State<CodeView> {
     _hideSuggestions();
     if (!_focusNode.hasFocus) return;
     // Show suggestions only for Java source editing.
-    if (!widget.controller.codeIsJava && !widget.controller.codeIsJavaSource) {
-      // Still allow for generic code if path ends with .java
-      final path = widget.controller.codePath.toLowerCase();
-      if (!path.endsWith('.java')) return;
+    final path = widget.controller.codePath.toLowerCase();
+    if (!widget.controller.codeIsJavaSource && !path.endsWith('.java')) {
+      return;
     }
     final text = _text.text;
     final sel = _text.selection;
@@ -554,30 +553,42 @@ class _CodeViewState extends State<CodeView> {
                             text: TextSpan(text: _text.text, style: textStyle),
                             textDirection: TextDirection.ltr,
                           );
-                          final maxWidth = (constraints.maxWidth - 32).clamp(0.0, double.infinity);
+                          final maxWidth =
+                              (constraints.maxWidth - 32).clamp(0.0, double.infinity);
                           painter.layout(maxWidth: maxWidth);
+                          final clampedOffset =
+                              selection.baseOffset.clamp(0, _text.text.length);
                           final caretOffset = painter.getOffsetForCaret(
-                            TextPosition(offset: selection.baseOffset.clamp(0, _text.text.length)),
+                            TextPosition(offset: clampedOffset),
                             Rect.zero,
                           );
                           final boxes = painter.getBoxesForSelection(
                             TextSelection(
-                              baseOffset: selection.baseOffset.clamp(0, _text.text.length),
-                              extentOffset: selection.baseOffset.clamp(0, _text.text.length),
+                              baseOffset: clampedOffset,
+                              extentOffset: clampedOffset,
                             ),
                           );
                           final lineHeight = painter.preferredLineHeight;
-                          final top = 16 + caretOffset.dy - _editorScrollController.offset;
-                          lineRect = Rect.fromLTWH(0, top, constraints.maxWidth, lineHeight);
-                          // if selection has boxes, use their top/bottom for better accuracy
+                          final scroll = _editorScrollController.hasClients
+                              ? _editorScrollController.offset
+                              : 0.0;
+                          var top = 16 + caretOffset.dy - scroll;
+                          var height = lineHeight;
                           if (boxes.isNotEmpty) {
                             final b = boxes.first;
-                            lineRect = Rect.fromLTWH(
-                              0,
-                              16 + b.top - _editorScrollController.offset,
-                              constraints.maxWidth,
-                              b.bottom - b.top,
-                            );
+                            top = 16 + b.top - scroll;
+                            height = (b.bottom - b.top).abs();
+                          }
+                          if (!top.isNaN && !height.isNaN && height > 0) {
+                            final bottom = top + height;
+                            if (bottom >= 0 && top <= constraints.maxHeight) {
+                              lineRect = Rect.fromLTWH(
+                                0,
+                                top,
+                                constraints.maxWidth,
+                                height.clamp(0.0, constraints.maxHeight),
+                              );
+                            }
                           }
                         }
                         return Stack(
