@@ -37,7 +37,7 @@ class _CodeViewState extends State<CodeView> {
   Timer? _autoApplyTimer;
   bool _suppressChange = false;
   bool _syncingScroll = false;
-  Rect? _currentLineRect;
+  final ValueNotifier<Rect?> _currentLineRect = ValueNotifier<Rect?>(null);
   double _editorTextWidth = 0;
   bool _lineRectScheduled = false;
 
@@ -201,6 +201,7 @@ class _CodeViewState extends State<CodeView> {
     _focusNode.dispose();
     _editorScrollController.dispose();
     _gutterScrollController.dispose();
+    _currentLineRect.dispose();
     super.dispose();
   }
 
@@ -402,10 +403,8 @@ class _CodeViewState extends State<CodeView> {
       }
     }
 
-    if (_currentLineRect != lineRect) {
-      setState(() {
-        _currentLineRect = lineRect;
-      });
+    if (_currentLineRect.value != lineRect) {
+      _currentLineRect.value = lineRect;
     }
   }
 
@@ -492,13 +491,8 @@ class _CodeViewState extends State<CodeView> {
     if (!_focusNode.hasFocus) {
       _hideSuggestions();
       _flushAutoApply(forLoadedFile: true);
-      if (_currentLineRect != null && mounted) {
-        setState(() {
-          _currentLineRect = null;
-        });
-      } else if (mounted) {
-        setState(() {});
-      }
+      _currentLineRect.value = null;
+      if (mounted) setState(() {});
     } else {
       // Defer highlight repaint so focus/caret placement isn't delayed.
       _scheduleCurrentLineUpdate();
@@ -689,23 +683,29 @@ class _CodeViewState extends State<CodeView> {
                           _editorTextWidth = w;
                           _scheduleCurrentLineUpdate();
                         }
-                        final lineRect = _currentLineRect;
                         return Stack(
                           children: <Widget>[
-                            if (lineRect != null)
-                              Positioned(
-                                left: 0,
-                                right: 0,
-                                top: lineRect.top,
-                                height: lineRect.height,
-                                child: IgnorePointer(
-                                  child: Container(
-                                    color: dark
-                                        ? const Color(0xFF2A2D2E)
-                                        : const Color(0xFFEAEAF2),
+                            ValueListenableBuilder<Rect?>(
+                              valueListenable: _currentLineRect,
+                              builder: (context, lineRect, _) {
+                                if (lineRect == null) {
+                                  return const SizedBox.shrink();
+                                }
+                                return Positioned(
+                                  left: 0,
+                                  right: 0,
+                                  top: lineRect.top,
+                                  height: lineRect.height,
+                                  child: IgnorePointer(
+                                    child: Container(
+                                      color: dark
+                                          ? const Color(0xFF2A2D2E)
+                                          : const Color(0xFFEAEAF2),
+                                    ),
                                   ),
-                                ),
-                              ),
+                                );
+                              },
+                            ),
                             Positioned.fill(
                               child: TextField(
                                 controller: _text,
