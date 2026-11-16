@@ -548,9 +548,56 @@ class _CodeViewState extends State<CodeView> {
                   Expanded(
                     child: LayoutBuilder(
                       builder: (context, constraints) {
-                        // Current-line highlight disabled: it caused a blocking gray
-                        // overlay in some cases on Flutter web (e.g. typing ':' in CSS).
-                        const Rect? lineRect = null;
+                        Rect? lineRect;
+                        final selection = _text.selection;
+                        if (selection.isValid &&
+                            _focusNode.hasFocus &&
+                            _editorScrollController.hasClients) {
+                          try {
+                            final painter = TextPainter(
+                              text: TextSpan(text: _text.text, style: textStyle),
+                              textDirection: TextDirection.ltr,
+                            );
+                            final maxWidth =
+                                (constraints.maxWidth - 32).clamp(0.0, double.infinity);
+                            painter.layout(maxWidth: maxWidth);
+                            final offset =
+                                selection.baseOffset.clamp(0, _text.text.length);
+                            final caret = painter.getOffsetForCaret(
+                              TextPosition(offset: offset),
+                              Rect.zero,
+                            );
+                            final scroll = _editorScrollController.offset;
+                            final lineHeight = painter.preferredLineHeight;
+                            var top = 16 + caret.dy - scroll;
+                            var height = lineHeight;
+                            final boxes = painter.getBoxesForSelection(
+                              TextSelection(baseOffset: offset, extentOffset: offset),
+                            );
+                            if (boxes.isNotEmpty) {
+                              final b = boxes.first;
+                              top = 16 + b.top - scroll;
+                              height = (b.bottom - b.top).abs();
+                            }
+                            if (height.isFinite && !height.isNaN && height > 0) {
+                              height = height.clamp(10.0, 32.0);
+                              if (top.isFinite && !top.isNaN) {
+                                final bottom = top + height;
+                                if (bottom >= -4 &&
+                                    top <= constraints.maxHeight + 4) {
+                                  lineRect = Rect.fromLTWH(
+                                    0,
+                                    top,
+                                    constraints.maxWidth,
+                                    height,
+                                  );
+                                }
+                              }
+                            }
+                          } catch (_) {
+                            lineRect = null;
+                          }
+                        }
                         return Stack(
                           children: <Widget>[
                             if (lineRect != null)
