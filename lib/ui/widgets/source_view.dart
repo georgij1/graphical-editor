@@ -130,10 +130,10 @@ class _CodeViewState extends State<CodeView> {
 
   HighlightLanguage get _highlightLanguage {
     final path = widget.controller.codePath.toLowerCase();
-    if (_isJava || path.endsWith('.java')) return HighlightLanguage.java;
-    if (_isXml || path.endsWith('.xml') || path.endsWith('.fxml')) {
+    if (_isXml) {
       return HighlightLanguage.xml;
     }
+    if (_isJava || path.endsWith('.java')) return HighlightLanguage.java;
     if (path.endsWith('.css')) return HighlightLanguage.css;
     if (path.endsWith('.sh') || path.endsWith('.bash')) {
       return HighlightLanguage.shell;
