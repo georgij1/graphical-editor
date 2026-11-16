@@ -94,12 +94,13 @@ class HighlightingTextEditingController extends TextEditingController {
           multiLine: true,
         );
       case HighlightLanguage.shell:
+        // Keep shell highlighting simple/robust across platforms (incl. Flutter web).
         return RegExp(
           r'(?<comment>#[^\n]*)|'
-          r'(?<string>"(?:\\.|[^"\\])*"|'
-          r"'(?:\\.|[^'\\])*')|"
-          r'(?<variable>\$\{[^}]+\}|\$[A-Za-z_]\w*|\$[0-9@*#?$!\-])|'
-          r'(?<keyword>\b(?:if|then|else|elif|fi|for|in|do|done|while|until|case|esac|function|select|time|coproc|export|local|readonly|declare|typeset|return|exit|break|continue|shift|trap|set|unset|source|alias|unalias|bg|fg|jobs|wait|exec|eval|test)\b)|'
+          r'(?<string>"[^"\n]*"|'
+          r"'[^'\n]*')|"
+          r'(?<variable>\$\{[^}]+\}|\$[A-Za-z_]\w*)|'
+          r'(?<keyword>\b(?:if|then|else|elif|fi|for|in|do|done|while|until|case|esac|function|export|local|readonly|return|exit|break|continue|set|unset|source|cd|echo)\b)|'
           r'(?<number>\b\d+\b)',
           multiLine: true,
         );
