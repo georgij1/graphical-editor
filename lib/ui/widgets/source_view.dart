@@ -618,6 +618,9 @@ class _CodeViewState extends State<CodeView> {
                               expands: true,
                               textAlignVertical: TextAlignVertical.top,
                               style: textStyle,
+                              autocorrect: false,
+                              enableSuggestions: false,
+                              enableIMEPersonalizedLearning: false,
                               decoration: const InputDecoration(
                                 border: InputBorder.none,
                                 contentPadding: EdgeInsets.all(16),
