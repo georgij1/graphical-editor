@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-enum HighlightLanguage { plain, java, xml, css }
+enum HighlightLanguage { plain, java, xml, css, shell }
 
 class HighlightingTextEditingController extends TextEditingController {
   HighlightingTextEditingController({
@@ -91,6 +91,16 @@ class HighlightingTextEditingController extends TextEditingController {
           r'(?<number>\b\d+(?:\.\d+)?(?:px|em|rem|%|vh|vw|s|ms)?\b)',
           multiLine: true,
         );
+      case HighlightLanguage.shell:
+        return RegExp(
+          r'(?<comment>#[^\n]*)|'
+          r'(?<string>"(?:\\.|[^"\\])*"|'
+          r"'(?:\\.|[^'\\])*')|"
+          r'(?<variable>\$\{[^}]+\}|\$[A-Za-z_]\w*|\$[0-9@*#?$!-])|'
+          r'(?<keyword>\b(?:if|then|else|elif|fi|for|in|do|done|while|until|case|esac|function|select|time|coproc|export|local|readonly|declare|typeset|return|exit|break|continue|shift|trap|set|unset|source|alias|unalias|bg|fg|jobs|wait|exec|eval|test)\b)|'
+          r'(?<number>\b\d+\b)',
+          multiLine: true,
+        );
       case HighlightLanguage.plain:
         return RegExp(r'$^');
     }
@@ -121,6 +131,9 @@ class HighlightingTextEditingController extends TextEditingController {
       weight = FontWeight.w600;
     } else if (m.namedGroup('pi') != null) {
       color = isDark ? const Color(0xFFC586C0) : const Color(0xFF800080);
+    } else if (m.namedGroup('variable') != null) {
+      color = isDark ? const Color(0xFF9CDCFE) : const Color(0xFF001080);
+      weight = FontWeight.w600;
     }
     return TextStyle(color: color, fontWeight: weight);
   }

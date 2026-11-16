@@ -135,6 +135,9 @@ class _CodeViewState extends State<CodeView> {
       return HighlightLanguage.xml;
     }
     if (path.endsWith('.css')) return HighlightLanguage.css;
+    if (path.endsWith('.sh') || path.endsWith('.bash')) {
+      return HighlightLanguage.shell;
+    }
     return HighlightLanguage.plain;
   }
 
