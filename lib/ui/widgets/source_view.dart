@@ -546,54 +546,9 @@ class _CodeViewState extends State<CodeView> {
                   Expanded(
                     child: LayoutBuilder(
                       builder: (context, constraints) {
-                        final selection = _text.selection;
-                        Rect? lineRect;
-                        if (selection.isValid && _focusNode.hasFocus) {
-                          final painter = TextPainter(
-                            text: TextSpan(text: _text.text, style: textStyle),
-                            textDirection: TextDirection.ltr,
-                          );
-                          final maxWidth =
-                              (constraints.maxWidth - 32).clamp(0.0, double.infinity);
-                          painter.layout(maxWidth: maxWidth);
-                          final clampedOffset =
-                              selection.baseOffset.clamp(0, _text.text.length);
-                          final caretOffset = painter.getOffsetForCaret(
-                            TextPosition(offset: clampedOffset),
-                            Rect.zero,
-                          );
-                          final boxes = painter.getBoxesForSelection(
-                            TextSelection(
-                              baseOffset: clampedOffset,
-                              extentOffset: clampedOffset,
-                            ),
-                          );
-                          final lineHeight = painter.preferredLineHeight;
-                          final scroll = _editorScrollController.hasClients
-                              ? _editorScrollController.offset
-                              : 0.0;
-                          var top = 16 + caretOffset.dy - scroll;
-                          var height = lineHeight;
-                          if (boxes.isNotEmpty) {
-                            final b = boxes.first;
-                            top = 16 + b.top - scroll;
-                            height = (b.bottom - b.top).abs();
-                          }
-                          if (!top.isNaN && !height.isNaN && height > 0) {
-                            final clampedHeight = height.clamp(0.0, 48.0);
-                            final bottom = top + clampedHeight;
-                            if (clampedHeight >= 8 &&
-                                bottom >= 0 &&
-                                top <= constraints.maxHeight) {
-                              lineRect = Rect.fromLTWH(
-                                0,
-                                top,
-                                constraints.maxWidth,
-                                clampedHeight,
-                              );
-                            }
-                          }
-                        }
+                        // Current-line highlight disabled: it caused a blocking gray
+                        // overlay in some cases on Flutter web (e.g. typing ':' in CSS).
+                        const Rect? lineRect = null;
                         return Stack(
                           children: <Widget>[
                             if (lineRect != null)
