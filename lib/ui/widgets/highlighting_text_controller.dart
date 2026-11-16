@@ -94,8 +94,14 @@ class HighlightingTextEditingController extends TextEditingController {
           multiLine: true,
         );
       case HighlightLanguage.shell:
-        // Debug/simple: highlight whole content to verify shell highlighting applies.
-        return RegExp(r'(?<comment>[\s\S]+)');
+        return RegExp(
+          r'(?<comment>#[^\n]*)|'
+          r'(?<string>"[^"\n]*"|' r"'[^'\n]*')|"
+          r'(?<variable>\$\{[^}\n]+\}|\$[A-Za-z_][A-Za-z0-9_]*|\$[0-9@*#?$!-])|'
+          r'(?<keyword>\b(?:if|then|else|elif|fi|for|in|do|done|while|until|case|esac|function|export|local|readonly|return|exit|break|continue|set|unset|source|cd|echo|test|read|printf|shift|trap|exec|eval)\b)|'
+          r'(?<number>\b\d+\b)',
+          multiLine: true,
+        );
       case HighlightLanguage.plain:
         return RegExp(r'$^');
     }
