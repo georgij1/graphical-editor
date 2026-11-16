@@ -98,7 +98,7 @@ class HighlightingTextEditingController extends TextEditingController {
           r'(?<comment>#[^\n]*)|'
           r'(?<string>"(?:\\.|[^"\\])*"|'
           r"'(?:\\.|[^'\\])*')|"
-          r'(?<variable>\$\{[^}]+\}|\$[A-Za-z_]\w*|\$[0-9@*#?$!-])|'
+          r'(?<variable>\$\{[^}]+\}|\$[A-Za-z_]\w*|\$[0-9@*#?$!\-])|'
           r'(?<keyword>\b(?:if|then|else|elif|fi|for|in|do|done|while|until|case|esac|function|select|time|coproc|export|local|readonly|declare|typeset|return|exit|break|continue|shift|trap|set|unset|source|alias|unalias|bg|fg|jobs|wait|exec|eval|test)\b)|'
           r'(?<number>\b\d+\b)',
           multiLine: true,

@@ -147,8 +147,9 @@ class _CodeViewState extends State<CodeView> {
     final changed = _text.language != lang || _text.dark != dark;
     _text.language = lang;
     _text.dark = dark;
-    if (changed) {
+    if (changed || lang != HighlightLanguage.plain) {
       // HighlightingTextEditingController's custom fields don't notify on their own.
+      // Always refresh for non-plain languages to ensure spans update on file open/switch.
       _text.refresh();
     }
   }
