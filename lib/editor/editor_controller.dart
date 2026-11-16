@@ -855,6 +855,90 @@ class EditorController extends ChangeNotifier {
     return applyJavaSource(source.path, text);
   }
 
+  /// Applies [text] to [path] without changing the currently active/open source.
+  /// Used when flushing edits for a file that is no longer the active one.
+  bool applyCodeToPath(String path, String text) {
+    final source = _openSource;
+    if (source != null && source.path == path) {
+      return applyCode(text);
+    }
+    final project = _currentProject;
+    if (project == null) return false;
+
+    // Update matching open tab content (keep its flags).
+    final tabIndex = _openTabs.indexWhere((f) => f.path == path);
+    GeneratedFile? tabFile;
+    if (tabIndex >= 0) {
+      final old = _openTabs[tabIndex];
+      tabFile = GeneratedFile(
+        path: old.path,
+        content: text,
+        isJava: old.isJava,
+        isXml: old.isXml,
+        isFxml: old.isFxml,
+      );
+      _openTabs[tabIndex] = tabFile;
+    }
+
+    final isFxml = tabFile?.isFxml ?? path.toLowerCase().endsWith('.fxml');
+    if (isFxml) {
+      // If this FXML belongs to a known scene, update that scene's stored FXML.
+      // Only reparse live document if it is the active scene.
+      final pkgDir = JavaGenerator.packageDir(project);
+      for (var i = 0; i < project.scenes.length; i++) {
+        final scene = project.scenes[i];
+        final scenePath = 'src/main/resources/$pkgDir/${scene.name}.fxml';
+        if (scenePath == path) {
+          project.scenes[i] = SceneFile(
+            name: scene.name,
+            fxml: text,
+            controllerClass: scene.controllerClass,
+          );
+          if (identical(scene, _activeScene) || _activeScene?.name == scene.name) {
+            // Active scene: update document state.
+            _activeScene = project.scenes[i];
+            _document = _parser.parse(text);
+            _fileName = project.scenes[i].name;
+            _dirty = false;
+          }
+          _persist();
+          _scheduleSharedPublish();
+          return true;
+        }
+      }
+      // Non-scene FXML file: store as override if applicable.
+      project.sourceOverrides[path] = text;
+      _persist();
+      _scheduleSharedPublish();
+      return true;
+    }
+
+    // Non-FXML: mirror applyJavaSource persistence logic without touching active source.
+    String? fallback;
+    for (final file in JavaGenerator.generate(project, applyOverrides: false)) {
+      if (file.path == path) {
+        fallback = file.content;
+        break;
+      }
+    }
+    if (fallback == null) {
+      for (final file in const BuildFiles().generate(project, BuildTool.maven)) {
+        if (file.path == path) {
+          fallback = file.content;
+          break;
+        }
+      }
+    }
+    if (fallback != null && fallback == text) {
+      project.sourceOverrides.remove(path);
+    } else {
+      project.sourceOverrides[path] = text;
+    }
+    _persist();
+    _scheduleSharedPublish();
+    return true;
+  }
+
   /// Stores a hand-edited Java source on the project. Editing it back to the
   /// generated content removes the override so the file tracks generation.
   bool applyJavaSource(String path, String content) {

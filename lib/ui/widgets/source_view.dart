@@ -30,6 +30,8 @@ class _CodeViewState extends State<CodeView> {
   final ScrollController _gutterScrollController = ScrollController();
   late ValidationResult _validation = _validate(_text.text);
   int _lastEpoch = 0;
+  String? _loadedPath;
+  String _loadedContent = '';
   OverlayEntry? _overlayEntry;
   List<String> _suggestions = <String>[];
   Timer? _autoApplyTimer;
@@ -145,6 +147,8 @@ class _CodeViewState extends State<CodeView> {
   void initState() {
     super.initState();
     _lastEpoch = widget.controller.codeEpoch;
+    _loadedPath = widget.controller.codePath;
+    _loadedContent = widget.controller.codeContent;
     _text.addListener(_onChanged);
     widget.controller.addListener(_onControllerChanged);
     _focusNode.addListener(_onFocusChanged);
@@ -162,7 +166,7 @@ class _CodeViewState extends State<CodeView> {
 
   @override
   void dispose() {
-    _flushAutoApply();
+    _flushAutoApply(forLoadedFile: true);
     _hideSuggestions();
     if (identical(widget.controller.aiFixHandler, _fixWithAi)) {
       widget.controller.aiFixHandler = null;
@@ -179,28 +183,52 @@ class _CodeViewState extends State<CodeView> {
     super.dispose();
   }
 
-  void _flushAutoApply() {
+  void _flushAutoApply({bool forLoadedFile = false}) {
     _autoApplyTimer?.cancel();
     _autoApplyTimer = null;
     if (!widget.controller.isAutoSaveMode) return;
-    if (_text.text == widget.controller.codeContent) return;
     if (!_validation.isValid) return;
-    widget.controller.applyCode(_text.text);
+    final text = _text.text;
+    if (text == _loadedContent) return;
+    final path = _loadedPath;
+    if (forLoadedFile && path != null) {
+      widget.controller.applyCodeToPath(path, text);
+      if (path == widget.controller.codePath) {
+        _loadedContent = widget.controller.codeContent;
+      }
+      return;
+    }
+    if (path != null) {
+      widget.controller.applyCodeToPath(path, text);
+    } else {
+      widget.controller.applyCode(text);
+    }
+    if (path == widget.controller.codePath) {
+      _loadedContent = widget.controller.codeContent;
+    }
   }
 
   void _onControllerChanged() {
     if (!mounted) return;
     final epoch = widget.controller.codeEpoch;
     if (epoch != _lastEpoch) {
-      _flushAutoApply();
+      // Save pending edits for the file that was loaded before switching.
+      _flushAutoApply(forLoadedFile: true);
       _lastEpoch = epoch;
+      _loadedPath = widget.controller.codePath;
+      _loadedContent = widget.controller.codeContent;
       _suppressChange = true;
-      _text.text = widget.controller.codeContent;
+      _text.text = _loadedContent;
       _suppressChange = false;
       _validation = _validate(_text.text);
       _syncHighlighting();
       setState(() {});
     } else {
+      // If controller updated current file content externally, keep baseline in sync.
+      if (widget.controller.codePath == _loadedPath &&
+          _text.text == widget.controller.codeContent) {
+        _loadedContent = widget.controller.codeContent;
+      }
       _syncHighlighting();
     }
   }
@@ -291,15 +319,22 @@ class _CodeViewState extends State<CodeView> {
     _autoApplyTimer?.cancel();
     if (!widget.controller.isAutoSaveMode) return;
     final text = _text.text;
-    final current = widget.controller.codeContent;
-    if (text == current) return;
+    if (text == _loadedContent) return;
     _autoApplyTimer = Timer(const Duration(milliseconds: 700), () {
       if (!mounted) return;
       if (!widget.controller.isAutoSaveMode) return;
       if (_text.text != text) return;
-      if (_text.text == widget.controller.codeContent) return;
+      if (_text.text == _loadedContent) return;
       if (!_validation.isValid) return;
-      widget.controller.applyCode(_text.text);
+      final path = _loadedPath;
+      if (path != null) {
+        widget.controller.applyCodeToPath(path, _text.text);
+      } else {
+        widget.controller.applyCode(_text.text);
+      }
+      if (path == widget.controller.codePath) {
+        _loadedContent = widget.controller.codeContent;
+      }
     });
   }
 
@@ -362,7 +397,7 @@ class _CodeViewState extends State<CodeView> {
   void _onFocusChanged() {
     if (!_focusNode.hasFocus) {
       _hideSuggestions();
-      _flushAutoApply();
+      _flushAutoApply(forLoadedFile: true);
     }
     if (mounted) setState(() {});
   }
