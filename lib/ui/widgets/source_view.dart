@@ -132,7 +132,9 @@ class _CodeViewState extends State<CodeView> {
     if (_isXml || path.endsWith('.xml') || path.endsWith('.fxml')) {
       return HighlightLanguage.xml;
     }
-    if (path.endsWith('.css')) return HighlightLanguage.css;
+    // CSS highlighting disabled temporarily: suspected cause of gray overlay
+    // artifact on Flutter web when typing ':'.
+    if (path.endsWith('.css')) return HighlightLanguage.plain;
     return HighlightLanguage.plain;
   }
 
