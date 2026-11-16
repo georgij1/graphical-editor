@@ -27,21 +27,35 @@ class HighlightingTextEditingController extends TextEditingController {
         withComposing: withComposing,
       );
     }
-    final spans = <TextSpan>[];
-    final pattern = _patternFor(language);
-    int last = 0;
-    for (final match in pattern.allMatches(source)) {
-      if (match.start > last) {
-        spans.add(TextSpan(text: source.substring(last, match.start), style: baseStyle));
+    try {
+      final spans = <TextSpan>[];
+      final pattern = _patternFor(language);
+      int last = 0;
+      for (final match in pattern.allMatches(source)) {
+        if (match.start > last) {
+          spans.add(
+            TextSpan(
+              text: source.substring(last, match.start),
+              style: baseStyle,
+            ),
+          );
+        }
+        final matched = match.group(0)!;
+        spans.add(
+          TextSpan(
+            text: matched,
+            style: baseStyle.merge(_styleForMatch(match, matched)),
+          ),
+        );
+        last = match.end;
       }
-      final matched = match.group(0)!;
-      spans.add(TextSpan(text: matched, style: baseStyle.merge(_styleForMatch(match, matched))));
-      last = match.end;
+      if (last < source.length) {
+        spans.add(TextSpan(text: source.substring(last), style: baseStyle));
+      }
+      return TextSpan(style: baseStyle, children: spans);
+    } catch (_) {
+      return TextSpan(text: source, style: baseStyle);
     }
-    if (last < source.length) {
-      spans.add(TextSpan(text: source.substring(last), style: baseStyle));
-    }
-    return TextSpan(style: baseStyle, children: spans);
   }
 
   RegExp _patternFor(HighlightLanguage lang) {
