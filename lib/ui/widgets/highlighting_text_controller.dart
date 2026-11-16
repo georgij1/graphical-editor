@@ -96,9 +96,9 @@ class HighlightingTextEditingController extends TextEditingController {
       case HighlightLanguage.shell:
         return RegExp(
           r'(?<comment>#[^\n]*)|'
-          r'(?<string>"[^"\n]*"|' r"'[^'\n]*')|"
-          r'(?<variable>\$\{[^}\n]+\}|\$[A-Za-z_][A-Za-z0-9_]*|\$[0-9@*#?$!-])|'
-          r'(?<keyword>\b(?:if|then|else|elif|fi|for|in|do|done|while|until|case|esac|function|export|local|readonly|return|exit|break|continue|set|unset|source|cd|echo|test|read|printf|shift|trap|exec|eval)\b)|'
+          r'(?<string>"[^"\n]*")|'
+          r"(?<variable>\$[A-Za-z_][A-Za-z0-9_]*|\$\{[^}\n]+\})|"
+          r'(?<keyword>\b(?:if|then|else|elif|fi|for|in|do|done|while|case|esac|function|export|local|return|exit|set|unset|cd|echo|source|test)\b)|'
           r'(?<number>\b\d+\b)',
           multiLine: true,
         );
