@@ -37,6 +37,9 @@ class _CodeViewState extends State<CodeView> {
   Timer? _autoApplyTimer;
   bool _suppressChange = false;
   bool _syncingScroll = false;
+  Rect? _currentLineRect;
+  double _editorTextWidth = 0;
+  bool _lineRectScheduled = false;
 
   static const List<String> _javaSuggestions = <String>[
     'abstract',
@@ -160,6 +163,7 @@ class _CodeViewState extends State<CodeView> {
     _loadedPath = widget.controller.codePath;
     _loadedContent = widget.controller.codeContent;
     _text.addListener(_onChanged);
+    _text.addListener(_scheduleCurrentLineUpdate);
     widget.controller.addListener(_onControllerChanged);
     _focusNode.addListener(_onFocusChanged);
     _focusNode.onKeyEvent = _handleKeyEvent;
@@ -167,7 +171,10 @@ class _CodeViewState extends State<CodeView> {
     _editorScrollController.addListener(_onEditorViewportChanged);
     widget.controller.aiFixHandler = _fixWithAi;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _syncHighlighting();
+      if (mounted) {
+        _syncHighlighting();
+        _updateCurrentLineRect();
+      }
     });
   }
 
@@ -188,6 +195,7 @@ class _CodeViewState extends State<CodeView> {
     _editorScrollController.removeListener(_onEditorViewportChanged);
     widget.controller.removeListener(_onControllerChanged);
     _text.removeListener(_onChanged);
+    _text.removeListener(_scheduleCurrentLineUpdate);
     _focusNode.removeListener(_onFocusChanged);
     _text.dispose();
     _focusNode.dispose();
@@ -313,6 +321,7 @@ class _CodeViewState extends State<CodeView> {
       ),
     );
     _syncingScroll = false;
+    _scheduleCurrentLineUpdate();
   }
 
   void _onChanged() {
@@ -325,7 +334,79 @@ class _CodeViewState extends State<CodeView> {
   }
 
   void _onEditorViewportChanged() {
-    if (mounted) setState(() {});
+    _scheduleCurrentLineUpdate();
+  }
+
+  void _scheduleCurrentLineUpdate() {
+    if (_lineRectScheduled || !mounted) return;
+    _lineRectScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _lineRectScheduled = false;
+      if (!mounted) return;
+      _updateCurrentLineRect();
+    });
+  }
+
+  void _updateCurrentLineRect() {
+    if (!mounted) return;
+    final selection = _text.selection;
+    final theme = Theme.of(context);
+    final dark = theme.brightness == Brightness.dark;
+    final textStyle = TextStyle(
+      fontFamily: 'monospace',
+      fontSize: 12.5,
+      height: 1.45,
+      color: dark ? const Color(0xFFE6E6E6) : const Color(0xFF1F1F1F),
+    );
+
+    Rect? lineRect;
+    if (selection.isValid &&
+        _focusNode.hasFocus &&
+        _editorScrollController.hasClients &&
+        _editorTextWidth > 0) {
+      try {
+        final painter = TextPainter(
+          text: TextSpan(text: _text.text, style: textStyle),
+          textDirection: TextDirection.ltr,
+        );
+        final maxWidth = (_editorTextWidth - 32).clamp(0.0, double.infinity);
+        painter.layout(maxWidth: maxWidth);
+        final offset = selection.baseOffset.clamp(0, _text.text.length);
+        final caret = painter.getOffsetForCaret(
+          TextPosition(offset: offset),
+          Rect.zero,
+        );
+        final scroll = _editorScrollController.offset;
+        final lineHeight = painter.preferredLineHeight;
+        var top = 16 + caret.dy - scroll;
+        var height = lineHeight;
+        final boxes = painter.getBoxesForSelection(
+          TextSelection(baseOffset: offset, extentOffset: offset),
+        );
+        if (boxes.isNotEmpty) {
+          final b = boxes.first;
+          top = 16 + b.top - scroll;
+          height = (b.bottom - b.top).abs();
+        }
+        if (height.isFinite && !height.isNaN && height > 0) {
+          height = height.clamp(10.0, 32.0);
+          if (top.isFinite && !top.isNaN) {
+            final bottom = top + height;
+            if (bottom >= -4 && top <= 100000) {
+              lineRect = Rect.fromLTWH(0, top, _editorTextWidth, height);
+            }
+          }
+        }
+      } catch (_) {
+        lineRect = null;
+      }
+    }
+
+    if (_currentLineRect != lineRect) {
+      setState(() {
+        _currentLineRect = lineRect;
+      });
+    }
   }
 
   void _scheduleAutoApply() {
@@ -411,12 +492,16 @@ class _CodeViewState extends State<CodeView> {
     if (!_focusNode.hasFocus) {
       _hideSuggestions();
       _flushAutoApply(forLoadedFile: true);
-      if (mounted) setState(() {});
+      if (_currentLineRect != null && mounted) {
+        setState(() {
+          _currentLineRect = null;
+        });
+      } else if (mounted) {
+        setState(() {});
+      }
     } else {
-      // Defer repaint (e.g. current-line highlight) so focus/caret placement isn't delayed.
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) setState(() {});
-      });
+      // Defer highlight repaint so focus/caret placement isn't delayed.
+      _scheduleCurrentLineUpdate();
     }
   }
 
@@ -599,56 +684,12 @@ class _CodeViewState extends State<CodeView> {
                   Expanded(
                     child: LayoutBuilder(
                       builder: (context, constraints) {
-                        Rect? lineRect;
-                        final selection = _text.selection;
-                        if (selection.isValid &&
-                            _focusNode.hasFocus &&
-                            _editorScrollController.hasClients) {
-                          try {
-                            final painter = TextPainter(
-                              text: TextSpan(text: _text.text, style: textStyle),
-                              textDirection: TextDirection.ltr,
-                            );
-                            final maxWidth =
-                                (constraints.maxWidth - 32).clamp(0.0, double.infinity);
-                            painter.layout(maxWidth: maxWidth);
-                            final offset =
-                                selection.baseOffset.clamp(0, _text.text.length);
-                            final caret = painter.getOffsetForCaret(
-                              TextPosition(offset: offset),
-                              Rect.zero,
-                            );
-                            final scroll = _editorScrollController.offset;
-                            final lineHeight = painter.preferredLineHeight;
-                            var top = 16 + caret.dy - scroll;
-                            var height = lineHeight;
-                            final boxes = painter.getBoxesForSelection(
-                              TextSelection(baseOffset: offset, extentOffset: offset),
-                            );
-                            if (boxes.isNotEmpty) {
-                              final b = boxes.first;
-                              top = 16 + b.top - scroll;
-                              height = (b.bottom - b.top).abs();
-                            }
-                            if (height.isFinite && !height.isNaN && height > 0) {
-                              height = height.clamp(10.0, 32.0);
-                              if (top.isFinite && !top.isNaN) {
-                                final bottom = top + height;
-                                if (bottom >= -4 &&
-                                    top <= constraints.maxHeight + 4) {
-                                  lineRect = Rect.fromLTWH(
-                                    0,
-                                    top,
-                                    constraints.maxWidth,
-                                    height,
-                                  );
-                                }
-                              }
-                            }
-                          } catch (_) {
-                            lineRect = null;
-                          }
+                        final w = constraints.maxWidth;
+                        if ((w - _editorTextWidth).abs() > 0.5) {
+                          _editorTextWidth = w;
+                          _scheduleCurrentLineUpdate();
                         }
+                        final lineRect = _currentLineRect;
                         return Stack(
                           children: <Widget>[
                             if (lineRect != null)
