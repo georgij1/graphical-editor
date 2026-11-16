@@ -11,6 +11,35 @@ class BuildArtifact {
   final Uint8List bytes;
 }
 
+/// A compiler diagnostic returned by the backend check.
+class BuildDiagnostic {
+  const BuildDiagnostic({
+    required this.file,
+    required this.line,
+    required this.column,
+    required this.kind,
+    required this.message,
+  });
+
+  final String file;
+  final int line;
+  final int column;
+  final String kind; // "error" | "warning"
+  final String message;
+
+  bool get isError => kind == 'error';
+
+  factory BuildDiagnostic.fromJson(Map<String, dynamic> json) {
+    return BuildDiagnostic(
+      file: (json['file'] as String?) ?? '',
+      line: (json['line'] as num?)?.toInt() ?? 1,
+      column: (json['column'] as num?)?.toInt() ?? 1,
+      kind: (json['kind'] as String?) ?? 'error',
+      message: (json['message'] as String?) ?? '',
+    );
+  }
+}
+
 class BuildException implements Exception {
   BuildException(this.message);
 
@@ -71,6 +100,36 @@ class BuildClient {
       fileName: _nameOf(response, bundle ? 'bundle.zip' : 'app.jar'),
       bytes: response.bodyBytes,
     );
+  }
+
+  /// Compiles [archive] and returns compiler diagnostics (no artifact).
+  Future<List<BuildDiagnostic>> check(Uint8List archive) async {
+    late http.Response response;
+    try {
+      response = await _http
+          .post(_url('/build/check'), body: archive)
+          .timeout(const Duration(minutes: 3));
+    } catch (error) {
+      throw BuildException('Build service is unreachable: $error');
+    }
+
+    final text = _decode(response.bodyBytes);
+    if (response.statusCode != 200) {
+      final detail = text.trim();
+      throw BuildException(
+        detail.isEmpty ? 'Check failed (HTTP ${response.statusCode})' : detail,
+      );
+    }
+    try {
+      final decoded = jsonDecode(text) as Map<String, dynamic>;
+      final list = (decoded['diagnostics'] as List? ?? const []);
+      return list
+          .whereType<Map<String, dynamic>>()
+          .map(BuildDiagnostic.fromJson)
+          .toList();
+    } catch (e) {
+      throw BuildException('Invalid check response: $e');
+    }
   }
 
   /// True when the service answers its health check.

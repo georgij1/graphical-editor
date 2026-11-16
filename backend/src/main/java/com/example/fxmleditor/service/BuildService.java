@@ -24,6 +24,8 @@ public class BuildService {
     private static final Pattern PACKAGE = Pattern.compile("(?m)^\\s*package\\s+([\\w.]+)\\s*;");
     private static final Pattern APPLICATION_CLASS =
             Pattern.compile("public\\s+class\\s+(\\w+)\\s+extends\\s+Application");
+    private static final Pattern DIAGNOSTIC =
+            Pattern.compile("^(.*?):(\\d+):\\s*(error|warning):\\s*(.*)$");
 
     public BuildService(@Value("${app.javafx-lib:/opt/javafx/lib}") String javafxLib,
                         @Value("${app.java-modules:javafx.controls,javafx.fxml}") String javaModules) {
@@ -34,6 +36,8 @@ public class BuildService {
     public static class BuildException extends Exception {
         public BuildException(String message) { super(message); }
     }
+
+    public record Diagnostic(String file, int line, int column, String kind, String message) {}
 
     public byte[] build(byte[] archive, boolean bundle) throws IOException, BuildException {
         Path work = Files.createTempDirectory("javafx-build-");
@@ -240,5 +244,102 @@ public class BuildService {
     private String trim(String value) {
         String trimmed = value.strip();
         return trimmed.length() > 4000 ? trimmed.substring(0, 4000) + "…" : trimmed;
+    }
+
+    public List<Diagnostic> check(byte[] archive) throws IOException, BuildException {
+        Path work = Files.createTempDirectory("javafx-check-");
+        try {
+            Path extracted = unzip(archive, work);
+            Path root = singleRoot(extracted);
+
+            Path javaDir = root.resolve("src/main/java");
+            if (!Files.isDirectory(javaDir)) {
+                return List.of();
+            }
+            List<Path> sources = new ArrayList<>();
+            try (var stream = Files.walk(javaDir)) {
+                stream.filter(Files::isRegularFile)
+                        .filter(p -> p.toString().endsWith(".java"))
+                        .forEach(sources::add);
+            }
+            if (sources.isEmpty()) {
+                return List.of();
+            }
+
+            Path out = work.resolve("out");
+            Files.createDirectories(out);
+            List<String> javac = new ArrayList<>(List.of(
+                    "javac", "-nowarn", "-encoding", "UTF-8", "--release", "21",
+                    "-proc:none", "-Xmaxerrs", "200", "-Xmaxwarns", "200",
+                    "-cp", javafxLib + "/*",
+                    "-d", out.toString()));
+            for (Path source : sources) {
+                javac.add(source.toString());
+            }
+
+            String output = runCapture(javac, work);
+            return parseDiagnostics(output, root);
+        } finally {
+            deleteRecursively(work);
+        }
+    }
+
+    private String runCapture(List<String> command, Path workDir) throws IOException, BuildException {
+        Process process = new ProcessBuilder(command)
+                .directory(workDir.toFile())
+                .redirectErrorStream(true)
+                .start();
+        String output;
+        try (InputStream in = process.getInputStream()) {
+            output = new String(in.readAllBytes(), StandardCharsets.UTF_8);
+        }
+        try {
+            process.waitFor();
+        } catch (InterruptedException error) {
+            Thread.currentThread().interrupt();
+            throw new BuildException("Check interrupted");
+        }
+        return output;
+    }
+
+    private List<Diagnostic> parseDiagnostics(String output, Path root) {
+        List<Diagnostic> result = new ArrayList<>();
+        String[] lines = output.replace("\r\n", "\n").split("\n");
+        for (int i = 0; i < lines.length; i++) {
+            String line = lines[i];
+            Matcher m = DIAGNOSTIC.matcher(line);
+            if (!m.matches()) continue;
+            String rawFile = m.group(1).trim();
+            int row;
+            try { row = Integer.parseInt(m.group(2)); } catch (NumberFormatException e) { row = 1; }
+            String kind = m.group(3);
+            String message = m.group(4);
+            int col = 1;
+            if (i + 2 < lines.length) {
+                String caretLine = lines[i + 2];
+                int caret = caretLine.indexOf('^');
+                if (caret >= 0) col = caret + 1;
+            }
+            String rel = relativizeToRoot(rawFile, root);
+            result.add(new Diagnostic(rel, row, col, kind, message));
+        }
+        return result;
+    }
+
+    private String relativizeToRoot(String rawFile, Path root) {
+        try {
+            Path p = Paths.get(rawFile);
+            if (p.isAbsolute()) {
+                Path normRoot = root.toAbsolutePath().normalize();
+                Path norm = p.toAbsolutePath().normalize();
+                if (norm.startsWith(normRoot)) {
+                    return normRoot.relativize(norm).toString().replace('\\', '/');
+                }
+            }
+        } catch (Exception ignored) {}
+        String s = rawFile.replace('\\', '/');
+        int idx = s.indexOf("src/main/");
+        if (idx >= 0) return s.substring(idx);
+        return s;
     }
 }

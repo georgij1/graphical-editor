@@ -62,6 +62,23 @@ public class BuildController {
         }
     }
 
+    @PostMapping("/check")
+    @Operation(summary = "Compile project sources and return compiler diagnostics")
+    public ResponseEntity<?> check(@RequestBody byte[] archive) {
+        try {
+            var diagnostics = buildService.check(archive);
+            return ResponseEntity.ok(java.util.Map.of("diagnostics", diagnostics));
+        } catch (BuildException e) {
+            return ResponseEntity.badRequest()
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(java.util.Map.of("error", e.getMessage(), "diagnostics", java.util.List.of()));
+        } catch (Exception e) {
+            return ResponseEntity.status(500)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(java.util.Map.of("error", "Check failed: " + e, "diagnostics", java.util.List.of()));
+        }
+    }
+
     @GetMapping("/health")
     @Operation(summary = "Health check for the build service")
     public ResponseEntity<?> health() {

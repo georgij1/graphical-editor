@@ -35,11 +35,14 @@ class _CodeViewState extends State<CodeView> {
   OverlayEntry? _overlayEntry;
   List<String> _suggestions = <String>[];
   Timer? _autoApplyTimer;
+  Timer? _remoteCheckTimer;
   bool _suppressChange = false;
   bool _syncingScroll = false;
   final ValueNotifier<Rect?> _currentLineRect = ValueNotifier<Rect?>(null);
   double _editorTextWidth = 0;
   bool _lineRectScheduled = false;
+  int _remoteCheckSeq = 0;
+  List<ValidationIssue> _remoteIssues = const <ValidationIssue>[];
 
   static const List<String> _javaSuggestions = <String>[
     'abstract',
@@ -131,6 +134,62 @@ class _CodeViewState extends State<CodeView> {
     return ValidationResult.valid;
   }
 
+  bool get _supportsRemoteCheck =>
+      widget.controller.currentProject != null &&
+      widget.controller.codePath.toLowerCase().endsWith('.java');
+
+  ValidationResult get _effectiveValidation {
+    if (_remoteIssues.isEmpty) return _validation;
+    final merged = <ValidationIssue>[..._validation.issues, ..._remoteIssues];
+    return ValidationResult(merged);
+  }
+
+  void _scheduleRemoteCheck() {
+    _remoteCheckTimer?.cancel();
+    if (!_supportsRemoteCheck) {
+      if (_remoteIssues.isNotEmpty && mounted) {
+        setState(() {
+          _remoteIssues = const <ValidationIssue>[];
+        });
+      } else {
+        _remoteIssues = const <ValidationIssue>[];
+      }
+      return;
+    }
+    final path = widget.controller.codePath;
+    final content = _text.text;
+    _remoteCheckTimer = Timer(const Duration(milliseconds: 900), () {
+      _runRemoteCheck(path: path, content: content);
+    });
+  }
+
+  Future<void> _runRemoteCheck({required String path, required String content}) async {
+    if (!mounted || !_supportsRemoteCheck) return;
+    final seq = ++_remoteCheckSeq;
+    try {
+      final diagnostics = await widget.controller.runBackendCheck(
+        path: path,
+        content: content,
+      );
+      if (!mounted || seq != _remoteCheckSeq) return;
+      if (widget.controller.codePath != path) return;
+      final current = diagnostics
+          .where((d) => d.file == path || d.file.endsWith('/$path') || path.endsWith(d.file))
+          .map((d) => ValidationIssue(
+                d.message,
+                line: d.line,
+                column: d.column,
+                severity: d.isError ? ValidationSeverity.error : ValidationSeverity.warning,
+              ))
+          .toList();
+      setState(() {
+        _remoteIssues = current;
+      });
+    } catch (_) {
+      // Backend unavailable or check failed: keep local validation only.
+    }
+  }
+
   HighlightLanguage get _highlightLanguage {
     final path = widget.controller.codePath.toLowerCase();
     if (path.endsWith('.sh') || path.endsWith('.bash')) {
@@ -174,6 +233,7 @@ class _CodeViewState extends State<CodeView> {
       if (mounted) {
         _syncHighlighting();
         _updateCurrentLineRect();
+        _scheduleRemoteCheck();
       }
     });
   }
@@ -187,6 +247,7 @@ class _CodeViewState extends State<CodeView> {
   @override
   void dispose() {
     _flushAutoApply(forLoadedFile: true);
+    _remoteCheckTimer?.cancel();
     _hideSuggestions();
     if (identical(widget.controller.aiFixHandler, _fixWithAi)) {
       widget.controller.aiFixHandler = null;
@@ -243,8 +304,11 @@ class _CodeViewState extends State<CodeView> {
       _text.text = _loadedContent;
       _suppressChange = false;
       _validation = _validate(_text.text);
+      _remoteIssues = const <ValidationIssue>[];
+      _remoteCheckSeq++;
       _syncHighlighting();
       setState(() {});
+      _scheduleRemoteCheck();
     } else {
       // If controller updated current file content externally, keep baseline in sync.
       if (widget.controller.codePath == _loadedPath &&
@@ -332,6 +396,7 @@ class _CodeViewState extends State<CodeView> {
     });
     _updateSuggestions();
     _scheduleAutoApply();
+    _scheduleRemoteCheck();
   }
 
   void _onEditorViewportChanged() {
@@ -474,13 +539,15 @@ class _CodeViewState extends State<CodeView> {
     controller.openAiFixPanel(
       path: controller.codePath,
       source: _text.text,
-      errors: _validation.issues.map((i) => i.toString()).toList(),
+      errors: _effectiveValidation.issues.map((i) => i.toString()).toList(),
       onApply: (fixed) {
         if (!mounted) return;
         setState(() {
           _text.text = fixed;
           _validation = _validate(fixed);
+          _remoteIssues = const <ValidationIssue>[];
         });
+        _scheduleRemoteCheck();
         controller.closeAiFixPanel();
         _showMessage(context.tr('AI suggestion loaded. Review and Apply.'));
       },
@@ -649,7 +716,7 @@ class _CodeViewState extends State<CodeView> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
-          _ValidationBar(validation: _validation),
+          _ValidationBar(validation: _effectiveValidation),
           Expanded(
             child: Container(
               color: dark ? const Color(0xFF1E1E1E) : const Color(0xFFFBFBFB),

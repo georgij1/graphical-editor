@@ -3158,6 +3158,52 @@ class EditorController extends ChangeNotifier {
     await _persist();
   }
 
+  /// Builds an archive for backend compilation/check, optionally applying an
+  /// in-memory edit [path]->[content] (e.g. the current unsaved buffer).
+  Uint8List buildCheckArchive(Project project, {String? path, String? content}) {
+    final copy = project.copy();
+    if (path != null && content != null) {
+      final pkgDir = JavaGenerator.packageDir(copy);
+      final prefix = 'src/main/resources/$pkgDir/';
+      if (path.startsWith(prefix) && path.endsWith('.fxml')) {
+        final name = path.substring(prefix.length, path.length - 5);
+        final idx = copy.scenes.indexWhere((s) => s.name == name);
+        if (idx >= 0) {
+          final s = copy.scenes[idx];
+          copy.scenes[idx] = SceneFile(
+            name: s.name,
+            fxml: content,
+            controllerClass: s.controllerClass,
+          );
+        } else {
+          copy.sourceOverrides[path] = content;
+        }
+      } else {
+        copy.sourceOverrides[path] = content;
+      }
+    }
+    return _exporter.build(
+      copy,
+      const ExportOptions(
+        format: ExportArchiveFormat.zip,
+        includeJavaSources: true,
+        buildTool: BuildTool.maven,
+      ),
+    );
+  }
+
+  Future<List<BuildDiagnostic>> runBackendCheck({String? path, String? content}) async {
+    final project = _currentProject;
+    if (project == null) return const <BuildDiagnostic>[];
+    try {
+      final archive = buildCheckArchive(project, path: path, content: content);
+      final client = buildClient ?? BuildClient();
+      return await client.check(archive);
+    } catch (_) {
+      return const <BuildDiagnostic>[];
+    }
+  }
+
   /// Packs the project into an archive and saves it. Returns false when the save
   /// was cancelled or failed.
   Future<bool> exportProject(Project project, ExportOptions options) {
