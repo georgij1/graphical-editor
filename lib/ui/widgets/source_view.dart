@@ -167,6 +167,9 @@ class _CodeViewState extends State<CodeView> {
     _editorScrollController.addListener(_onEditorScroll);
     _editorScrollController.addListener(_onEditorViewportChanged);
     widget.controller.aiFixHandler = _fixWithAi;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _syncHighlighting();
+    });
   }
 
   @override
