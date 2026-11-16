@@ -580,13 +580,16 @@ class _CodeViewState extends State<CodeView> {
                             height = (b.bottom - b.top).abs();
                           }
                           if (!top.isNaN && !height.isNaN && height > 0) {
-                            final bottom = top + height;
-                            if (bottom >= 0 && top <= constraints.maxHeight) {
+                            final clampedHeight = height.clamp(0.0, 48.0);
+                            final bottom = top + clampedHeight;
+                            if (clampedHeight >= 8 &&
+                                bottom >= 0 &&
+                                top <= constraints.maxHeight) {
                               lineRect = Rect.fromLTWH(
                                 0,
                                 top,
                                 constraints.maxWidth,
-                                height.clamp(0.0, constraints.maxHeight),
+                                clampedHeight,
                               );
                             }
                           }
