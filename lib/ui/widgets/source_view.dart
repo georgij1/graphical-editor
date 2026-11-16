@@ -142,8 +142,15 @@ class _CodeViewState extends State<CodeView> {
   }
 
   void _syncHighlighting() {
-    _text.language = _highlightLanguage;
-    _text.dark = Theme.of(context).brightness == Brightness.dark;
+    final lang = _highlightLanguage;
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final changed = _text.language != lang || _text.dark != dark;
+    _text.language = lang;
+    _text.dark = dark;
+    if (changed) {
+      // HighlightingTextEditingController's custom fields don't notify on their own.
+      _text.refresh();
+    }
   }
 
   @override

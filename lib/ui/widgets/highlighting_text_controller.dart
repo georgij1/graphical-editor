@@ -12,6 +12,8 @@ class HighlightingTextEditingController extends TextEditingController {
   HighlightLanguage language;
   bool dark;
 
+  void refresh() => notifyListeners();
+
   @override
   TextSpan buildTextSpan({
     required BuildContext context,
