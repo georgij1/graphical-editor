@@ -492,7 +492,6 @@ class _CodeViewState extends State<CodeView> {
       _hideSuggestions();
       _flushAutoApply(forLoadedFile: true);
       _currentLineRect.value = null;
-      if (mounted) setState(() {});
     } else {
       // Defer highlight repaint so focus/caret placement isn't delayed.
       _scheduleCurrentLineUpdate();
@@ -718,6 +717,7 @@ class _CodeViewState extends State<CodeView> {
                                 autocorrect: false,
                                 enableSuggestions: false,
                                 enableIMEPersonalizedLearning: false,
+                                onTap: _scheduleCurrentLineUpdate,
                                 decoration: const InputDecoration(
                                   border: InputBorder.none,
                                   contentPadding: EdgeInsets.all(16),
