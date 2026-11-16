@@ -95,11 +95,11 @@ class HighlightingTextEditingController extends TextEditingController {
         );
       case HighlightLanguage.shell:
         return RegExp(
-          r'(?<comment>#[^\n]*)|'
-          r'(?<string>"[^"\n]*")|'
-          r"(?<variable>\$[A-Za-z_][A-Za-z0-9_]*|\$\{[^}\n]+\})|"
-          r'(?<keyword>\b(?:if|then|else|elif|fi|for|in|do|done|while|case|esac|function|export|local|return|exit|set|unset|cd|echo|source|test)\b)|'
-          r'(?<number>\b\d+\b)',
+          r'(#[^\n]*)|'
+          r'("[^"\n]*")|'
+          r"(\$[A-Za-z_][A-Za-z0-9_]*|\$\{[^}\n]+\})|"
+          r'(\b(?:if|then|else|elif|fi|for|in|do|done|while|case|esac|function|export|local|return|exit|set|unset|cd|echo|source|test)\b)|'
+          r'(\b\d+\b)',
           multiLine: true,
         );
       case HighlightLanguage.plain:
@@ -111,28 +111,54 @@ class HighlightingTextEditingController extends TextEditingController {
     final isDark = dark;
     Color? color;
     FontWeight? weight;
-    if (m.namedGroup('comment') != null) {
+
+    if (language == HighlightLanguage.shell) {
+      if (m.group(1) != null) {
+        color = isDark ? const Color(0xFF6A9955) : const Color(0xFF008000);
+      } else if (m.group(2) != null) {
+        color = isDark ? const Color(0xFFCE9178) : const Color(0xFFA31515);
+      } else if (m.group(3) != null) {
+        color = isDark ? const Color(0xFF9CDCFE) : const Color(0xFF001080);
+        weight = FontWeight.w600;
+      } else if (m.group(4) != null) {
+        color = isDark ? const Color(0xFF569CD6) : const Color(0xFF0000FF);
+        weight = FontWeight.w600;
+      } else if (m.group(5) != null) {
+        color = isDark ? const Color(0xFFB5CEA8) : const Color(0xFF098658);
+      }
+      return TextStyle(color: color, fontWeight: weight);
+    }
+
+    bool has(String name) {
+      try {
+        return m.namedGroup(name) != null;
+      } catch (_) {
+        return false;
+      }
+    }
+
+    if (has('comment')) {
       color = isDark ? const Color(0xFF6A9955) : const Color(0xFF008000);
-    } else if (m.namedGroup('string') != null) {
+    } else if (has('string')) {
       color = isDark ? const Color(0xFFCE9178) : const Color(0xFFA31515);
-    } else if (m.namedGroup('keyword') != null) {
+    } else if (has('keyword')) {
       color = isDark ? const Color(0xFF569CD6) : const Color(0xFF0000FF);
       weight = FontWeight.w600;
-    } else if (m.namedGroup('annotation') != null) {
+    } else if (has('annotation')) {
       color = isDark ? const Color(0xFFDCDCAA) : const Color(0xFF795E26);
-    } else if (m.namedGroup('number') != null) {
+    } else if (has('number')) {
       color = isDark ? const Color(0xFFB5CEA8) : const Color(0xFF098658);
-    } else if (m.namedGroup('tag') != null) {
+    } else if (has('tag')) {
       color = isDark ? const Color(0xFF569CD6) : const Color(0xFF800000);
       weight = FontWeight.w600;
-    } else if (m.namedGroup('attr') != null || m.namedGroup('property') != null) {
+    } else if (has('attr') || has('property')) {
       color = isDark ? const Color(0xFF9CDCFE) : const Color(0xFFFF0000);
-    } else if (m.namedGroup('selector') != null) {
+    } else if (has('selector')) {
       color = isDark ? const Color(0xFFD7BA7D) : const Color(0xFF800000);
       weight = FontWeight.w600;
-    } else if (m.namedGroup('pi') != null) {
+    } else if (has('pi')) {
       color = isDark ? const Color(0xFFC586C0) : const Color(0xFF800080);
-    } else if (m.namedGroup('variable') != null) {
+    } else if (has('variable')) {
       color = isDark ? const Color(0xFF9CDCFE) : const Color(0xFF001080);
       weight = FontWeight.w600;
     }
