@@ -332,7 +332,7 @@ class _EditorPageState extends State<EditorPage> {
                           icon: const Icon(Icons.style_outlined, size: 18),
                           label: Text(context.tr('Attach stylesheet')),
                         ),
-                      if (_controller.codeMode || _controller.openSource != null)
+                      if (_controller.codeMode || _controller.openSource != null) ...<Widget>[
                         TextButton.icon(
                           onPressed: _controller.aiFixHandler == null
                               ? null
@@ -340,6 +340,13 @@ class _EditorPageState extends State<EditorPage> {
                           icon: const Icon(Icons.auto_fix_high, size: 18),
                           label: Text(context.tr('AI chat')),
                         ),
+                        if (_controller.canRestoreOriginalRunScript)
+                          TextButton.icon(
+                            onPressed: _controller.restoreOriginalRunScript,
+                            icon: const Icon(Icons.restore, size: 18),
+                            label: Text(context.tr('Restore original script')),
+                          ),
+                      ],
                       EditorToolbar(
                         controller: _controller,
                         onShowCode: _showCode,

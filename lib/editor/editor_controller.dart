@@ -147,6 +147,46 @@ class EditorController extends ChangeNotifier {
     notifyListeners();
   }
 
+  bool get canRestoreOriginalRunScript {
+    final path = openSource?.path ?? '';
+    return path == 'run.sh' || path.endsWith('/run.sh');
+  }
+
+  void restoreOriginalRunScript() {
+    final source = openSource;
+    if (source == null) return;
+    final path = source.path;
+    if (!(path == 'run.sh' || path.endsWith('/run.sh'))) return;
+    final project = _currentProject;
+    if (project == null) return;
+    const buildFiles = BuildFiles();
+    String original = '#!/usr/bin/env bash\nset -e\ncd "\$(dirname "\$0")"\njava -jar app.jar\n';
+    try {
+      final generated = buildFiles.generate(project, BuildTool.maven);
+      for (final f in generated) {
+        if (f.path == 'run.sh' || f.path.endsWith('/run.sh')) {
+          original = f.content;
+          break;
+        }
+      }
+    } catch (_) {}
+    project.sourceOverrides[path] = original;
+    _openSource = GeneratedFile(
+      path: path,
+      content: original,
+      isJava: source.isJava,
+      isXml: source.isXml,
+      isFxml: source.isFxml,
+    );
+    if (_activeTabIndex >= 0 && _activeTabIndex < _openTabs.length) {
+      _openTabs[_activeTabIndex] = _openSource!;
+    }
+    _codeEpoch++;
+    _persist();
+    _scheduleSharedPublish();
+    notifyListeners();
+  }
+
   // Embedded AI chat panel state (shown left of the project tree).
   bool get aiFixPanelOpen => _aiChatPanelOpen;
   bool get aiChatPanelOpen => _aiChatPanelOpen;
