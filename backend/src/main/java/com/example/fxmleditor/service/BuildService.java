@@ -361,6 +361,22 @@ public class BuildService {
             return result;
         }
         for (Path script : scripts) {
+            String rel = relativizeToRoot(script.toString(), root);
+
+            // Heuristic checks beyond `bash -n` syntax parsing.
+            try {
+                String content = Files.readString(script, StandardCharsets.UTF_8);
+                String firstLine = content.replace("\r\n", "\n").replace('\r', '\n');
+                int nl = firstLine.indexOf('\n');
+                if (nl >= 0) firstLine = firstLine.substring(0, nl);
+                String trimmed = firstLine.stripLeading();
+                if (trimmed.startsWith("!") && !trimmed.startsWith("#!")) {
+                    result.add(new Diagnostic(rel, 1, 1, "error",
+                            "Invalid shebang: expected '#!' at the beginning of the script."));
+                }
+            } catch (Exception ignored) {
+            }
+
             String output;
             try {
                 output = runCapture(List.of("bash", "-n", script.toString()), root);
@@ -369,7 +385,6 @@ public class BuildService {
                 continue;
             }
             if (output == null || output.isBlank()) continue;
-            String rel = relativizeToRoot(script.toString(), root);
             result.addAll(parseShellDiagnostics(output, rel, script.toString()));
         }
         return result;
