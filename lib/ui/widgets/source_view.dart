@@ -43,6 +43,7 @@ class _CodeViewState extends State<CodeView> {
   bool _lineRectScheduled = false;
   int _remoteCheckSeq = 0;
   List<ValidationIssue> _remoteIssues = const <ValidationIssue>[];
+  bool _remoteCheckInProgress = false;
 
   static const List<String> _javaSuggestions = <String>[
     'abstract',
@@ -149,24 +150,42 @@ class _CodeViewState extends State<CodeView> {
   void _scheduleRemoteCheck() {
     _remoteCheckTimer?.cancel();
     if (!_supportsRemoteCheck) {
-      if (_remoteIssues.isNotEmpty && mounted) {
+      if ((_remoteIssues.isNotEmpty || _remoteCheckInProgress) && mounted) {
         setState(() {
           _remoteIssues = const <ValidationIssue>[];
+          _remoteCheckInProgress = false;
         });
       } else {
         _remoteIssues = const <ValidationIssue>[];
+        _remoteCheckInProgress = false;
       }
       return;
     }
     final path = widget.controller.codePath;
     final content = _text.text;
+    if (!_remoteCheckInProgress && mounted) {
+      setState(() {
+        _remoteCheckInProgress = true;
+      });
+    } else {
+      _remoteCheckInProgress = true;
+    }
     _remoteCheckTimer = Timer(const Duration(milliseconds: 900), () {
       _runRemoteCheck(path: path, content: content);
     });
   }
 
   Future<void> _runRemoteCheck({required String path, required String content}) async {
-    if (!mounted || !_supportsRemoteCheck) return;
+    if (!mounted || !_supportsRemoteCheck) {
+      if (mounted && _remoteCheckInProgress) {
+        setState(() {
+          _remoteCheckInProgress = false;
+        });
+      } else {
+        _remoteCheckInProgress = false;
+      }
+      return;
+    }
     final seq = ++_remoteCheckSeq;
     try {
       final diagnostics = await widget.controller.runBackendCheck(
@@ -186,8 +205,13 @@ class _CodeViewState extends State<CodeView> {
           .toList();
       setState(() {
         _remoteIssues = current;
+        _remoteCheckInProgress = false;
       });
     } catch (_) {
+      if (!mounted || seq != _remoteCheckSeq) return;
+      setState(() {
+        _remoteCheckInProgress = false;
+      });
       // Backend unavailable or check failed: keep local validation only.
     }
   }
@@ -250,6 +274,7 @@ class _CodeViewState extends State<CodeView> {
   void dispose() {
     _flushAutoApply(forLoadedFile: true);
     _remoteCheckTimer?.cancel();
+    _remoteCheckInProgress = false;
     _hideSuggestions();
     if (identical(widget.controller.aiFixHandler, _fixWithAi)) {
       widget.controller.aiFixHandler = null;
@@ -307,6 +332,7 @@ class _CodeViewState extends State<CodeView> {
       _suppressChange = false;
       _validation = _validate(_text.text);
       _remoteIssues = const <ValidationIssue>[];
+      _remoteCheckInProgress = false;
       _remoteCheckSeq++;
       _syncHighlighting();
       setState(() {});
@@ -718,7 +744,10 @@ class _CodeViewState extends State<CodeView> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
-          _ValidationBar(validation: _effectiveValidation),
+          _ValidationBar(
+            validation: _effectiveValidation,
+            checking: _remoteCheckInProgress && _supportsRemoteCheck,
+          ),
           Expanded(
             child: Container(
               color: dark ? const Color(0xFF1E1E1E) : const Color(0xFFFBFBFB),
@@ -809,9 +838,10 @@ class _CodeViewState extends State<CodeView> {
 }
 
 class _ValidationBar extends StatelessWidget {
-  const _ValidationBar({required this.validation});
+  const _ValidationBar({required this.validation, this.checking = false});
 
   final ValidationResult validation;
+  final bool checking;
 
   @override
   Widget build(BuildContext context) {
@@ -820,23 +850,57 @@ class _ValidationBar extends StatelessWidget {
 
     // Nothing to complain about: a calm "all clear" row.
     if (issues.isEmpty) {
-      final color = theme.colorScheme.primary;
+      final color = checking ? theme.colorScheme.tertiary : theme.colorScheme.primary;
       return Container(
         width: double.infinity,
         color: color.withValues(alpha: 0.08),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
         child: Row(
           children: <Widget>[
-            Icon(Icons.check_circle_outline, size: 14, color: color),
+            if (checking)
+              SizedBox(
+                width: 14,
+                height: 14,
+                child: CircularProgressIndicator(strokeWidth: 2, color: color),
+              )
+            else
+              Icon(Icons.check_circle_outline, size: 14, color: color),
             const SizedBox(width: 6),
             Text(
-              context.tr('No issues found.'),
+              context.tr(checking ? 'Checking...' : 'No issues found.'),
               style: TextStyle(fontSize: 11.5, color: color),
             ),
           ],
         ),
       );
     }
+
+    // Show checking status alongside existing issues (e.g. while recompiling).
+    final checkingWidget = checking
+        ? Padding(
+            padding: const EdgeInsets.only(bottom: 2),
+            child: Row(
+              children: <Widget>[
+                SizedBox(
+                  width: 12,
+                  height: 12,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: theme.colorScheme.tertiary,
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  context.tr('Checking...'),
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    color: theme.colorScheme.tertiary,
+                  ),
+                ),
+              ],
+            ),
+          )
+        : null;
 
     // Red for errors (they block Apply), amber for warnings only — the same
     // split IntelliJ IDEA makes in its editor.
@@ -850,6 +914,7 @@ class _ValidationBar extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
+          ?checkingWidget,
           Row(
             children: <Widget>[
               Icon(

@@ -479,6 +479,7 @@ class AppLocalizations {
     'AI suggestion loaded. Review and Apply.':
         'Предложение ИИ загружено. Проверьте и нажмите «Применить».',
     'No issues found.': 'Ошибок нет.',
+    'Checking...': 'Проверка...',
     'Select a file in the project tree to start editing.':
         'Выберите файл в дереве проекта, чтобы начать редактирование.',
     'No open files. Select a file in the project tree.':
