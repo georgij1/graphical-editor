@@ -1379,13 +1379,49 @@ class _CompilationHistoryDialogState extends State<_CompilationHistoryDialog> {
       );
     }
 
+    String serverDiagSig(List<FileCheckDiagnostic> diags) =>
+        diags.map((d) => '${d.line}|${d.column}|${d.kind}|${d.message}').join('\n');
+    String localIssuesSig(List<ValidationIssue> issues) => issues
+        .map((i) => '${i.line ?? 1}|${i.column ?? 1}|${i.isError ? 'error' : 'warning'}|${i.message}')
+        .join('\n');
+
     final hasServerHistory = _records.isNotEmpty;
     final hasLocalHistory = _local.isNotEmpty;
-    final usingServer = hasServerHistory;
+
+    // Include very recent local in-session checks that may not be persisted/visible
+    // on the server yet (dialog prefers server history when available).
+    var localHeadCount = 0;
+    if (hasLocalHistory && hasServerHistory) {
+      final newestServerSig = serverDiagSig(_records.first.diagnostics);
+      for (final snap in _local) {
+        final isAfterServer = snap.time.isAfter(_records.first.date);
+        final sameAsServer = localIssuesSig(snap.issues) == newestServerSig;
+        if (isAfterServer && !sameAsServer) {
+          localHeadCount++;
+        } else {
+          break;
+        }
+      }
+    } else if (hasLocalHistory && !hasServerHistory) {
+      localHeadCount = _local.length;
+    }
+
+    List<({int line, int column, String kind, String message})> serverIssues(FileCheckRecord rec) => rec.diagnostics
+        .map((d) => (line: d.line, column: d.column, kind: d.kind, message: d.message))
+        .toList();
+    List<({int line, int column, String kind, String message})> localIssues(_CheckSnapshot snap) => snap.issues
+        .map((issue) => (
+              line: issue.line ?? 1,
+              column: issue.column ?? 1,
+              kind: issue.isError ? 'error' : 'warning',
+              message: issue.render(context.tr),
+            ))
+        .toList();
 
     final filteredRecordIndices = <int>[];
     final filteredLocalIndices = <int>[];
-    if (usingServer) {
+    final filteredLocalHeadIndices = <int>[];
+    if (hasServerHistory) {
       for (int i = 0; i < _records.length; i++) {
         final rec = _records[i];
         final diags = rec.diagnostics;
@@ -1411,6 +1447,31 @@ class _CompilationHistoryDialogState extends State<_CompilationHistoryDialog> {
             ..write(' ');
         }
         if (_matchesQuery(buf.toString())) filteredRecordIndices.add(i);
+      }
+      for (int i = 0; i < localHeadCount; i++) {
+        final snap = _local[i];
+        final hasErrors = snap.issues.any((issue) => issue.isError);
+        if (!_matchesDate(snap.time)) continue;
+        if (!_matchesFilter(isEmpty: snap.issues.isEmpty, hasErrors: hasErrors)) continue;
+        final buf = StringBuffer()
+          ..write(_fmtTime(snap.time))
+          ..write(' ')
+          ..write(snap.time.toLocal().toIso8601String())
+          ..write(' ');
+        for (final issue in snap.issues) {
+          buf
+            ..write(issue.isError ? 'error' : 'warning')
+            ..write(' ')
+            ..write(issue.line ?? 1)
+            ..write(':')
+            ..write(issue.column ?? 1)
+            ..write(' ')
+            ..write(issue.render(context.tr))
+            ..write(' ')
+            ..write(issue.message)
+            ..write(' ');
+        }
+        if (_matchesQuery(buf.toString())) filteredLocalHeadIndices.add(i);
       }
     } else if (hasLocalHistory) {
       for (int i = 0; i < _local.length; i++) {
@@ -1448,8 +1509,158 @@ class _CompilationHistoryDialogState extends State<_CompilationHistoryDialog> {
         );
       }
 
-      if (usingServer) {
-        if (filteredRecordIndices.isEmpty) {
+      Widget serverCard(int i) {
+        return Builder(builder: (context) {
+          final rec = _records[i];
+          final date = rec.date;
+          final diags = rec.diagnostics;
+          final hasErrors = diags.any((d) => d.isError);
+          final statusColor = diags.isEmpty
+              ? Colors.green.shade700
+              : (hasErrors ? theme.colorScheme.error : Colors.amber.shade800);
+          final statusIcon = diags.isEmpty
+              ? Icons.check_circle_outline
+              : (hasErrors ? Icons.error_outline : Icons.warning_amber_outlined);
+          final current = serverIssues(rec);
+          final previous = (i + 1 < _records.length) ? serverIssues(_records[i + 1]) : null;
+          final isLatestOverall = i == 0 && localHeadCount == 0;
+          final content = Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Row(
+                children: <Widget>[
+                  Icon(statusIcon, size: 18, color: statusColor),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      '${context.tr('Check')} ${_fmtTime(date)}'
+                      '${isLatestOverall ? ' (${context.tr('latest')})' : ''}',
+                      style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                  Icon(Icons.chevron_right, size: 18, color: theme.colorScheme.onSurfaceVariant),
+                ],
+              ),
+              const SizedBox(height: 8),
+              if (diags.isEmpty)
+                Text(
+                  context.tr('No issues found.'),
+                  style: TextStyle(color: statusColor),
+                )
+              else
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    for (final d in diags)
+                      issueTile(
+                        isError: d.isError,
+                        line: d.line,
+                        column: d.column,
+                        message: d.message,
+                      ),
+                  ],
+                ),
+            ],
+          );
+          return Card(
+            margin: const EdgeInsets.only(bottom: 10),
+            clipBehavior: Clip.antiAlias,
+            child: InkWell(
+              onTap: () => _showCheckReportDialog(
+                date: date,
+                author: rec.author,
+                issues: current,
+                previousIssues: previous,
+              ),
+              mouseCursor: SystemMouseCursors.click,
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: content,
+              ),
+            ),
+          );
+        });
+      }
+
+      Widget localCard(int i, {required bool fromHead}) {
+        return Builder(builder: (context) {
+          final snap = _local[i];
+          final hasErrors = snap.issues.any((issue) => issue.isError);
+          final statusColor = snap.issues.isEmpty
+              ? Colors.green.shade700
+              : (hasErrors ? theme.colorScheme.error : Colors.amber.shade800);
+          final statusIcon = snap.issues.isEmpty
+              ? Icons.check_circle_outline
+              : (hasErrors ? Icons.error_outline : Icons.warning_amber_outlined);
+          final current = localIssues(snap);
+          List<({int line, int column, String kind, String message})>? previous;
+          if (i + 1 < _local.length) {
+            previous = localIssues(_local[i + 1]);
+          } else if (fromHead && hasServerHistory) {
+            previous = serverIssues(_records.first);
+          } else {
+            previous = null;
+          }
+          final isLatestOverall = fromHead ? i == 0 : (localHeadCount == 0 && i == 0 && !hasServerHistory);
+          final content = Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Row(
+                children: <Widget>[
+                  Icon(statusIcon, size: 18, color: statusColor),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      '${context.tr('Check')} ${_fmtTime(snap.time)}'
+                      '${isLatestOverall ? ' (${context.tr('latest')})' : ''}',
+                      style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                  Icon(Icons.chevron_right, size: 18, color: theme.colorScheme.onSurfaceVariant),
+                ],
+              ),
+              const SizedBox(height: 8),
+              if (snap.issues.isEmpty)
+                Text(
+                  context.tr('No issues found.'),
+                  style: TextStyle(color: statusColor),
+                )
+              else
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: snap.issues
+                      .map((issue) => issueTile(
+                            isError: issue.isError,
+                            line: issue.line ?? 1,
+                            column: issue.column ?? 1,
+                            message: issue.render(context.tr),
+                          ))
+                      .toList(),
+                ),
+            ],
+          );
+          return Card(
+            margin: const EdgeInsets.only(bottom: 10),
+            clipBehavior: Clip.antiAlias,
+            child: InkWell(
+              onTap: () => _showCheckReportDialog(
+                date: snap.time,
+                author: null,
+                issues: current,
+                previousIssues: previous,
+              ),
+              mouseCursor: SystemMouseCursors.click,
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: content,
+              ),
+            ),
+          );
+        });
+      }
+
+      if (hasServerHistory) {
+        if (filteredLocalHeadIndices.isEmpty && filteredRecordIndices.isEmpty) {
           return Padding(
             padding: const EdgeInsets.symmetric(vertical: 8),
             child: Text(context.tr('No checks match search or filters.')),
@@ -1459,83 +1670,8 @@ class _CompilationHistoryDialogState extends State<_CompilationHistoryDialog> {
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
-            for (final i in filteredRecordIndices)
-              Builder(builder: (context) {
-                final rec = _records[i];
-                final date = rec.date;
-                final diags = rec.diagnostics;
-                final hasErrors = diags.any((d) => d.isError);
-                final statusColor = diags.isEmpty
-                    ? Colors.green.shade700
-                    : (hasErrors ? theme.colorScheme.error : Colors.amber.shade800);
-                final statusIcon = diags.isEmpty
-                    ? Icons.check_circle_outline
-                    : (hasErrors ? Icons.error_outline : Icons.warning_amber_outlined);
-                final current = diags
-                    .map((d) => (line: d.line, column: d.column, kind: d.kind, message: d.message))
-                    .toList();
-                final previous = (i + 1 < _records.length)
-                    ? _records[i + 1]
-                        .diagnostics
-                        .map((d) => (line: d.line, column: d.column, kind: d.kind, message: d.message))
-                        .toList()
-                    : null;
-                final content = Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: <Widget>[
-                    Row(
-                      children: <Widget>[
-                        Icon(statusIcon, size: 18, color: statusColor),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            '${context.tr('Check')} ${_fmtTime(date)}'
-                            '${i == 0 ? ' (${context.tr('latest')})' : ''}',
-                            style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
-                          ),
-                        ),
-                        Icon(Icons.chevron_right, size: 18, color: theme.colorScheme.onSurfaceVariant),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    if (diags.isEmpty)
-                      Text(
-                        context.tr('No issues found.'),
-                        style: TextStyle(color: statusColor),
-                      )
-                    else
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: <Widget>[
-                          for (final d in diags)
-                            issueTile(
-                              isError: d.isError,
-                              line: d.line,
-                              column: d.column,
-                              message: d.message,
-                            ),
-                        ],
-                      ),
-                  ],
-                );
-                return Card(
-                  margin: const EdgeInsets.only(bottom: 10),
-                  clipBehavior: Clip.antiAlias,
-                  child: InkWell(
-                    onTap: () => _showCheckReportDialog(
-                      date: date,
-                      author: rec.author,
-                      issues: current,
-                      previousIssues: previous,
-                    ),
-                    mouseCursor: SystemMouseCursors.click,
-                    child: Padding(
-                      padding: const EdgeInsets.all(12),
-                      child: content,
-                    ),
-                  ),
-                );
-              }),
+            for (final i in filteredLocalHeadIndices) localCard(i, fromHead: true),
+            for (final i in filteredRecordIndices) serverCard(i),
           ],
         );
       }
@@ -1551,90 +1687,7 @@ class _CompilationHistoryDialogState extends State<_CompilationHistoryDialog> {
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
-            for (final i in filteredLocalIndices)
-              Builder(builder: (context) {
-                final snap = _local[i];
-                final hasErrors = snap.issues.any((issue) => issue.isError);
-                final statusColor = snap.issues.isEmpty
-                    ? Colors.green.shade700
-                    : (hasErrors ? theme.colorScheme.error : Colors.amber.shade800);
-                final statusIcon = snap.issues.isEmpty
-                    ? Icons.check_circle_outline
-                    : (hasErrors ? Icons.error_outline : Icons.warning_amber_outlined);
-                final current = snap.issues
-                    .map((issue) => (
-                          line: issue.line ?? 1,
-                          column: issue.column ?? 1,
-                          kind: issue.isError ? 'error' : 'warning',
-                          message: issue.render(context.tr),
-                        ))
-                    .toList();
-                final previous = (i + 1 < _local.length)
-                    ? _local[i + 1]
-                        .issues
-                        .map((issue) => (
-                              line: issue.line ?? 1,
-                              column: issue.column ?? 1,
-                              kind: issue.isError ? 'error' : 'warning',
-                              message: issue.render(context.tr),
-                            ))
-                        .toList()
-                    : null;
-                final content = Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: <Widget>[
-                    Row(
-                      children: <Widget>[
-                        Icon(statusIcon, size: 18, color: statusColor),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            '${context.tr('Check')} ${_fmtTime(snap.time)}'
-                            '${i == 0 ? ' (${context.tr('latest')})' : ''}',
-                            style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
-                          ),
-                        ),
-                        Icon(Icons.chevron_right, size: 18, color: theme.colorScheme.onSurfaceVariant),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    if (snap.issues.isEmpty)
-                      Text(
-                        context.tr('No issues found.'),
-                        style: TextStyle(color: statusColor),
-                      )
-                    else
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: snap.issues
-                            .map((issue) => issueTile(
-                                  isError: issue.isError,
-                                  line: issue.line ?? 1,
-                                  column: issue.column ?? 1,
-                                  message: issue.render(context.tr),
-                                ))
-                            .toList(),
-                      ),
-                  ],
-                );
-                return Card(
-                  margin: const EdgeInsets.only(bottom: 10),
-                  clipBehavior: Clip.antiAlias,
-                  child: InkWell(
-                    onTap: () => _showCheckReportDialog(
-                      date: snap.time,
-                      author: null,
-                      issues: current,
-                      previousIssues: previous,
-                    ),
-                    mouseCursor: SystemMouseCursors.click,
-                    child: Padding(
-                      padding: const EdgeInsets.all(12),
-                      child: content,
-                    ),
-                  ),
-                );
-              }),
+            for (final i in filteredLocalIndices) localCard(i, fromHead: false),
           ],
         );
       }
