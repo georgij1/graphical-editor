@@ -493,6 +493,12 @@ class AppLocalizations {
     'No changes compared to previous check.': 'Нет изменений по сравнению с предыдущей проверкой.',
     'No previous check to compare.': 'Нет предыдущей проверки для сравнения.',
     'Compared to previous check': 'По сравнению с предыдущей проверкой',
+    'Search checks': 'Поиск по проверкам',
+    'All': 'Все',
+    'Successful': 'Успешные',
+    'With errors': 'С ошибками',
+    'With warnings': 'С предупреждениями',
+    'No checks match search or filters.': 'Нет проверок, соответствующих поиску или фильтрам.',
     'Select a file in the project tree to start editing.':
         'Выберите файл в дереве проекта, чтобы начать редактирование.',
     'No open files. Select a file in the project tree.':

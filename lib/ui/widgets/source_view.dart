@@ -900,6 +900,8 @@ class _CheckSnapshot {
   final List<ValidationIssue> issues;
 }
 
+enum _HistoryFilter { all, success, warnings, errors }
+
 class _CompilationHistoryDialog extends StatefulWidget {
   const _CompilationHistoryDialog({
     required this.path,
@@ -922,6 +924,9 @@ class _CompilationHistoryDialogState extends State<_CompilationHistoryDialog> {
   String _recordsHash = '';
   String _localHash = '';
   List<_CheckSnapshot> _local = const <_CheckSnapshot>[];
+  final TextEditingController _searchController = TextEditingController();
+  String _query = '';
+  _HistoryFilter _filter = _HistoryFilter.all;
 
   @override
   void initState() {
@@ -935,6 +940,7 @@ class _CompilationHistoryDialogState extends State<_CompilationHistoryDialog> {
   @override
   void dispose() {
     _timer?.cancel();
+    _searchController.dispose();
     super.dispose();
   }
 
@@ -1296,14 +1302,34 @@ class _CompilationHistoryDialogState extends State<_CompilationHistoryDialog> {
     );
   }
 
+  bool _matchesFilter({required bool isEmpty, required bool hasErrors}) {
+    switch (_filter) {
+      case _HistoryFilter.all:
+        return true;
+      case _HistoryFilter.success:
+        return isEmpty;
+      case _HistoryFilter.warnings:
+        return !isEmpty && !hasErrors;
+      case _HistoryFilter.errors:
+        return hasErrors;
+    }
+  }
+
+  bool _matchesQuery(String haystack) {
+    final q = _query.trim().toLowerCase();
+    if (q.isEmpty) return true;
+    return haystack.toLowerCase().contains(q);
+  }
+
+  String _fmtTime(DateTime t) {
+    String two(int v) => v.toString().padLeft(2, '0');
+    final local = t.toLocal();
+    return '${two(local.hour)}:${two(local.minute)}:${two(local.second)}';
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    String two(int v) => v.toString().padLeft(2, '0');
-    String fmtTime(DateTime t) {
-      final local = t.toLocal();
-      return '${two(local.hour)}:${two(local.minute)}:${two(local.second)}';
-    }
 
     Widget issueTile({required bool isError, required int line, required int column, required String message}) {
       final color = isError ? theme.colorScheme.error : Colors.amber.shade800;
@@ -1329,226 +1355,366 @@ class _CompilationHistoryDialogState extends State<_CompilationHistoryDialog> {
       );
     }
 
-    final children = <Widget>[
-      Align(
-        alignment: Alignment.centerLeft,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-          decoration: BoxDecoration(
-            color: theme.colorScheme.surfaceContainerHighest,
-            borderRadius: BorderRadius.circular(999),
-            border: Border.all(color: theme.colorScheme.outlineVariant),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: <Widget>[
-              Icon(
-                Icons.insert_drive_file_outlined,
-                size: 14,
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-              const SizedBox(width: 6),
-              Flexible(
-                child: Text(
-                  widget.path,
-                  style: theme.textTheme.labelMedium?.copyWith(
-                    color: theme.colorScheme.onSurface,
-                    fontFamily: 'monospace',
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-      const SizedBox(height: 12),
-      if (_loading)
-        const Padding(
-          padding: EdgeInsets.symmetric(vertical: 16),
+    final hasServerHistory = _records.isNotEmpty;
+    final hasLocalHistory = _local.isNotEmpty;
+    final usingServer = hasServerHistory;
+
+    final filteredRecordIndices = <int>[];
+    final filteredLocalIndices = <int>[];
+    if (usingServer) {
+      for (int i = 0; i < _records.length; i++) {
+        final rec = _records[i];
+        final diags = rec.diagnostics;
+        final hasErrors = diags.any((d) => d.isError);
+        if (!_matchesFilter(isEmpty: diags.isEmpty, hasErrors: hasErrors)) continue;
+        final buf = StringBuffer()
+          ..write(_fmtTime(rec.date))
+          ..write(' ')
+          ..write(rec.date.toLocal().toIso8601String())
+          ..write(' ')
+          ..write(rec.author)
+          ..write(' ');
+        for (final d in diags) {
+          buf
+            ..write(d.kind)
+            ..write(' ')
+            ..write(d.line)
+            ..write(':')
+            ..write(d.column)
+            ..write(' ')
+            ..write(d.message)
+            ..write(' ');
+        }
+        if (_matchesQuery(buf.toString())) filteredRecordIndices.add(i);
+      }
+    } else if (hasLocalHistory) {
+      for (int i = 0; i < _local.length; i++) {
+        final snap = _local[i];
+        final hasErrors = snap.issues.any((issue) => issue.isError);
+        if (!_matchesFilter(isEmpty: snap.issues.isEmpty, hasErrors: hasErrors)) continue;
+        final buf = StringBuffer()
+          ..write(_fmtTime(snap.time))
+          ..write(' ')
+          ..write(snap.time.toLocal().toIso8601String())
+          ..write(' ');
+        for (final issue in snap.issues) {
+          buf
+            ..write(issue.isError ? 'error' : 'warning')
+            ..write(' ')
+            ..write(issue.line ?? 1)
+            ..write(':')
+            ..write(issue.column ?? 1)
+            ..write(' ')
+            ..write(issue.render(context.tr))
+            ..write(' ')
+            ..write(issue.message)
+            ..write(' ');
+        }
+        if (_matchesQuery(buf.toString())) filteredLocalIndices.add(i);
+      }
+    }
+
+    Widget buildList() {
+      if (_loading) {
+        return const Padding(
+          padding: EdgeInsets.symmetric(vertical: 24),
           child: Center(child: CircularProgressIndicator()),
-        )
-      else if (_records.isNotEmpty) ...<Widget>[
-        for (int i = 0; i < _records.length; i++) ...<Widget>[
-          Builder(builder: (context) {
-            final rec = _records[i];
-            final date = rec.date;
-            final diags = rec.diagnostics;
-            final hasErrors = diags.any((d) => d.isError);
-            final statusColor = diags.isEmpty
-                ? Colors.green.shade700
-                : (hasErrors ? theme.colorScheme.error : Colors.amber.shade800);
-            final statusIcon = diags.isEmpty
-                ? Icons.check_circle_outline
-                : (hasErrors ? Icons.error_outline : Icons.warning_amber_outlined);
-            final current = diags
-                .map((d) => (line: d.line, column: d.column, kind: d.kind, message: d.message))
-                .toList();
-            final previous = (i + 1 < _records.length)
-                ? _records[i + 1]
-                    .diagnostics
+        );
+      }
+
+      if (usingServer) {
+        if (filteredRecordIndices.isEmpty) {
+          return Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: Text(context.tr('No checks match search or filters.')),
+          );
+        }
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            for (final i in filteredRecordIndices)
+              Builder(builder: (context) {
+                final rec = _records[i];
+                final date = rec.date;
+                final diags = rec.diagnostics;
+                final hasErrors = diags.any((d) => d.isError);
+                final statusColor = diags.isEmpty
+                    ? Colors.green.shade700
+                    : (hasErrors ? theme.colorScheme.error : Colors.amber.shade800);
+                final statusIcon = diags.isEmpty
+                    ? Icons.check_circle_outline
+                    : (hasErrors ? Icons.error_outline : Icons.warning_amber_outlined);
+                final current = diags
                     .map((d) => (line: d.line, column: d.column, kind: d.kind, message: d.message))
-                    .toList()
-                : null;
-            final content = Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Row(
+                    .toList();
+                final previous = (i + 1 < _records.length)
+                    ? _records[i + 1]
+                        .diagnostics
+                        .map((d) => (line: d.line, column: d.column, kind: d.kind, message: d.message))
+                        .toList()
+                    : null;
+                final content = Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: <Widget>[
-                    Icon(statusIcon, size: 18, color: statusColor),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        '${context.tr('Check')} ${fmtTime(date)}'
-                        '${i == 0 ? ' (${context.tr('latest')})' : ''}',
-                        style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
-                      ),
-                    ),
-                    Icon(Icons.chevron_right, size: 18, color: theme.colorScheme.onSurfaceVariant),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                if (diags.isEmpty)
-                  Text(
-                    context.tr('No issues found.'),
-                    style: TextStyle(color: statusColor),
-                  )
-                else
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: <Widget>[
-                      for (final d in diags)
-                        issueTile(
-                          isError: d.isError,
-                          line: d.line,
-                          column: d.column,
-                          message: d.message,
+                    Row(
+                      children: <Widget>[
+                        Icon(statusIcon, size: 18, color: statusColor),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            '${context.tr('Check')} ${_fmtTime(date)}'
+                            '${i == 0 ? ' (${context.tr('latest')})' : ''}',
+                            style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+                          ),
                         ),
-                    ],
+                        Icon(Icons.chevron_right, size: 18, color: theme.colorScheme.onSurfaceVariant),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    if (diags.isEmpty)
+                      Text(
+                        context.tr('No issues found.'),
+                        style: TextStyle(color: statusColor),
+                      )
+                    else
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: <Widget>[
+                          for (final d in diags)
+                            issueTile(
+                              isError: d.isError,
+                              line: d.line,
+                              column: d.column,
+                              message: d.message,
+                            ),
+                        ],
+                      ),
+                  ],
+                );
+                return Card(
+                  margin: const EdgeInsets.only(bottom: 10),
+                  clipBehavior: Clip.antiAlias,
+                  child: InkWell(
+                    onTap: () => _showCheckReportDialog(
+                      date: date,
+                      author: rec.author,
+                      issues: current,
+                      previousIssues: previous,
+                    ),
+                    mouseCursor: SystemMouseCursors.click,
+                    child: Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: content,
+                    ),
                   ),
-              ],
-            );
-            return Card(
-              margin: const EdgeInsets.only(bottom: 10),
-              clipBehavior: Clip.antiAlias,
-              child: InkWell(
-                onTap: () => _showCheckReportDialog(
-                  date: date,
-                  author: rec.author,
-                  issues: current,
-                  previousIssues: previous,
-                ),
-                mouseCursor: SystemMouseCursors.click,
-                child: Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: content,
-                ),
-              ),
-            );
-          }),
-        ],
-      ] else if (_local.isNotEmpty) ...<Widget>[
-        for (int i = 0; i < _local.length; i++) ...<Widget>[
-          Builder(builder: (context) {
-            final snap = _local[i];
-            final hasErrors = snap.issues.any((issue) => issue.isError);
-            final statusColor = snap.issues.isEmpty
-                ? Colors.green.shade700
-                : (hasErrors ? theme.colorScheme.error : Colors.amber.shade800);
-            final statusIcon = snap.issues.isEmpty
-                ? Icons.check_circle_outline
-                : (hasErrors ? Icons.error_outline : Icons.warning_amber_outlined);
-            final current = snap.issues
-                .map((issue) => (
-                      line: issue.line ?? 1,
-                      column: issue.column ?? 1,
-                      kind: issue.isError ? 'error' : 'warning',
-                      message: issue.render(context.tr),
-                    ))
-                .toList();
-            final previous = (i + 1 < _local.length)
-                ? _local[i + 1]
-                    .issues
+                );
+              }),
+          ],
+        );
+      }
+
+      if (hasLocalHistory) {
+        if (filteredLocalIndices.isEmpty) {
+          return Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: Text(context.tr('No checks match search or filters.')),
+          );
+        }
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            for (final i in filteredLocalIndices)
+              Builder(builder: (context) {
+                final snap = _local[i];
+                final hasErrors = snap.issues.any((issue) => issue.isError);
+                final statusColor = snap.issues.isEmpty
+                    ? Colors.green.shade700
+                    : (hasErrors ? theme.colorScheme.error : Colors.amber.shade800);
+                final statusIcon = snap.issues.isEmpty
+                    ? Icons.check_circle_outline
+                    : (hasErrors ? Icons.error_outline : Icons.warning_amber_outlined);
+                final current = snap.issues
                     .map((issue) => (
                           line: issue.line ?? 1,
                           column: issue.column ?? 1,
                           kind: issue.isError ? 'error' : 'warning',
                           message: issue.render(context.tr),
                         ))
-                    .toList()
-                : null;
-            final content = Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Row(
-                  children: <Widget>[
-                    Icon(statusIcon, size: 18, color: statusColor),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        '${context.tr('Check')} ${fmtTime(snap.time)}'
-                        '${i == 0 ? ' (${context.tr('latest')})' : ''}',
-                        style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
-                      ),
-                    ),
-                    Icon(Icons.chevron_right, size: 18, color: theme.colorScheme.onSurfaceVariant),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                if (snap.issues.isEmpty)
-                  Text(
-                    context.tr('No issues found.'),
-                    style: TextStyle(color: statusColor),
-                  )
-                else
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: snap.issues
-                        .map((issue) => issueTile(
-                              isError: issue.isError,
+                    .toList();
+                final previous = (i + 1 < _local.length)
+                    ? _local[i + 1]
+                        .issues
+                        .map((issue) => (
                               line: issue.line ?? 1,
                               column: issue.column ?? 1,
+                              kind: issue.isError ? 'error' : 'warning',
                               message: issue.render(context.tr),
                             ))
-                        .toList(),
+                        .toList()
+                    : null;
+                final content = Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Row(
+                      children: <Widget>[
+                        Icon(statusIcon, size: 18, color: statusColor),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            '${context.tr('Check')} ${_fmtTime(snap.time)}'
+                            '${i == 0 ? ' (${context.tr('latest')})' : ''}',
+                            style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+                          ),
+                        ),
+                        Icon(Icons.chevron_right, size: 18, color: theme.colorScheme.onSurfaceVariant),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    if (snap.issues.isEmpty)
+                      Text(
+                        context.tr('No issues found.'),
+                        style: TextStyle(color: statusColor),
+                      )
+                    else
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: snap.issues
+                            .map((issue) => issueTile(
+                                  isError: issue.isError,
+                                  line: issue.line ?? 1,
+                                  column: issue.column ?? 1,
+                                  message: issue.render(context.tr),
+                                ))
+                            .toList(),
+                      ),
+                  ],
+                );
+                return Card(
+                  margin: const EdgeInsets.only(bottom: 10),
+                  clipBehavior: Clip.antiAlias,
+                  child: InkWell(
+                    onTap: () => _showCheckReportDialog(
+                      date: snap.time,
+                      author: null,
+                      issues: current,
+                      previousIssues: previous,
+                    ),
+                    mouseCursor: SystemMouseCursors.click,
+                    child: Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: content,
+                    ),
                   ),
-              ],
-            );
-            return Card(
-              margin: const EdgeInsets.only(bottom: 10),
-              clipBehavior: Clip.antiAlias,
-              child: InkWell(
-                onTap: () => _showCheckReportDialog(
-                  date: snap.time,
-                  author: null,
-                  issues: current,
-                  previousIssues: previous,
-                ),
-                mouseCursor: SystemMouseCursors.click,
-                child: Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: content,
-                ),
-              ),
-            );
-          }),
-        ],
-      ] else
-        Text(context.tr('No compilation results yet for this file.')),
-    ];
+                );
+              }),
+          ],
+        );
+      }
+
+      return Text(context.tr('No compilation results yet for this file.'));
+    }
+
+    Widget filterChip(_HistoryFilter value, String label, IconData icon) {
+      final selected = _filter == value;
+      return ChoiceChip(
+        label: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            Icon(icon, size: 14),
+            const SizedBox(width: 4),
+            Text(label),
+          ],
+        ),
+        selected: selected,
+        onSelected: (_) => setState(() => _filter = value),
+        visualDensity: VisualDensity.compact,
+        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      );
+    }
 
     return AlertDialog(
       title: Text(context.tr('Compilation history')),
       content: SizedBox(
-        width: 640,
+        width: 680,
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxHeight: 420),
-          child: SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: children,
-            ),
+          constraints: const BoxConstraints(maxHeight: 520),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(999),
+                    border: Border.all(color: theme.colorScheme.outlineVariant),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: <Widget>[
+                      Icon(
+                        Icons.insert_drive_file_outlined,
+                        size: 14,
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                      const SizedBox(width: 6),
+                      Flexible(
+                        child: Text(
+                          widget.path,
+                          style: theme.textTheme.labelMedium?.copyWith(
+                            color: theme.colorScheme.onSurface,
+                            fontFamily: 'monospace',
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: _searchController,
+                decoration: InputDecoration(
+                  isDense: true,
+                  prefixIcon: const Icon(Icons.search, size: 18),
+                  hintText: context.tr('Search checks'),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                  suffixIcon: _query.isEmpty
+                      ? null
+                      : IconButton(
+                          tooltip: context.tr('Clear'),
+                          icon: const Icon(Icons.clear, size: 16),
+                          onPressed: () {
+                            _searchController.clear();
+                            setState(() => _query = '');
+                          },
+                        ),
+                ),
+                onChanged: (value) => setState(() => _query = value),
+              ),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: <Widget>[
+                  filterChip(_HistoryFilter.all, context.tr('All'), Icons.filter_list),
+                  filterChip(_HistoryFilter.success, context.tr('Successful'), Icons.check_circle_outline),
+                  filterChip(_HistoryFilter.errors, context.tr('With errors'), Icons.error_outline),
+                  filterChip(_HistoryFilter.warnings, context.tr('With warnings'), Icons.warning_amber_outlined),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Flexible(
+                child: SingleChildScrollView(
+                  child: buildList(),
+                ),
+              ),
+            ],
           ),
         ),
       ),
