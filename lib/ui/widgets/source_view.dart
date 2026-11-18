@@ -194,8 +194,23 @@ class _CodeViewState extends State<CodeView> {
       );
       if (!mounted || seq != _remoteCheckSeq) return;
       if (widget.controller.codePath != path) return;
+      bool matchesPath(String diagFile, String currentPath) {
+        String norm(String s) => s.replaceAll('\\', '/');
+        final df = norm(diagFile);
+        final cp = norm(currentPath);
+        if (df == cp) return true;
+        if (df.endsWith('/$cp') || cp.endsWith('/$df')) return true;
+        // Handle cases where one side includes project/archive root prefixes.
+        if (df.endsWith(cp) && (df.length == cp.length || df[df.length - cp.length - 1] == '/')) return true;
+        if (cp.endsWith(df) && (cp.length == df.length || cp[cp.length - df.length - 1] == '/')) return true;
+        final dfBase = df.split('/').last;
+        final cpBase = cp.split('/').last;
+        if (dfBase == cpBase && (df == cpBase || cp == dfBase)) return true;
+        return false;
+      }
+
       final current = diagnostics
-          .where((d) => d.file == path || d.file.endsWith('/$path') || path.endsWith(d.file))
+          .where((d) => matchesPath(d.file, path))
           .map((d) => ValidationIssue(
                 d.message,
                 line: d.line,
