@@ -1204,6 +1204,13 @@ class _CompilationHistoryDialogState extends State<_CompilationHistoryDialog> {
             final rec = _records[i];
             final date = rec.date;
             final diags = rec.diagnostics;
+            final hasErrors = diags.any((d) => d.isError);
+            final statusColor = diags.isEmpty
+                ? Colors.green.shade700
+                : (hasErrors ? theme.colorScheme.error : Colors.amber.shade800);
+            final statusIcon = diags.isEmpty
+                ? Icons.check_circle_outline
+                : (hasErrors ? Icons.error_outline : Icons.warning_amber_outlined);
             final current = diags
                 .map((d) => (line: d.line, column: d.column, kind: d.kind, message: d.message))
                 .toList();
@@ -1218,61 +1225,69 @@ class _CompilationHistoryDialogState extends State<_CompilationHistoryDialog> {
               children: <Widget>[
                 Row(
                   children: <Widget>[
+                    Icon(statusIcon, size: 18, color: statusColor),
+                    const SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         '${context.tr('Check')} ${fmtTime(date)}'
                         '${i == 0 ? ' (${context.tr('latest')})' : ''}',
-                        style: theme.textTheme.titleSmall,
+                        style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
                       ),
                     ),
-                    Icon(Icons.open_in_new, size: 14, color: theme.colorScheme.onSurfaceVariant),
+                    Icon(Icons.chevron_right, size: 18, color: theme.colorScheme.onSurfaceVariant),
                   ],
                 ),
-                const SizedBox(height: 6),
+                const SizedBox(height: 8),
                 if (diags.isEmpty)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 10),
-                    child: Text(context.tr('No issues found.')),
+                  Text(
+                    context.tr('No issues found.'),
+                    style: TextStyle(color: statusColor),
                   )
                 else
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 10),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: <Widget>[
-                        for (final d in diags)
-                          issueTile(
-                            isError: d.isError,
-                            line: d.line,
-                            column: d.column,
-                            message: d.message,
-                          ),
-                      ],
-                    ),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      for (final d in diags)
+                        issueTile(
+                          isError: d.isError,
+                          line: d.line,
+                          column: d.column,
+                          message: d.message,
+                        ),
+                    ],
                   ),
               ],
             );
-            return InkWell(
-              onTap: () => _showCheckReportDialog(
-                date: date,
-                author: rec.author,
-                issues: current,
-                previousIssues: previous,
-              ),
-              mouseCursor: SystemMouseCursors.click,
-              borderRadius: BorderRadius.circular(6),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 2),
-                child: content,
+            return Card(
+              margin: const EdgeInsets.only(bottom: 10),
+              clipBehavior: Clip.antiAlias,
+              child: InkWell(
+                onTap: () => _showCheckReportDialog(
+                  date: date,
+                  author: rec.author,
+                  issues: current,
+                  previousIssues: previous,
+                ),
+                mouseCursor: SystemMouseCursors.click,
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: content,
+                ),
               ),
             );
           }),
-          if (i != _records.length - 1) const Divider(height: 16),
         ],
       ] else if (_local.isNotEmpty) ...<Widget>[
         for (int i = 0; i < _local.length; i++) ...<Widget>[
           Builder(builder: (context) {
             final snap = _local[i];
+            final hasErrors = snap.issues.any((issue) => issue.isError);
+            final statusColor = snap.issues.isEmpty
+                ? Colors.green.shade700
+                : (hasErrors ? theme.colorScheme.error : Colors.amber.shade800);
+            final statusIcon = snap.issues.isEmpty
+                ? Icons.check_circle_outline
+                : (hasErrors ? Icons.error_outline : Icons.warning_amber_outlined);
             final current = snap.issues
                 .map((issue) => (
                       line: issue.line ?? 1,
@@ -1297,55 +1312,56 @@ class _CompilationHistoryDialogState extends State<_CompilationHistoryDialog> {
               children: <Widget>[
                 Row(
                   children: <Widget>[
+                    Icon(statusIcon, size: 18, color: statusColor),
+                    const SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         '${context.tr('Check')} ${fmtTime(snap.time)}'
                         '${i == 0 ? ' (${context.tr('latest')})' : ''}',
-                        style: theme.textTheme.titleSmall,
+                        style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
                       ),
                     ),
-                    Icon(Icons.open_in_new, size: 14, color: theme.colorScheme.onSurfaceVariant),
+                    Icon(Icons.chevron_right, size: 18, color: theme.colorScheme.onSurfaceVariant),
                   ],
                 ),
-                const SizedBox(height: 6),
+                const SizedBox(height: 8),
                 if (snap.issues.isEmpty)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 10),
-                    child: Text(context.tr('No issues found.')),
+                  Text(
+                    context.tr('No issues found.'),
+                    style: TextStyle(color: statusColor),
                   )
                 else
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 10),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: snap.issues
-                          .map((issue) => issueTile(
-                                isError: issue.isError,
-                                line: issue.line ?? 1,
-                                column: issue.column ?? 1,
-                                message: issue.render(context.tr),
-                              ))
-                          .toList(),
-                    ),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: snap.issues
+                        .map((issue) => issueTile(
+                              isError: issue.isError,
+                              line: issue.line ?? 1,
+                              column: issue.column ?? 1,
+                              message: issue.render(context.tr),
+                            ))
+                        .toList(),
                   ),
               ],
             );
-            return InkWell(
-              onTap: () => _showCheckReportDialog(
-                date: snap.time,
-                author: null,
-                issues: current,
-                previousIssues: previous,
-              ),
-              mouseCursor: SystemMouseCursors.click,
-              borderRadius: BorderRadius.circular(6),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 2),
-                child: content,
+            return Card(
+              margin: const EdgeInsets.only(bottom: 10),
+              clipBehavior: Clip.antiAlias,
+              child: InkWell(
+                onTap: () => _showCheckReportDialog(
+                  date: snap.time,
+                  author: null,
+                  issues: current,
+                  previousIssues: previous,
+                ),
+                mouseCursor: SystemMouseCursors.click,
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: content,
+                ),
               ),
             );
           }),
-          if (i != _local.length - 1) const Divider(height: 16),
         ],
       ] else
         Text(context.tr('No compilation results yet for this file.')),
