@@ -26,6 +26,8 @@ public class BuildService {
             Pattern.compile("public\\s+class\\s+(\\w+)\\s+extends\\s+Application");
     private static final Pattern DIAGNOSTIC =
             Pattern.compile("^(.*?):(\\d+):\\s*(error|warning):\\s*(.*)$");
+    private static final Pattern SHELL_LINE =
+            Pattern.compile("line\\s+(\\d+)");
 
     public BuildService(@Value("${app.javafx-lib:/opt/javafx/lib}") String javafxLib,
                         @Value("${app.java-modules:javafx.controls,javafx.fxml}") String javaModules) {
@@ -252,33 +254,35 @@ public class BuildService {
             Path extracted = unzip(archive, work);
             Path root = singleRoot(extracted);
 
+            List<Diagnostic> result = new ArrayList<>();
+
             Path javaDir = root.resolve("src/main/java");
-            if (!Files.isDirectory(javaDir)) {
-                return List.of();
-            }
-            List<Path> sources = new ArrayList<>();
-            try (var stream = Files.walk(javaDir)) {
-                stream.filter(Files::isRegularFile)
-                        .filter(p -> p.toString().endsWith(".java"))
-                        .forEach(sources::add);
-            }
-            if (sources.isEmpty()) {
-                return List.of();
+            if (Files.isDirectory(javaDir)) {
+                List<Path> sources = new ArrayList<>();
+                try (var stream = Files.walk(javaDir)) {
+                    stream.filter(Files::isRegularFile)
+                            .filter(p -> p.toString().endsWith(".java"))
+                            .forEach(sources::add);
+                }
+                if (!sources.isEmpty()) {
+                    Path out = work.resolve("out");
+                    Files.createDirectories(out);
+                    List<String> javac = new ArrayList<>(List.of(
+                            "javac", "-nowarn", "-encoding", "UTF-8", "--release", "21",
+                            "-proc:none", "-Xmaxerrs", "200", "-Xmaxwarns", "200",
+                            "-cp", javafxLib + "/*",
+                            "-d", out.toString()));
+                    for (Path source : sources) {
+                        javac.add(source.toString());
+                    }
+
+                    String output = runCapture(javac, work);
+                    result.addAll(parseDiagnostics(output, root));
+                }
             }
 
-            Path out = work.resolve("out");
-            Files.createDirectories(out);
-            List<String> javac = new ArrayList<>(List.of(
-                    "javac", "-nowarn", "-encoding", "UTF-8", "--release", "21",
-                    "-proc:none", "-Xmaxerrs", "200", "-Xmaxwarns", "200",
-                    "-cp", javafxLib + "/*",
-                    "-d", out.toString()));
-            for (Path source : sources) {
-                javac.add(source.toString());
-            }
-
-            String output = runCapture(javac, work);
-            return parseDiagnostics(output, root);
+            result.addAll(checkShellScripts(root));
+            return result;
         } finally {
             deleteRecursively(work);
         }
@@ -341,5 +345,64 @@ public class BuildService {
         int idx = s.indexOf("src/main/");
         if (idx >= 0) return s.substring(idx);
         return s;
+    }
+
+    private List<Diagnostic> checkShellScripts(Path root) {
+        List<Diagnostic> result = new ArrayList<>();
+        List<Path> scripts = new ArrayList<>();
+        try (var walk = Files.walk(root)) {
+            walk.filter(Files::isRegularFile)
+                    .filter(p -> {
+                        String n = p.getFileName().toString().toLowerCase();
+                        return n.endsWith(".sh") || n.endsWith(".bash");
+                    })
+                    .forEach(scripts::add);
+        } catch (IOException ignored) {
+            return result;
+        }
+        for (Path script : scripts) {
+            String output;
+            try {
+                output = runCapture(List.of("bash", "-n", script.toString()), root);
+            } catch (Exception e) {
+                // bash may be unavailable or execution failed; skip silently.
+                continue;
+            }
+            if (output == null || output.isBlank()) continue;
+            String rel = relativizeToRoot(script.toString(), root);
+            result.addAll(parseShellDiagnostics(output, rel, script.toString()));
+        }
+        return result;
+    }
+
+    private List<Diagnostic> parseShellDiagnostics(String output, String rel, String abs) {
+        List<Diagnostic> result = new ArrayList<>();
+        String[] lines = output.replace("\r\n", "\n").split("\n");
+        for (String line : lines) {
+            String msg = line.strip();
+            if (msg.isEmpty()) continue;
+            // Strip leading file path (absolute or relative) if present.
+            if (msg.startsWith(abs + ":")) {
+                msg = msg.substring(abs.length() + 1).stripLeading();
+            } else if (msg.startsWith(rel + ":")) {
+                msg = msg.substring(rel.length() + 1).stripLeading();
+            } else {
+                int idx = msg.indexOf(": line ");
+                if (idx > 0) {
+                    msg = msg.substring(idx + 2).stripLeading(); // keep "line N: ..."
+                }
+            }
+            int row = 1;
+            Matcher m = SHELL_LINE.matcher(msg);
+            if (m.find()) {
+                try { row = Integer.parseInt(m.group(1)); } catch (NumberFormatException ignored) {}
+                // keep message as-is; optionally trim leading "line N: " for readability
+            }
+            result.add(new Diagnostic(rel, row, 1, "error", msg));
+        }
+        if (result.isEmpty() && output != null && !output.isBlank()) {
+            result.add(new Diagnostic(rel, 1, 1, "error", output.strip()));
+        }
+        return result;
     }
 }

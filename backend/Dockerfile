@@ -27,7 +27,10 @@ RUN set -eux; \
           "${base}/${module}/21.0.2/${module}-21.0.2-${platform}.jar"; \
       done; \
     done; \
-    chmod -R a+rX /opt/javafx/lib
+    chmod -R a+rX /opt/javafx/lib; \
+    if command -v apt-get >/dev/null 2>&1; then \
+      apt-get update && apt-get install -y --no-install-recommends bash && rm -rf /var/lib/apt/lists/*; \
+    fi
 
 COPY --from=build /app/build/libs/fxml-editor-backend-*.jar /app/app.jar
 

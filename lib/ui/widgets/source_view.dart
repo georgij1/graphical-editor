@@ -134,9 +134,11 @@ class _CodeViewState extends State<CodeView> {
     return ValidationResult.valid;
   }
 
-  bool get _supportsRemoteCheck =>
-      widget.controller.currentProject != null &&
-      widget.controller.codePath.toLowerCase().endsWith('.java');
+  bool get _supportsRemoteCheck {
+    if (widget.controller.currentProject == null) return false;
+    final p = widget.controller.codePath.toLowerCase();
+    return p.endsWith('.java') || p.endsWith('.sh') || p.endsWith('.bash');
+  }
 
   ValidationResult get _effectiveValidation {
     if (_remoteIssues.isEmpty) return _validation;
