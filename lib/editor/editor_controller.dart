@@ -149,22 +149,33 @@ class EditorController extends ChangeNotifier {
 
   bool get canRestoreOriginalRunScript {
     final path = openSource?.path ?? '';
-    return path == 'run.sh' || path.endsWith('/run.sh');
+    final lower = path.toLowerCase();
+    return path == 'run.sh' ||
+        path.endsWith('/run.sh') ||
+        lower == 'run.bat' ||
+        lower.endsWith('/run.bat');
   }
 
   void restoreOriginalRunScript() {
     final source = openSource;
     if (source == null) return;
     final path = source.path;
-    if (!(path == 'run.sh' || path.endsWith('/run.sh'))) return;
+    final lower = path.toLowerCase();
+    final isRunSh = path == 'run.sh' || path.endsWith('/run.sh');
+    final isRunBat = lower == 'run.bat' || lower.endsWith('/run.bat');
+    if (!isRunSh && !isRunBat) return;
     final project = _currentProject;
     if (project == null) return;
+    final targetName = isRunBat ? 'run.bat' : 'run.sh';
     const buildFiles = BuildFiles();
-    String original = '#!/usr/bin/env bash\nset -e\ncd "\$(dirname "\$0")"\njava -jar app.jar\n';
+    String original = isRunBat
+        ? '@echo off\r\n'
+        : '#!/usr/bin/env bash\nset -e\ncd "\$(dirname "\$0")"\njava -jar app.jar\n';
     try {
       final generated = buildFiles.generate(project, BuildTool.maven);
       for (final f in generated) {
-        if (f.path == 'run.sh' || f.path.endsWith('/run.sh')) {
+        final fp = f.path.toLowerCase();
+        if (fp == targetName || fp.endsWith('/$targetName')) {
           original = f.content;
           break;
         }

@@ -282,6 +282,7 @@ public class BuildService {
             }
 
             result.addAll(checkShellScripts(root));
+            result.addAll(checkBatchScripts(root));
             return result;
         } finally {
             deleteRecursively(work);
@@ -386,6 +387,47 @@ public class BuildService {
             }
             if (output == null || output.isBlank()) continue;
             result.addAll(parseShellDiagnostics(output, rel, script.toString()));
+        }
+        return result;
+    }
+
+    private List<Diagnostic> checkBatchScripts(Path root) {
+        List<Diagnostic> result = new ArrayList<>();
+        List<Path> scripts = new ArrayList<>();
+        try (var walk = Files.walk(root)) {
+            walk.filter(Files::isRegularFile)
+                    .filter(p -> {
+                        String n = p.getFileName().toString().toLowerCase();
+                        return n.endsWith(".bat") || n.endsWith(".cmd");
+                    })
+                    .forEach(scripts::add);
+        } catch (IOException ignored) {
+            return result;
+        }
+        for (Path script : scripts) {
+            String rel = relativizeToRoot(script.toString(), root);
+            try {
+                byte[] raw = Files.readAllBytes(script);
+                if (raw.length >= 3 && raw[0] == (byte) 0xEF && raw[1] == (byte) 0xBB && raw[2] == (byte) 0xBF) {
+                    result.add(new Diagnostic(rel, 1, 1, "error",
+                            "Batch script must not contain a UTF-8 BOM."));
+                }
+                String content = Files.readString(script, StandardCharsets.UTF_8);
+                // Strip UTF-8 BOM char if present after decoding.
+                if (!content.isEmpty() && content.charAt(0) == '\uFEFF') {
+                    content = content.substring(1);
+                }
+                String normalized = content.replace("\r\n", "\n").replace('\r', '\n');
+                String[] lines = normalized.split("\n", -1);
+                if (lines.length > 0) {
+                    String first = lines[0].stripLeading();
+                    if (first.startsWith("#!")) {
+                        result.add(new Diagnostic(rel, 1, 1, "error",
+                                "Batch script must not start with a shebang (#!)."));
+                    }
+                }
+            } catch (Exception ignored) {
+            }
         }
         return result;
     }
