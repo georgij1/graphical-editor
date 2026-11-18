@@ -68,36 +68,42 @@ class ProjectExporter {
     final root = project.name;
     final added = <String>{};
 
-    void add(String path, String content) {
+    void add(String relPath, String content) {
+      final path = '$root/$relPath';
       if (!added.add(path)) return;
       final bytes = utf8.encode(content);
       archive.addFile(ArchiveFile(path, bytes.length, bytes));
     }
 
-    for (final file in _buildFiles.generate(project, options.buildTool)) {
-      add('$root/${file.path}', file.content);
+    void addOverrideable(String relPath, String content) {
+      add(relPath, project.sourceOverrides[relPath] ?? content);
     }
 
-    add('$root/project.json',
+    for (final file in _buildFiles.generate(project, options.buildTool)) {
+      addOverrideable(file.path, file.content);
+    }
+
+    add('project.json',
         const JsonEncoder.withIndent('  ').convert(project.toJson()));
 
     if (options.includeJavaSources) {
       for (final source in JavaGenerator.generate(project,
           kioskMode: options.kioskMode)) {
-        add('$root/${source.path}', source.content);
+        addOverrideable(source.path, source.content);
       }
     }
 
     final packageDir = JavaGenerator.packageDir(project);
     for (final scene in project.scenes) {
-      add('$root/src/main/resources/$packageDir/${scene.name}.fxml',
-          scene.fxml);
+      addOverrideable(
+          'src/main/resources/$packageDir/${scene.name}.fxml', scene.fxml);
     }
 
-    // Extra files stored in sourceOverrides (e.g. CSS, custom files).
+    // Extra files stored in sourceOverrides (e.g. CSS, custom files) and any
+    // overrides that were not emitted by the generators above.
     for (final entry in project.sourceOverrides.entries) {
       if (entry.key.endsWith('/')) continue;
-      add('$root/${entry.key}', entry.value);
+      add(entry.key, entry.value);
     }
 
     final encoded = switch (options.format) {

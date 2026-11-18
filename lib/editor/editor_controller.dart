@@ -3235,13 +3235,9 @@ class EditorController extends ChangeNotifier {
   Future<List<BuildDiagnostic>> runBackendCheck({String? path, String? content}) async {
     final project = _currentProject;
     if (project == null) return const <BuildDiagnostic>[];
-    try {
-      final archive = buildCheckArchive(project, path: path, content: content);
-      final client = buildClient ?? BuildClient();
-      return await client.check(archive);
-    } catch (_) {
-      return const <BuildDiagnostic>[];
-    }
+    final archive = buildCheckArchive(project, path: path, content: content);
+    final client = buildClient ?? BuildClient();
+    return await client.check(archive);
   }
 
   /// Packs the project into an archive and saves it. Returns false when the save
