@@ -927,6 +927,7 @@ class _CompilationHistoryDialogState extends State<_CompilationHistoryDialog> {
   final TextEditingController _searchController = TextEditingController();
   String _query = '';
   _HistoryFilter _filter = _HistoryFilter.all;
+  DateTimeRange? _dateRange;
 
   @override
   void initState() {
@@ -1321,6 +1322,22 @@ class _CompilationHistoryDialogState extends State<_CompilationHistoryDialog> {
     return haystack.toLowerCase().contains(q);
   }
 
+  bool _matchesDate(DateTime dt) {
+    final r = _dateRange;
+    if (r == null) return true;
+    final local = dt.toLocal();
+    final d = DateTime(local.year, local.month, local.day);
+    final start = DateTime(r.start.year, r.start.month, r.start.day);
+    final end = DateTime(r.end.year, r.end.month, r.end.day);
+    return !d.isBefore(start) && !d.isAfter(end);
+  }
+
+  String _fmtDateShort(DateTime dt) {
+    String two(int v) => v.toString().padLeft(2, '0');
+    final local = dt.toLocal();
+    return '${two(local.day)}.${two(local.month)}.${local.year}';
+  }
+
   String _fmtTime(DateTime t) {
     String two(int v) => v.toString().padLeft(2, '0');
     final local = t.toLocal();
@@ -1366,6 +1383,7 @@ class _CompilationHistoryDialogState extends State<_CompilationHistoryDialog> {
         final rec = _records[i];
         final diags = rec.diagnostics;
         final hasErrors = diags.any((d) => d.isError);
+        if (!_matchesDate(rec.date)) continue;
         if (!_matchesFilter(isEmpty: diags.isEmpty, hasErrors: hasErrors)) continue;
         final buf = StringBuffer()
           ..write(_fmtTime(rec.date))
@@ -1391,6 +1409,7 @@ class _CompilationHistoryDialogState extends State<_CompilationHistoryDialog> {
       for (int i = 0; i < _local.length; i++) {
         final snap = _local[i];
         final hasErrors = snap.issues.any((issue) => issue.isError);
+        if (!_matchesDate(snap.time)) continue;
         if (!_matchesFilter(isEmpty: snap.issues.isEmpty, hasErrors: hasErrors)) continue;
         final buf = StringBuffer()
           ..write(_fmtTime(snap.time))
@@ -1706,6 +1725,44 @@ class _CompilationHistoryDialogState extends State<_CompilationHistoryDialog> {
                   filterChip(_HistoryFilter.success, context.tr('Successful'), Icons.check_circle_outline),
                   filterChip(_HistoryFilter.errors, context.tr('With errors'), Icons.error_outline),
                   filterChip(_HistoryFilter.warnings, context.tr('With warnings'), Icons.warning_amber_outlined),
+                  FilterChip(
+                    label: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: <Widget>[
+                        const Icon(Icons.date_range, size: 14),
+                        const SizedBox(width: 4),
+                        Text(
+                          _dateRange == null
+                              ? context.tr('Date')
+                              : '${_fmtDateShort(_dateRange!.start)} – ${_fmtDateShort(_dateRange!.end)}',
+                        ),
+                      ],
+                    ),
+                    selected: _dateRange != null,
+                    onSelected: (_) async {
+                      final now = DateTime.now();
+                      final initialRange = _dateRange ??
+                          DateTimeRange(
+                            start: DateTime(now.year, now.month, now.day).subtract(const Duration(days: 7)),
+                            end: DateTime(now.year, now.month, now.day),
+                          );
+                      final picked = await showDateRangePicker(
+                        context: context,
+                        firstDate: DateTime(2020),
+                        lastDate: DateTime(now.year + 1, 12, 31),
+                        initialDateRange: initialRange,
+                        helpText: context.tr('Date'),
+                        saveText: context.tr('Apply'),
+                      );
+                      if (!mounted) return;
+                      if (picked != null) {
+                        setState(() => _dateRange = picked);
+                      }
+                    },
+                    onDeleted: _dateRange == null ? null : () => setState(() => _dateRange = null),
+                    visualDensity: VisualDensity.compact,
+                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
                 ],
               ),
               const SizedBox(height: 10),
