@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import '../../editor/code_validator.dart';
 import '../../editor/editor_controller.dart';
 import '../../l10n/app_localizations.dart';
+import '../../project/project_history.dart';
 import 'highlighting_text_controller.dart';
 
 /// Editable text editor for the file currently selected in the project tree:
@@ -237,6 +238,9 @@ class _CodeViewState extends State<CodeView> {
           history.removeRange(20, history.length);
         }
       });
+      // Persist check/compilation result for this file on the server (best effort).
+      // ignore: discarded_futures
+      widget.controller.recordFileCheck(file: path, diagnostics: diagnostics);
     } catch (_) {
       if (!mounted || seq != _remoteCheckSeq) return;
       setState(() {
@@ -874,113 +878,163 @@ class _CodeViewState extends State<CodeView> {
   }
 
   Future<void> _showCompilationHistoryDialog(String path) async {
-    final snapshots = List<_CheckSnapshot>.from(
-      _checkHistoryByPath[path] ?? const <_CheckSnapshot>[],
-    );
-    final currentIssues = List<ValidationIssue>.from(
-      path == widget.controller.codePath ? _remoteIssues : const <ValidationIssue>[],
-    );
     if (!mounted) return;
     await showDialog<void>(
       context: context,
       builder: (dialogContext) {
-        final theme = Theme.of(dialogContext);
-        String fmtTime(DateTime t) {
-          String two(int v) => v.toString().padLeft(2, '0');
-          return '${two(t.hour)}:${two(t.minute)}:${two(t.second)}';
-        }
+        return FutureBuilder<List<FileCheckRecord>>(
+          future: widget.controller.getFileCheckHistory(path),
+          builder: (context, snapshot) {
+            final theme = Theme.of(dialogContext);
+            String two(int v) => v.toString().padLeft(2, '0');
+            String fmtTime(DateTime t) {
+              final local = t.toLocal();
+              return '${two(local.hour)}:${two(local.minute)}:${two(local.second)}';
+            }
 
-        Widget issueTile(ValidationIssue issue) {
-          final color = issue.isError
-              ? theme.colorScheme.error
-              : Colors.amber.shade800;
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 6),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Icon(
-                  issue.isError ? Icons.error_outline : Icons.warning_amber_outlined,
-                  size: 14,
-                  color: color,
-                ),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Text(
-                    dialogContext.l10n.issueLocation(issue.line, issue.column) +
-                        issue.render(dialogContext.tr),
-                    style: TextStyle(fontSize: 12.5, color: color),
-                  ),
-                ),
-              ],
-            ),
-          );
-        }
-
-        final children = <Widget>[
-          Text(
-            path,
-            style: theme.textTheme.labelMedium?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-              fontFamily: 'monospace',
-            ),
-          ),
-          const SizedBox(height: 12),
-          if (snapshots.isEmpty && currentIssues.isEmpty)
-            Text(dialogContext.tr('No compilation results yet for this file.'))
-          else ...<Widget>[
-            if (snapshots.isNotEmpty)
-              for (int i = 0; i < snapshots.length; i++) ...<Widget>[
-                Text(
-                  '${dialogContext.tr('Check')} ${fmtTime(snapshots[i].time)}'
-                  '${i == 0 ? ' (${dialogContext.tr('latest')})' : ''}',
-                  style: theme.textTheme.titleSmall,
-                ),
-                const SizedBox(height: 6),
-                if (snapshots[i].issues.isEmpty)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 10),
-                    child: Text(dialogContext.tr('No issues found.')),
-                  )
-                else
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 10),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: snapshots[i].issues.map(issueTile).toList(),
-                    ),
-                  ),
-                if (i != snapshots.length - 1) const Divider(height: 16),
-              ]
-            else ...<Widget>[
-              Text(dialogContext.tr('Current issues'), style: theme.textTheme.titleSmall),
-              const SizedBox(height: 6),
-              ...currentIssues.map(issueTile),
-            ],
-          ],
-        ];
-
-        return AlertDialog(
-          title: Text(dialogContext.tr('Compilation history')),
-          content: SizedBox(
-            width: 640,
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxHeight: 420),
-              child: SingleChildScrollView(
-                child: Column(
+            Widget issueTile({required bool isError, required int line, required int column, required String message}) {
+              final color = isError
+                  ? theme.colorScheme.error
+                  : Colors.amber.shade800;
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: children,
+                  children: <Widget>[
+                    Icon(
+                      isError ? Icons.error_outline : Icons.warning_amber_outlined,
+                      size: 14,
+                      color: color,
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        dialogContext.l10n.issueLocation(line, column) + message,
+                        style: TextStyle(fontSize: 12.5, color: color),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }
+
+            final localSnapshots = List<_CheckSnapshot>.from(
+              _checkHistoryByPath[path] ?? const <_CheckSnapshot>[],
+            );
+            final serverRecords = snapshot.data ?? const <FileCheckRecord>[];
+
+            final children = <Widget>[
+              Text(
+                path,
+                style: theme.textTheme.labelMedium?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                  fontFamily: 'monospace',
                 ),
               ),
-            ),
-          ),
-          actions: <Widget>[
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(),
-              child: Text(dialogContext.tr('Close')),
-            ),
-          ],
+              const SizedBox(height: 12),
+              if (snapshot.connectionState == ConnectionState.waiting)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 16),
+                  child: Center(child: CircularProgressIndicator()),
+                )
+              else if (serverRecords.isNotEmpty) ...<Widget>[
+                for (int i = 0; i < serverRecords.length; i++) ...<Widget>[
+                  Builder(builder: (context) {
+                    final rec = serverRecords[i];
+                    final date = rec.date;
+                    final diags = rec.diagnostics;
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: <Widget>[
+                        Text(
+                          '${dialogContext.tr('Check')} ${fmtTime(date)}'
+                          '${i == 0 ? ' (${dialogContext.tr('latest')})' : ''}',
+                          style: theme.textTheme.titleSmall,
+                        ),
+                        const SizedBox(height: 6),
+                        if (diags.isEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 10),
+                            child: Text(dialogContext.tr('No issues found.')),
+                          )
+                        else
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 10),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: <Widget>[
+                                for (final d in diags)
+                                  issueTile(
+                                    isError: d.isError,
+                                    line: d.line,
+                                    column: d.column,
+                                    message: d.message,
+                                  ),
+                              ],
+                            ),
+                          ),
+                      ],
+                    );
+                  }),
+                  if (i != serverRecords.length - 1) const Divider(height: 16),
+                ],
+              ] else if (localSnapshots.isNotEmpty) ...<Widget>[
+                for (int i = 0; i < localSnapshots.length; i++) ...<Widget>[
+                  Text(
+                    '${dialogContext.tr('Check')} ${fmtTime(localSnapshots[i].time)}'
+                    '${i == 0 ? ' (${dialogContext.tr('latest')})' : ''}',
+                    style: theme.textTheme.titleSmall,
+                  ),
+                  const SizedBox(height: 6),
+                  if (localSnapshots[i].issues.isEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: Text(dialogContext.tr('No issues found.')),
+                    )
+                  else
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: localSnapshots[i].issues
+                            .map((issue) => issueTile(
+                                  isError: issue.isError,
+                                  line: issue.line ?? 1,
+                                  column: issue.column ?? 1,
+                                  message: issue.render(dialogContext.tr),
+                                ))
+                            .toList(),
+                      ),
+                    ),
+                  if (i != localSnapshots.length - 1) const Divider(height: 16),
+                ],
+              ] else
+                Text(dialogContext.tr('No compilation results yet for this file.')),
+            ];
+
+            return AlertDialog(
+              title: Text(dialogContext.tr('Compilation history')),
+              content: SizedBox(
+                width: 640,
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxHeight: 420),
+                  child: SingleChildScrollView(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: children,
+                    ),
+                  ),
+                ),
+              ),
+              actions: <Widget>[
+                TextButton(
+                  onPressed: () => Navigator.of(dialogContext).pop(),
+                  child: Text(dialogContext.tr('Close')),
+                ),
+              ],
+            );
+          },
         );
       },
     );

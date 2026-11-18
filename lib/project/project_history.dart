@@ -152,3 +152,70 @@ class ProjectHistory {
         ],
       );
 }
+
+/// A recorded live source-check/compilation run for a specific file.
+class FileCheckDiagnostic {
+  const FileCheckDiagnostic({
+    required this.file,
+    required this.line,
+    required this.column,
+    required this.kind,
+    required this.message,
+  });
+
+  final String file;
+  final int line;
+  final int column;
+  final String kind; // "error" | "warning"
+  final String message;
+
+  bool get isError => kind == 'error';
+
+  Map<String, dynamic> toJson() => <String, dynamic>{
+        'file': file,
+        'line': line,
+        'column': column,
+        'kind': kind,
+        'message': message,
+      };
+
+  factory FileCheckDiagnostic.fromJson(Map<String, dynamic> json) =>
+      FileCheckDiagnostic(
+        file: (json['file'] as String?) ?? '',
+        line: (json['line'] as num?)?.toInt() ?? 1,
+        column: (json['column'] as num?)?.toInt() ?? 1,
+        kind: (json['kind'] as String?) ?? 'error',
+        message: (json['message'] as String?) ?? '',
+      );
+}
+
+class FileCheckRecord {
+  const FileCheckRecord({
+    required this.id,
+    required this.file,
+    required this.date,
+    required this.author,
+    required this.diagnostics,
+  });
+
+  final String id;
+  final String file;
+  final DateTime date;
+  final String author;
+  final List<FileCheckDiagnostic> diagnostics;
+
+  factory FileCheckRecord.fromJson(Map<String, dynamic> json) => FileCheckRecord(
+        id: (json['id'] as String?) ?? '',
+        file: (json['file'] as String?) ?? '',
+        date: DateTime.tryParse(json['date'] as String? ?? '')?.toUtc() ??
+            DateTime.now().toUtc(),
+        author: (json['author'] as String?) ?? '',
+        diagnostics: [
+          for (final d in (json['diagnostics'] as List? ?? []))
+            if (d is Map<String, dynamic>)
+              FileCheckDiagnostic.fromJson(d)
+            else if (d is Map)
+              FileCheckDiagnostic.fromJson(Map<String, dynamic>.from(d)),
+        ],
+      );
+}

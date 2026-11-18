@@ -3240,6 +3240,65 @@ class EditorController extends ChangeNotifier {
     return await client.check(archive);
   }
 
+  Future<List<FileCheckRecord>> getFileCheckHistory(String file) async {
+    final project = _currentProject;
+    final token = _token;
+    if (project == null || token == null || project.id.isEmpty || file.isEmpty) {
+      return const <FileCheckRecord>[];
+    }
+    try {
+      final result = await _api.getFileCheckHistory(token, project.id, file: file);
+      if (!result.isOk || result.value == null) return const <FileCheckRecord>[];
+      return result.value!;
+    } catch (_) {
+      return const <FileCheckRecord>[];
+    }
+  }
+
+  Future<void> recordFileCheck({
+    required String file,
+    required List<BuildDiagnostic> diagnostics,
+  }) async {
+    final project = _currentProject;
+    final token = _token;
+    if (project == null || token == null || project.id.isEmpty || file.isEmpty) {
+      return;
+    }
+    bool matchesPath(String diagFile, String currentPath) {
+      String norm(String s) => s.replaceAll('\\', '/');
+      final df = norm(diagFile);
+      final cp = norm(currentPath);
+      if (df == cp) return true;
+      if (df.endsWith('/$cp') || cp.endsWith('/$df')) return true;
+      if (df.endsWith(cp) && (df.length == cp.length || df[df.length - cp.length - 1] == '/')) return true;
+      if (cp.endsWith(df) && (cp.length == df.length || cp[cp.length - df.length - 1] == '/')) return true;
+      final dfBase = df.split('/').last;
+      final cpBase = cp.split('/').last;
+      if (dfBase == cpBase && (df == cpBase || cp == dfBase)) return true;
+      return false;
+    }
+    final fileDiagnostics = diagnostics
+        .where((d) => matchesPath(d.file, file))
+        .map((d) => FileCheckDiagnostic(
+              file: d.file,
+              line: d.line,
+              column: d.column,
+              kind: d.kind,
+              message: d.message,
+            ))
+        .toList();
+    try {
+      await _api.recordFileCheck(
+        token,
+        project.id,
+        file: file,
+        diagnostics: fileDiagnostics,
+      );
+    } catch (_) {
+      // Best effort: keep local in-session history even if persistence fails.
+    }
+  }
+
   /// Packs the project into an archive and saves it. Returns false when the save
   /// was cancelled or failed.
   Future<bool> exportProject(Project project, ExportOptions options) {

@@ -3,6 +3,7 @@ package com.example.fxmleditor.controller;
 import com.example.fxmleditor.model.ProjectMember;
 import com.example.fxmleditor.model.SharedProject;
 import com.example.fxmleditor.security.JwtService;
+import com.example.fxmleditor.service.HistoryStore;
 import com.example.fxmleditor.service.ProjectStore;
 import com.example.fxmleditor.service.UserStore;
 import io.swagger.v3.oas.annotations.Operation;
@@ -20,11 +21,13 @@ public class ProjectController {
     private final ProjectStore projects;
     private final UserStore users;
     private final JwtService jwt;
+    private final HistoryStore history;
 
-    public ProjectController(ProjectStore projects, UserStore users, JwtService jwt) {
+    public ProjectController(ProjectStore projects, UserStore users, JwtService jwt, HistoryStore history) {
         this.projects = projects;
         this.users = users;
         this.jwt = jwt;
+        this.history = history;
     }
 
     private String bearer(String auth) {
@@ -263,8 +266,12 @@ public class ProjectController {
     public ResponseEntity<?> getHistory(@RequestHeader("Authorization") String auth, @PathVariable String id) {
         var claims = auth(auth);
         if (claims == null) return ResponseEntity.status(401).body(Map.of("error", "Not authenticated."));
-        // history store is separate; return empty for now
-        return ResponseEntity.ok(Map.of("projectId", id, "versions", List.of(), "builds", List.of()));
+        SharedProject project = projects.find(id);
+        if (project == null) return ResponseEntity.status(404).body(Map.of("error", "Project not found."));
+        if (!project.canRead(jwt.userId(claims), jwt.email(claims))) {
+            return ResponseEntity.status(403).body(Map.of("error", "You cannot open this project."));
+        }
+        return ResponseEntity.ok(history.get(id));
     }
 
     @PostMapping("/projects/{id}/versions")
@@ -272,7 +279,28 @@ public class ProjectController {
     public ResponseEntity<?> createVersion(@RequestHeader("Authorization") String auth, @PathVariable String id, @RequestBody Map<String, Object> body) {
         var claims = auth(auth);
         if (claims == null) return ResponseEntity.status(401).body(Map.of("error", "Not authenticated."));
-        return ResponseEntity.ok(Map.of("ok", true));
+        SharedProject project = projects.find(id);
+        if (project == null) return ResponseEntity.status(404).body(Map.of("error", "Project not found."));
+        if (!project.canEdit(jwt.userId(claims), jwt.email(claims))) {
+            return ResponseEntity.status(403).body(Map.of("error", "You cannot change this project."));
+        }
+        String summary = str(body, "summary");
+        int revision = 0;
+        Object rev = body.get("revision");
+        if (rev instanceof Number) revision = ((Number) rev).intValue();
+        int scenesCount = 0;
+        Object sc = body.get("scenesCount");
+        if (sc instanceof Number) scenesCount = ((Number) sc).intValue();
+        int filesCount = 0;
+        Object fc = body.get("filesCount");
+        if (fc instanceof Number) filesCount = ((Number) fc).intValue();
+        List<String> sceneNames = new ArrayList<>();
+        Object sn = body.get("sceneNames");
+        if (sn instanceof List) {
+            for (Object o : (List<?>) sn) sceneNames.add(String.valueOf(o));
+        }
+        String author = jwt.email(claims);
+        return ResponseEntity.ok(history.createVersion(id, summary, revision, scenesCount, filesCount, sceneNames, author));
     }
 
     @PostMapping("/projects/{id}/builds")
@@ -280,7 +308,62 @@ public class ProjectController {
     public ResponseEntity<?> recordBuild(@RequestHeader("Authorization") String auth, @PathVariable String id, @RequestBody Map<String, Object> body) {
         var claims = auth(auth);
         if (claims == null) return ResponseEntity.status(401).body(Map.of("error", "Not authenticated."));
-        return ResponseEntity.ok(Map.of("ok", true));
+        SharedProject project = projects.find(id);
+        if (project == null) return ResponseEntity.status(404).body(Map.of("error", "Project not found."));
+        if (!project.canEdit(jwt.userId(claims), jwt.email(claims))) {
+            return ResponseEntity.status(403).body(Map.of("error", "You cannot change this project."));
+        }
+        Map<String, Object> build = new java.util.HashMap<>(body == null ? Map.of() : body);
+        if (!build.containsKey("date")) build.put("date", java.time.Instant.now().toString());
+        if (!build.containsKey("author")) build.put("author", jwt.email(claims));
+        return ResponseEntity.ok(history.recordBuild(id, build));
+    }
+
+    @GetMapping("/projects/{id}/checks")
+    @Operation(summary = "File check/compilation history")
+    public ResponseEntity<?> getChecks(@RequestHeader("Authorization") String auth,
+                                       @PathVariable String id,
+                                       @RequestParam(value = "file", required = false) String file,
+                                       @RequestParam(value = "limit", required = false, defaultValue = "50") int limit) {
+        var claims = auth(auth);
+        if (claims == null) return ResponseEntity.status(401).body(Map.of("error", "Not authenticated."));
+        SharedProject project = projects.find(id);
+        if (project == null) return ResponseEntity.status(404).body(Map.of("error", "Project not found."));
+        if (!project.canRead(jwt.userId(claims), jwt.email(claims))) {
+            return ResponseEntity.status(403).body(Map.of("error", "You cannot open this project."));
+        }
+        return ResponseEntity.ok(Map.of("checks", history.getChecks(id, file, Math.max(1, Math.min(limit, 200)))));
+    }
+
+    @PostMapping("/projects/{id}/checks")
+    @Operation(summary = "Record a file check/compilation result")
+    public ResponseEntity<?> recordCheck(@RequestHeader("Authorization") String auth,
+                                         @PathVariable String id,
+                                         @RequestBody Map<String, Object> body) {
+        var claims = auth(auth);
+        if (claims == null) return ResponseEntity.status(401).body(Map.of("error", "Not authenticated."));
+        SharedProject project = projects.find(id);
+        if (project == null) return ResponseEntity.status(404).body(Map.of("error", "Project not found."));
+        if (!project.canRead(jwt.userId(claims), jwt.email(claims))) {
+            return ResponseEntity.status(403).body(Map.of("error", "You cannot open this project."));
+        }
+        String file = str(body, "file");
+        if (file.isBlank()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "File is required."));
+        }
+        Map<String, Object> check = new java.util.HashMap<>();
+        check.put("id", java.util.UUID.randomUUID().toString());
+        check.put("file", file);
+        check.put("date", java.time.Instant.now().toString());
+        check.put("author", jwt.email(claims));
+        Object diags = body == null ? null : body.get("diagnostics");
+        if (diags instanceof List) {
+            check.put("diagnostics", diags);
+        } else {
+            check.put("diagnostics", List.of());
+        }
+        history.recordCheck(id, check);
+        return ResponseEntity.ok(check);
     }
 
     private SharedProject fromJson(Map<String, Object> body, String id, SharedProject existing, String uid, String email) {

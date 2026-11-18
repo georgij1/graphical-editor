@@ -35,18 +35,34 @@ public class HistoryStore {
         lock.lock();
         try {
             Path f = file(projectId);
-            if (!Files.exists(f)) return Map.of("projectId", projectId, "versions", List.of(), "builds", List.of());
+            if (!Files.exists(f)) {
+                return new java.util.HashMap<>(Map.of(
+                        "projectId", projectId,
+                        "versions", List.of(),
+                        "builds", List.of(),
+                        "checks", List.of()));
+            }
             try {
-                return mapper.readValue(f.toFile(), Map.class);
+                Map<String, Object> data = mapper.readValue(f.toFile(), Map.class);
+                if (data == null) data = new java.util.HashMap<>();
+                data.putIfAbsent("projectId", projectId);
+                data.putIfAbsent("versions", List.of());
+                data.putIfAbsent("builds", List.of());
+                data.putIfAbsent("checks", List.of());
+                return data;
             } catch (Exception e) {
-                return Map.of("projectId", projectId, "versions", List.of(), "builds", List.of());
+                return new java.util.HashMap<>(Map.of(
+                        "projectId", projectId,
+                        "versions", List.of(),
+                        "builds", List.of(),
+                        "checks", List.of()));
             }
         } finally {
             lock.unlock();
         }
     }
 
-    public Map<String, Object> createVersion(String projectId, String summary, int revision, int scenesCount, int filesCount, List<String> sceneNames) {
+    public Map<String, Object> createVersion(String projectId, String summary, int revision, int scenesCount, int filesCount, List<String> sceneNames, String author) {
         lock.lock();
         try {
             Map<String, Object> data = get(projectId);
@@ -58,6 +74,7 @@ public class HistoryStore {
             v.put("scenesCount", scenesCount);
             v.put("filesCount", filesCount);
             v.put("sceneNames", sceneNames == null ? List.of() : sceneNames);
+            if (author != null && !author.isBlank()) v.put("author", author);
             versions.add(0, v);
             data.put("versions", versions);
             save(projectId, data);
@@ -79,6 +96,42 @@ public class HistoryStore {
         } finally {
             lock.unlock();
         }
+    }
+
+    public Map<String, Object> recordCheck(String projectId, Map<String, Object> check) {
+        lock.lock();
+        try {
+            Map<String, Object> data = get(projectId);
+            List<Object> checks = new ArrayList<>((List<Object>) data.getOrDefault("checks", new ArrayList<>()));
+            checks.add(0, check);
+            if (checks.size() > 200) {
+                checks = new ArrayList<>(checks.subList(0, 200));
+            }
+            data.put("checks", checks);
+            save(projectId, data);
+            return data;
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    public List<Map<String, Object>> getChecks(String projectId, String file, int limit) {
+        Map<String, Object> data = get(projectId);
+        List<Object> checks = (List<Object>) data.getOrDefault("checks", List.of());
+        List<Map<String, Object>> result = new ArrayList<>();
+        int max = limit > 0 ? limit : 50;
+        for (Object c : checks) {
+            if (!(c instanceof Map)) continue;
+            Map<String, Object> m = (Map<String, Object>) c;
+            if (file != null && !file.isBlank()) {
+                Object f = m.get("file");
+                String fs = f == null ? "" : f.toString();
+                if (!fs.equals(file)) continue;
+            }
+            result.add(m);
+            if (result.size() >= max) break;
+        }
+        return result;
     }
 
     private void save(String projectId, Map<String, Object> data) {

@@ -151,6 +151,15 @@ abstract class ApiClient {
   Future<ApiResult<ProjectHistory>> recordProjectBuild(
       String token, String projectId, BuildRecord build);
 
+  /// File check/compilation history for a project file.
+  Future<ApiResult<List<FileCheckRecord>>> getFileCheckHistory(
+      String token, String projectId, {required String file, int limit = 50});
+
+  /// Records a live file check/compilation result.
+  Future<ApiResult<FileCheckRecord>> recordFileCheck(
+      String token, String projectId,
+      {required String file, required List<FileCheckDiagnostic> diagnostics});
+
   /// Reads the profile of [token]; the result may be null when signed out.
   Future<ApiResult<Profile?>> getProfile(String token);
 
@@ -594,6 +603,46 @@ class HttpApiClient implements ApiClient {
     }
     return ApiResult<ProjectHistory>.ok(
         ProjectHistory.fromJson(result.value!));
+  }
+
+  @override
+  Future<ApiResult<List<FileCheckRecord>>> getFileCheckHistory(
+      String token, String projectId, {required String file, int limit = 50}) async {
+    final qp = Uri(queryParameters: <String, String>{
+      'file': file,
+      'limit': '$limit',
+    }).query;
+    final result = await _projectRequest(
+        'GET', '/projects/$projectId/checks?$qp', token);
+    if (!result.isOk || result.value == null) {
+      return ApiResult<List<FileCheckRecord>>.failure(
+          result.status, result.message);
+    }
+    final list = (result.value!['checks'] as List? ?? const [])
+        .whereType<Map>()
+        .map((e) => FileCheckRecord.fromJson(Map<String, dynamic>.from(e)))
+        .toList();
+    return ApiResult<List<FileCheckRecord>>.ok(list);
+  }
+
+  @override
+  Future<ApiResult<FileCheckRecord>> recordFileCheck(
+      String token, String projectId,
+      {required String file, required List<FileCheckDiagnostic> diagnostics}) async {
+    final result = await _projectRequest(
+      'POST',
+      '/projects/$projectId/checks',
+      token,
+      body: <String, dynamic>{
+        'file': file,
+        'diagnostics': [for (final d in diagnostics) d.toJson()],
+      },
+    );
+    if (!result.isOk || result.value == null) {
+      return ApiResult<FileCheckRecord>.failure(result.status, result.message);
+    }
+    return ApiResult<FileCheckRecord>.ok(
+        FileCheckRecord.fromJson(result.value!));
   }
 
   @override
