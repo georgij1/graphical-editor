@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-enum HighlightLanguage { plain, java, xml, css, shell }
+enum HighlightLanguage { plain, java, xml, css, shell, batch }
 
 class HighlightingTextEditingController extends TextEditingController {
   HighlightingTextEditingController({
@@ -102,6 +102,17 @@ class HighlightingTextEditingController extends TextEditingController {
           r'(\b\d+\b)',
           multiLine: true,
         );
+      case HighlightLanguage.batch:
+        return RegExp(
+          r'(^\s*@?\s*(?:REM\b|::).*$)|'
+          r'("[^"\r\n]*")|'
+          r'(%%[A-Za-z]|%~?[A-Za-z0-9_*]+%?|![A-Za-z0-9_]+!)|'
+          r'(\b(?:if|else|for|in|do|goto|call|set|setlocal|endlocal|echo|exit|pause|rem|shift|pushd|popd|cd|chdir|dir|copy|xcopy|move|del|erase|md|mkdir|rd|rmdir|cls|title|type|path|start|defined|exist|errorlevel|not|equ|neq|lss|leq|gtr|geq|off|on|assoc|ftype|ver|vol|date|time|find|findstr|sort|more|powershell|msiexec)\b)|'
+          r'(^\s*:[A-Za-z0-9_.][A-Za-z0-9_.-]*)|'
+          r'(\b\d+\b)',
+          multiLine: true,
+          caseSensitive: false,
+        );
       case HighlightLanguage.plain:
         return RegExp(r'$^');
     }
@@ -124,6 +135,26 @@ class HighlightingTextEditingController extends TextEditingController {
         color = isDark ? const Color(0xFF569CD6) : const Color(0xFF0000FF);
         weight = FontWeight.w600;
       } else if (m.group(5) != null) {
+        color = isDark ? const Color(0xFFB5CEA8) : const Color(0xFF098658);
+      }
+      return TextStyle(color: color, fontWeight: weight);
+    }
+
+    if (language == HighlightLanguage.batch) {
+      if (m.group(1) != null) {
+        color = isDark ? const Color(0xFF6A9955) : const Color(0xFF008000);
+      } else if (m.group(2) != null) {
+        color = isDark ? const Color(0xFFCE9178) : const Color(0xFFA31515);
+      } else if (m.group(3) != null) {
+        color = isDark ? const Color(0xFF9CDCFE) : const Color(0xFF001080);
+        weight = FontWeight.w600;
+      } else if (m.group(4) != null) {
+        color = isDark ? const Color(0xFF569CD6) : const Color(0xFF0000FF);
+        weight = FontWeight.w600;
+      } else if (m.group(5) != null) {
+        color = isDark ? const Color(0xFFDCDCAA) : const Color(0xFF795E26);
+        weight = FontWeight.w600;
+      } else if (m.group(6) != null) {
         color = isDark ? const Color(0xFFB5CEA8) : const Color(0xFF098658);
       }
       return TextStyle(color: color, fontWeight: weight);
