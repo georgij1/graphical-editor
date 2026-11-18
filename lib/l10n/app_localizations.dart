@@ -480,6 +480,11 @@ class AppLocalizations {
         'Предложение ИИ загружено. Проверьте и нажмите «Применить».',
     'No issues found.': 'Ошибок нет.',
     'Checking...': 'Проверка...',
+    'Compilation history': 'История компиляции',
+    'No compilation results yet for this file.': 'Результатов проверки для этого файла пока нет.',
+    'Check': 'Проверка',
+    'latest': 'последняя',
+    'Current issues': 'Текущие проблемы',
     'Select a file in the project tree to start editing.':
         'Выберите файл в дереве проекта, чтобы начать редактирование.',
     'No open files. Select a file in the project tree.':

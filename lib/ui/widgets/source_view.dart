@@ -44,6 +44,7 @@ class _CodeViewState extends State<CodeView> {
   int _remoteCheckSeq = 0;
   List<ValidationIssue> _remoteIssues = const <ValidationIssue>[];
   bool _remoteCheckInProgress = false;
+  final Map<String, List<_CheckSnapshot>> _checkHistoryByPath = <String, List<_CheckSnapshot>>{};
 
   static const List<String> _javaSuggestions = <String>[
     'abstract',
@@ -221,6 +222,20 @@ class _CodeViewState extends State<CodeView> {
       setState(() {
         _remoteIssues = current;
         _remoteCheckInProgress = false;
+        final history = _checkHistoryByPath.putIfAbsent(
+          path,
+          () => <_CheckSnapshot>[],
+        );
+        history.insert(
+          0,
+          _CheckSnapshot(
+            time: DateTime.now(),
+            issues: List<ValidationIssue>.unmodifiable(current),
+          ),
+        );
+        if (history.length > 20) {
+          history.removeRange(20, history.length);
+        }
       });
     } catch (_) {
       if (!mounted || seq != _remoteCheckSeq) return;
@@ -762,6 +777,13 @@ class _CodeViewState extends State<CodeView> {
           _ValidationBar(
             validation: _effectiveValidation,
             checking: _remoteCheckInProgress && _supportsRemoteCheck,
+            filePath: widget.controller.codePath,
+            history: List<_CheckSnapshot>.unmodifiable(
+              _checkHistoryByPath[widget.controller.codePath] ?? const <_CheckSnapshot>[],
+            ),
+            onShowHistory: () => _showCompilationHistoryDialog(
+              widget.controller.codePath,
+            ),
           ),
           Expanded(
             child: Container(
@@ -850,13 +872,141 @@ class _CodeViewState extends State<CodeView> {
       ),
     );
   }
+
+  Future<void> _showCompilationHistoryDialog(String path) async {
+    final snapshots = List<_CheckSnapshot>.from(
+      _checkHistoryByPath[path] ?? const <_CheckSnapshot>[],
+    );
+    final currentIssues = List<ValidationIssue>.from(
+      path == widget.controller.codePath ? _remoteIssues : const <ValidationIssue>[],
+    );
+    if (!mounted) return;
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        final theme = Theme.of(dialogContext);
+        String fmtTime(DateTime t) {
+          String two(int v) => v.toString().padLeft(2, '0');
+          return '${two(t.hour)}:${two(t.minute)}:${two(t.second)}';
+        }
+
+        Widget issueTile(ValidationIssue issue) {
+          final color = issue.isError
+              ? theme.colorScheme.error
+              : Colors.amber.shade800;
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 6),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Icon(
+                  issue.isError ? Icons.error_outline : Icons.warning_amber_outlined,
+                  size: 14,
+                  color: color,
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    dialogContext.l10n.issueLocation(issue.line, issue.column) +
+                        issue.render(dialogContext.tr),
+                    style: TextStyle(fontSize: 12.5, color: color),
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
+
+        final children = <Widget>[
+          Text(
+            path,
+            style: theme.textTheme.labelMedium?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+              fontFamily: 'monospace',
+            ),
+          ),
+          const SizedBox(height: 12),
+          if (snapshots.isEmpty && currentIssues.isEmpty)
+            Text(dialogContext.tr('No compilation results yet for this file.'))
+          else ...<Widget>[
+            if (snapshots.isNotEmpty)
+              for (int i = 0; i < snapshots.length; i++) ...<Widget>[
+                Text(
+                  '${dialogContext.tr('Check')} ${fmtTime(snapshots[i].time)}'
+                  '${i == 0 ? ' (${dialogContext.tr('latest')})' : ''}',
+                  style: theme.textTheme.titleSmall,
+                ),
+                const SizedBox(height: 6),
+                if (snapshots[i].issues.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: Text(dialogContext.tr('No issues found.')),
+                  )
+                else
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: snapshots[i].issues.map(issueTile).toList(),
+                    ),
+                  ),
+                if (i != snapshots.length - 1) const Divider(height: 16),
+              ]
+            else ...<Widget>[
+              Text(dialogContext.tr('Current issues'), style: theme.textTheme.titleSmall),
+              const SizedBox(height: 6),
+              ...currentIssues.map(issueTile),
+            ],
+          ],
+        ];
+
+        return AlertDialog(
+          title: Text(dialogContext.tr('Compilation history')),
+          content: SizedBox(
+            width: 640,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxHeight: 420),
+              child: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: children,
+                ),
+              ),
+            ),
+          ),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: Text(dialogContext.tr('Close')),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _CheckSnapshot {
+  const _CheckSnapshot({required this.time, required this.issues});
+  final DateTime time;
+  final List<ValidationIssue> issues;
 }
 
 class _ValidationBar extends StatelessWidget {
-  const _ValidationBar({required this.validation, this.checking = false});
+  const _ValidationBar({
+    required this.validation,
+    this.checking = false,
+    this.filePath,
+    this.history = const <_CheckSnapshot>[],
+    this.onShowHistory,
+  });
 
   final ValidationResult validation;
   final bool checking;
+  final String? filePath;
+  final List<_CheckSnapshot> history;
+  final VoidCallback? onShowHistory;
 
   @override
   Widget build(BuildContext context) {
@@ -866,7 +1016,7 @@ class _ValidationBar extends StatelessWidget {
     // Nothing to complain about: a calm "all clear" row.
     if (issues.isEmpty) {
       final color = checking ? theme.colorScheme.tertiary : theme.colorScheme.primary;
-      return Container(
+      final row = Container(
         width: double.infinity,
         color: color.withValues(alpha: 0.08),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
@@ -887,6 +1037,12 @@ class _ValidationBar extends StatelessWidget {
             ),
           ],
         ),
+      );
+      if (onShowHistory == null) return row;
+      return InkWell(
+        onTap: onShowHistory,
+        mouseCursor: SystemMouseCursors.click,
+        child: row,
       );
     }
 
@@ -922,6 +1078,32 @@ class _ValidationBar extends StatelessWidget {
     final hasErrors = validation.hasErrors;
     final warnColor = Colors.amber.shade800;
     final color = hasErrors ? theme.colorScheme.error : warnColor;
+    final header = Row(
+      children: <Widget>[
+        Icon(
+          hasErrors ? Icons.error_outline : Icons.warning_amber_outlined,
+          size: 14,
+          color: color,
+        ),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Text(
+            context.l10n.validationSummary(
+              validation.errorCount,
+              validation.warningCount,
+            ),
+            style: TextStyle(
+              fontSize: 11.5,
+              fontWeight: FontWeight.w600,
+              color: color,
+            ),
+          ),
+        ),
+        if (onShowHistory != null)
+          Icon(Icons.history, size: 14, color: color.withValues(alpha: 0.8)),
+      ],
+    );
+
     return Container(
       width: double.infinity,
       color: color.withValues(alpha: 0.08),
@@ -930,27 +1112,13 @@ class _ValidationBar extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
           ?checkingWidget,
-          Row(
-            children: <Widget>[
-              Icon(
-                hasErrors ? Icons.error_outline : Icons.warning_amber_outlined,
-                size: 14,
-                color: color,
-              ),
-              const SizedBox(width: 6),
-              Text(
-                context.l10n.validationSummary(
-                  validation.errorCount,
-                  validation.warningCount,
+          onShowHistory == null
+              ? header
+              : InkWell(
+                  onTap: onShowHistory,
+                  mouseCursor: SystemMouseCursors.click,
+                  child: header,
                 ),
-                style: TextStyle(
-                  fontSize: 11.5,
-                  fontWeight: FontWeight.w600,
-                  color: color,
-                ),
-              ),
-            ],
-          ),
           const SizedBox(height: 2),
           ConstrainedBox(
             constraints: const BoxConstraints(maxHeight: 120),
@@ -963,7 +1131,7 @@ class _ValidationBar extends StatelessWidget {
                 final issueColor = issue.isError
                     ? theme.colorScheme.error
                     : warnColor;
-                return Padding(
+                final row = Padding(
                   padding: const EdgeInsets.only(left: 20, bottom: 2),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -985,6 +1153,12 @@ class _ValidationBar extends StatelessWidget {
                       ),
                     ],
                   ),
+                );
+                if (onShowHistory == null) return row;
+                return InkWell(
+                  onTap: onShowHistory,
+                  mouseCursor: SystemMouseCursors.click,
+                  child: row,
                 );
               },
             ),
