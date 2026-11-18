@@ -1051,24 +1051,43 @@ class _CompilationHistoryDialogState extends State<_CompilationHistoryDialog> {
           return '${local.year}-${two(local.month)}-${two(local.day)} ${two(local.hour)}:${two(local.minute)}:${two(local.second)}';
         }
 
+        final errorCount = issues.where((e) => e.kind == 'error').length;
+        final warningCount = issues.length - errorCount;
+        final hasErrors = errorCount > 0;
+        final statusColor = issues.isEmpty
+            ? Colors.green.shade700
+            : (hasErrors ? theme.colorScheme.error : Colors.amber.shade800);
+        final statusIcon = issues.isEmpty
+            ? Icons.check_circle_outline
+            : (hasErrors ? Icons.error_outline : Icons.warning_amber_outlined);
+        final statusText = issues.isEmpty
+            ? dialogContext.tr('No issues found.')
+            : dialogContext.l10n.validationSummary(errorCount, warningCount);
+
         Widget issueTile(({int line, int column, String kind, String message}) issue, {Color? forceColor}) {
           final isError = issue.kind == 'error';
           final color = forceColor ?? (isError ? theme.colorScheme.error : Colors.amber.shade800);
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 6),
+          return Container(
+            margin: const EdgeInsets.only(bottom: 6),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.06),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: color.withValues(alpha: 0.18)),
+            ),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
                 Icon(
                   isError ? Icons.error_outline : Icons.warning_amber_outlined,
-                  size: 14,
+                  size: 15,
                   color: color,
                 ),
-                const SizedBox(width: 6),
+                const SizedBox(width: 8),
                 Expanded(
                   child: Text(
                     dialogContext.l10n.issueLocation(issue.line, issue.column) + issue.message,
-                    style: TextStyle(fontSize: 12.5, color: color),
+                    style: TextStyle(fontSize: 12.5, color: color, height: 1.35),
                   ),
                 ),
               ],
@@ -1076,61 +1095,187 @@ class _CompilationHistoryDialogState extends State<_CompilationHistoryDialog> {
           );
         }
 
-        final children = <Widget>[
-          Text(
-            widget.path,
-            style: theme.textTheme.labelMedium?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-              fontFamily: 'monospace',
+        Widget sectionCard({required IconData icon, required String title, required Widget child, Color? accent}) {
+          final accentColor = accent ?? theme.colorScheme.primary;
+          return Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surfaceContainerLow,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.7)),
             ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Row(
+                  children: <Widget>[
+                    Icon(icon, size: 16, color: accentColor),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        title,
+                        style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                child,
+              ],
+            ),
+          );
+        }
+
+        Widget fileTag() {
+          return Align(
+            alignment: Alignment.centerLeft,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(999),
+                border: Border.all(color: theme.colorScheme.outlineVariant),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: <Widget>[
+                  Icon(Icons.insert_drive_file_outlined, size: 14, color: theme.colorScheme.onSurfaceVariant),
+                  const SizedBox(width: 6),
+                  Flexible(
+                    child: Text(
+                      widget.path,
+                      style: theme.textTheme.labelMedium?.copyWith(
+                        color: theme.colorScheme.onSurface,
+                        fontFamily: 'monospace',
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+
+        final infoItems = <Widget>[
+          Row(
+            children: <Widget>[
+              Icon(statusIcon, size: 18, color: statusColor),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  statusText,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: statusColor,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 8),
-          Text('${dialogContext.tr('Check')}: ${fmtDateTime(date)}'),
+          Row(
+            children: <Widget>[
+              Icon(Icons.schedule, size: 14, color: theme.colorScheme.onSurfaceVariant),
+              const SizedBox(width: 6),
+              Text(
+                '${dialogContext.tr('Check')}: ${fmtDateTime(date)}',
+                style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+              ),
+            ],
+          ),
           if (author != null && author.trim().isNotEmpty) ...<Widget>[
             const SizedBox(height: 4),
-            Text('${dialogContext.tr('Author')}: $author'),
-          ],
-          const SizedBox(height: 12),
-          Text(dialogContext.tr('Issues in this check'), style: theme.textTheme.titleSmall),
-          const SizedBox(height: 6),
-          if (issues.isEmpty)
-            Text(dialogContext.tr('No issues found.'))
-          else
-            ...issues.map((e) => issueTile(e)),
-          const SizedBox(height: 14),
-          Text(dialogContext.tr('Changes in this check'), style: theme.textTheme.titleSmall),
-          const SizedBox(height: 6),
-          if (previousIssues == null)
-            Text(dialogContext.tr('No previous check to compare.'))
-          else if (introduced.isEmpty && resolved.isEmpty)
-            Text(dialogContext.tr('No changes compared to previous check.'))
-          else ...<Widget>[
-            if (introduced.isNotEmpty) ...<Widget>[
-              Text(
-                '${dialogContext.tr('Introduced issues')} (${introduced.length})',
-                style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
-              ),
-              const SizedBox(height: 4),
-              ...introduced.map((e) => issueTile(e)),
-              const SizedBox(height: 8),
-            ],
-            if (resolved.isNotEmpty) ...<Widget>[
-              Text(
-                '${dialogContext.tr('Resolved issues')} (${resolved.length})',
-                style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
-              ),
-              const SizedBox(height: 4),
-              ...resolved.map((e) => issueTile(e, forceColor: Colors.green.shade700)),
-            ],
+            Row(
+              children: <Widget>[
+                Icon(Icons.person_outline, size: 14, color: theme.colorScheme.onSurfaceVariant),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    '${dialogContext.tr('Author')}: $author',
+                    style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
           ],
         ];
 
+        final children = <Widget>[
+          fileTag(),
+          const SizedBox(height: 12),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: statusColor.withValues(alpha: 0.06),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: statusColor.withValues(alpha: 0.2)),
+            ),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: infoItems),
+          ),
+          const SizedBox(height: 12),
+          sectionCard(
+            icon: Icons.list_alt_outlined,
+            title: '${dialogContext.tr('Issues in this check')} (${issues.length})',
+            accent: statusColor,
+            child: issues.isEmpty
+                ? Text(dialogContext.tr('No issues found.'))
+                : Column(crossAxisAlignment: CrossAxisAlignment.start, children: issues.map((e) => issueTile(e)).toList()),
+          ),
+          const SizedBox(height: 12),
+          sectionCard(
+            icon: Icons.compare_arrows_outlined,
+            title: dialogContext.tr('Changes in this check'),
+            child: previousIssues == null
+                ? Text(dialogContext.tr('No previous check to compare.'))
+                : (introduced.isEmpty && resolved.isEmpty)
+                    ? Text(dialogContext.tr('No changes compared to previous check.'))
+                    : Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: <Widget>[
+                          if (introduced.isNotEmpty) ...<Widget>[
+                            Text(
+                              '${dialogContext.tr('Introduced issues')} (${introduced.length})',
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                fontWeight: FontWeight.w700,
+                                color: theme.colorScheme.error,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            ...introduced.map((e) => issueTile(e)),
+                            if (resolved.isNotEmpty) const SizedBox(height: 8),
+                          ],
+                          if (resolved.isNotEmpty) ...<Widget>[
+                            Text(
+                              '${dialogContext.tr('Resolved issues')} (${resolved.length})',
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                fontWeight: FontWeight.w700,
+                                color: Colors.green.shade700,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            ...resolved.map((e) => issueTile(e, forceColor: Colors.green.shade700)),
+                          ],
+                        ],
+                      ),
+          ),
+        ];
+
         return AlertDialog(
-          title: Text(dialogContext.tr('Check report')),
+          title: Row(
+            children: <Widget>[
+              Icon(Icons.assignment_outlined, color: theme.colorScheme.primary),
+              const SizedBox(width: 8),
+              Expanded(child: Text(dialogContext.tr('Check report'))),
+            ],
+          ),
           content: SizedBox(
-            width: 680,
+            width: 700,
             child: ConstrainedBox(
-              constraints: const BoxConstraints(maxHeight: 460),
+              constraints: const BoxConstraints(maxHeight: 520),
               child: SingleChildScrollView(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -1141,7 +1286,7 @@ class _CompilationHistoryDialogState extends State<_CompilationHistoryDialog> {
             ),
           ),
           actions: <Widget>[
-            TextButton(
+            FilledButton.tonal(
               onPressed: () => Navigator.of(dialogContext).pop(),
               child: Text(dialogContext.tr('Close')),
             ),
