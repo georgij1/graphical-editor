@@ -1379,126 +1379,139 @@ class _CompilationHistoryDialogState extends State<_CompilationHistoryDialog> {
       );
     }
 
-    String serverDiagSig(List<FileCheckDiagnostic> diags) =>
-        diags.map((d) => '${d.line}|${d.column}|${d.kind}|${d.message}').join('\n');
-    String localIssuesSig(List<ValidationIssue> issues) => issues
-        .map((i) => '${i.line ?? 1}|${i.column ?? 1}|${i.isError ? 'error' : 'warning'}|${i.message}')
-        .join('\n');
-
-    final hasServerHistory = _records.isNotEmpty;
-    final hasLocalHistory = _local.isNotEmpty;
-
-    // Include very recent local in-session checks that may not be persisted/visible
-    // on the server yet (dialog prefers server history when available).
-    var localHeadCount = 0;
-    if (hasLocalHistory && hasServerHistory) {
-      final newestServerSig = serverDiagSig(_records.first.diagnostics);
-      for (final snap in _local) {
-        final isAfterServer = snap.time.isAfter(_records.first.date);
-        final sameAsServer = localIssuesSig(snap.issues) == newestServerSig;
-        if (isAfterServer && !sameAsServer) {
-          localHeadCount++;
-        } else {
-          break;
-        }
-      }
-    } else if (hasLocalHistory && !hasServerHistory) {
-      localHeadCount = _local.length;
-    }
+    String diagSig(List<({int line, int column, String kind, String message})> issues) =>
+        issues.map((d) => '${d.line}|${d.column}|${d.kind}|${d.message}').join('\n');
 
     List<({int line, int column, String kind, String message})> serverIssues(FileCheckRecord rec) => rec.diagnostics
         .map((d) => (line: d.line, column: d.column, kind: d.kind, message: d.message))
         .toList();
+
+    // Use raw diagnostic messages for comparison so local/server entries are comparable.
     List<({int line, int column, String kind, String message})> localIssues(_CheckSnapshot snap) => snap.issues
         .map((issue) => (
               line: issue.line ?? 1,
               column: issue.column ?? 1,
               kind: issue.isError ? 'error' : 'warning',
-              message: issue.render(context.tr),
+              message: issue.message,
             ))
         .toList();
 
-    final filteredRecordIndices = <int>[];
-    final filteredLocalIndices = <int>[];
-    final filteredLocalHeadIndices = <int>[];
-    if (hasServerHistory) {
-      for (int i = 0; i < _records.length; i++) {
-        final rec = _records[i];
-        final diags = rec.diagnostics;
-        final hasErrors = diags.any((d) => d.isError);
-        if (!_matchesDate(rec.date)) continue;
-        if (!_matchesFilter(isEmpty: diags.isEmpty, hasErrors: hasErrors)) continue;
-        final buf = StringBuffer()
-          ..write(_fmtTime(rec.date))
-          ..write(' ')
-          ..write(rec.date.toLocal().toIso8601String())
-          ..write(' ')
-          ..write(rec.author)
-          ..write(' ');
-        for (final d in diags) {
-          buf
-            ..write(d.kind)
-            ..write(' ')
-            ..write(d.line)
-            ..write(':')
-            ..write(d.column)
-            ..write(' ')
-            ..write(d.message)
-            ..write(' ');
-        }
-        if (_matchesQuery(buf.toString())) filteredRecordIndices.add(i);
+    // Unified timeline (newest -> oldest): merge local in-session checks with server
+    // history so the latest check and its diff vs previous are shown even before
+    // persistence/sync catches up.
+    final timeline = <({
+      DateTime date,
+      String? author,
+      List<({int line, int column, String kind, String message})> issues,
+      String sig,
+      bool localOnly,
+    })>[];
+
+    final serverTimeline = <({
+      DateTime date,
+      String? author,
+      List<({int line, int column, String kind, String message})> issues,
+      String sig,
+      bool localOnly,
+    })>[];
+    for (final rec in _records) {
+      final issues = serverIssues(rec);
+      serverTimeline.add((
+        date: rec.date,
+        author: rec.author,
+        issues: issues,
+        sig: diagSig(issues),
+        localOnly: false,
+      ));
+    }
+
+    bool persistedLocally(({
+      DateTime date,
+      String? author,
+      List<({int line, int column, String kind, String message})> issues,
+      String sig,
+      bool localOnly,
+    }) localItem) {
+      for (final s in serverTimeline) {
+        if (s.sig != localItem.sig) continue;
+        final diff = s.date.difference(localItem.date).inSeconds.abs();
+        if (diff <= 10) return true;
       }
-      for (int i = 0; i < localHeadCount; i++) {
-        final snap = _local[i];
-        final hasErrors = snap.issues.any((issue) => issue.isError);
-        if (!_matchesDate(snap.time)) continue;
-        if (!_matchesFilter(isEmpty: snap.issues.isEmpty, hasErrors: hasErrors)) continue;
-        final buf = StringBuffer()
-          ..write(_fmtTime(snap.time))
-          ..write(' ')
-          ..write(snap.time.toLocal().toIso8601String())
-          ..write(' ');
-        for (final issue in snap.issues) {
-          buf
-            ..write(issue.isError ? 'error' : 'warning')
-            ..write(' ')
-            ..write(issue.line ?? 1)
-            ..write(':')
-            ..write(issue.column ?? 1)
-            ..write(' ')
-            ..write(issue.render(context.tr))
-            ..write(' ')
-            ..write(issue.message)
-            ..write(' ');
-        }
-        if (_matchesQuery(buf.toString())) filteredLocalHeadIndices.add(i);
+      return false;
+    }
+
+    for (final snap in _local) {
+      final issues = localIssues(snap);
+      final item = (
+        date: snap.time,
+        author: null as String?,
+        issues: issues,
+        sig: diagSig(issues),
+        localOnly: true,
+      );
+      if (!persistedLocally(item)) {
+        timeline.add(item);
       }
-    } else if (hasLocalHistory) {
-      for (int i = 0; i < _local.length; i++) {
-        final snap = _local[i];
-        final hasErrors = snap.issues.any((issue) => issue.isError);
-        if (!_matchesDate(snap.time)) continue;
-        if (!_matchesFilter(isEmpty: snap.issues.isEmpty, hasErrors: hasErrors)) continue;
-        final buf = StringBuffer()
-          ..write(_fmtTime(snap.time))
-          ..write(' ')
-          ..write(snap.time.toLocal().toIso8601String())
-          ..write(' ');
-        for (final issue in snap.issues) {
-          buf
-            ..write(issue.isError ? 'error' : 'warning')
-            ..write(' ')
-            ..write(issue.line ?? 1)
-            ..write(':')
-            ..write(issue.column ?? 1)
-            ..write(' ')
-            ..write(issue.render(context.tr))
-            ..write(' ')
-            ..write(issue.message)
-            ..write(' ');
+    }
+    timeline.addAll(serverTimeline);
+    timeline.sort((a, b) => b.date.compareTo(a.date));
+
+    // Deduplicate identical adjacent-near entries (prefer server-backed).
+    final deduped = <({
+      DateTime date,
+      String? author,
+      List<({int line, int column, String kind, String message})> issues,
+      String sig,
+      bool localOnly,
+    })>[];
+    for (final item in timeline) {
+      if (deduped.isNotEmpty) {
+        final prev = deduped.last;
+        final diff = prev.date.difference(item.date).inSeconds.abs();
+        if (prev.sig == item.sig && diff <= 10) {
+          if (prev.localOnly && !item.localOnly) {
+            deduped[deduped.length - 1] = item;
+          }
+          continue;
         }
-        if (_matchesQuery(buf.toString())) filteredLocalIndices.add(i);
       }
+      deduped.add(item);
+    }
+
+    bool matchesItemSearch(({
+      DateTime date,
+      String? author,
+      List<({int line, int column, String kind, String message})> issues,
+      String sig,
+      bool localOnly,
+    }) item) {
+      final hasErrors = item.issues.any((d) => d.kind == 'error');
+      if (!_matchesDate(item.date)) return false;
+      if (!_matchesFilter(isEmpty: item.issues.isEmpty, hasErrors: hasErrors)) return false;
+      final buf = StringBuffer()
+        ..write(_fmtTime(item.date))
+        ..write(' ')
+        ..write(item.date.toLocal().toIso8601String())
+        ..write(' ')
+        ..write(item.author ?? '')
+        ..write(' ');
+      for (final d in item.issues) {
+        buf
+          ..write(d.kind)
+          ..write(' ')
+          ..write(d.line)
+          ..write(':')
+          ..write(d.column)
+          ..write(' ')
+          ..write(d.message)
+          ..write(' ');
+      }
+      return _matchesQuery(buf.toString());
+    }
+
+    final filteredIndices = <int>[];
+    for (int i = 0; i < deduped.length; i++) {
+      if (matchesItemSearch(deduped[i])) filteredIndices.add(i);
     }
 
     Widget buildList() {
@@ -1509,21 +1522,28 @@ class _CompilationHistoryDialogState extends State<_CompilationHistoryDialog> {
         );
       }
 
-      Widget serverCard(int i) {
+      if (deduped.isEmpty) {
+        return Text(context.tr('No compilation results yet for this file.'));
+      }
+      if (filteredIndices.isEmpty) {
+        return Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Text(context.tr('No checks match search or filters.')),
+        );
+      }
+
+      Widget checkCard(int i) {
         return Builder(builder: (context) {
-          final rec = _records[i];
-          final date = rec.date;
-          final diags = rec.diagnostics;
-          final hasErrors = diags.any((d) => d.isError);
-          final statusColor = diags.isEmpty
+          final item = deduped[i];
+          final hasErrors = item.issues.any((d) => d.kind == 'error');
+          final statusColor = item.issues.isEmpty
               ? Colors.green.shade700
               : (hasErrors ? theme.colorScheme.error : Colors.amber.shade800);
-          final statusIcon = diags.isEmpty
+          final statusIcon = item.issues.isEmpty
               ? Icons.check_circle_outline
               : (hasErrors ? Icons.error_outline : Icons.warning_amber_outlined);
-          final current = serverIssues(rec);
-          final previous = (i + 1 < _records.length) ? serverIssues(_records[i + 1]) : null;
-          final isLatestOverall = i == 0 && localHeadCount == 0;
+          final previous = (i + 1 < deduped.length) ? deduped[i + 1].issues : null;
+          final isLatestOverall = i == 0;
           final content = Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
@@ -1533,7 +1553,7 @@ class _CompilationHistoryDialogState extends State<_CompilationHistoryDialog> {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      '${context.tr('Check')} ${_fmtTime(date)}'
+                      '${context.tr('Check')} ${_fmtTime(item.date)}'
                       '${isLatestOverall ? ' (${context.tr('latest')})' : ''}',
                       style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
                     ),
@@ -1542,7 +1562,7 @@ class _CompilationHistoryDialogState extends State<_CompilationHistoryDialog> {
                 ],
               ),
               const SizedBox(height: 8),
-              if (diags.isEmpty)
+              if (item.issues.isEmpty)
                 Text(
                   context.tr('No issues found.'),
                   style: TextStyle(color: statusColor),
@@ -1551,9 +1571,9 @@ class _CompilationHistoryDialogState extends State<_CompilationHistoryDialog> {
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: <Widget>[
-                    for (final d in diags)
+                    for (final d in item.issues)
                       issueTile(
-                        isError: d.isError,
+                        isError: d.kind == 'error',
                         line: d.line,
                         column: d.column,
                         message: d.message,
@@ -1567,9 +1587,9 @@ class _CompilationHistoryDialogState extends State<_CompilationHistoryDialog> {
             clipBehavior: Clip.antiAlias,
             child: InkWell(
               onTap: () => _showCheckReportDialog(
-                date: date,
-                author: rec.author,
-                issues: current,
+                date: item.date,
+                author: item.author,
+                issues: item.issues,
                 previousIssues: previous,
               ),
               mouseCursor: SystemMouseCursors.click,
@@ -1582,117 +1602,13 @@ class _CompilationHistoryDialogState extends State<_CompilationHistoryDialog> {
         });
       }
 
-      Widget localCard(int i, {required bool fromHead}) {
-        return Builder(builder: (context) {
-          final snap = _local[i];
-          final hasErrors = snap.issues.any((issue) => issue.isError);
-          final statusColor = snap.issues.isEmpty
-              ? Colors.green.shade700
-              : (hasErrors ? theme.colorScheme.error : Colors.amber.shade800);
-          final statusIcon = snap.issues.isEmpty
-              ? Icons.check_circle_outline
-              : (hasErrors ? Icons.error_outline : Icons.warning_amber_outlined);
-          final current = localIssues(snap);
-          List<({int line, int column, String kind, String message})>? previous;
-          if (i + 1 < _local.length) {
-            previous = localIssues(_local[i + 1]);
-          } else if (fromHead && hasServerHistory) {
-            previous = serverIssues(_records.first);
-          } else {
-            previous = null;
-          }
-          final isLatestOverall = fromHead ? i == 0 : (localHeadCount == 0 && i == 0 && !hasServerHistory);
-          final content = Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              Row(
-                children: <Widget>[
-                  Icon(statusIcon, size: 18, color: statusColor),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      '${context.tr('Check')} ${_fmtTime(snap.time)}'
-                      '${isLatestOverall ? ' (${context.tr('latest')})' : ''}',
-                      style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
-                    ),
-                  ),
-                  Icon(Icons.chevron_right, size: 18, color: theme.colorScheme.onSurfaceVariant),
-                ],
-              ),
-              const SizedBox(height: 8),
-              if (snap.issues.isEmpty)
-                Text(
-                  context.tr('No issues found.'),
-                  style: TextStyle(color: statusColor),
-                )
-              else
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: snap.issues
-                      .map((issue) => issueTile(
-                            isError: issue.isError,
-                            line: issue.line ?? 1,
-                            column: issue.column ?? 1,
-                            message: issue.render(context.tr),
-                          ))
-                      .toList(),
-                ),
-            ],
-          );
-          return Card(
-            margin: const EdgeInsets.only(bottom: 10),
-            clipBehavior: Clip.antiAlias,
-            child: InkWell(
-              onTap: () => _showCheckReportDialog(
-                date: snap.time,
-                author: null,
-                issues: current,
-                previousIssues: previous,
-              ),
-              mouseCursor: SystemMouseCursors.click,
-              child: Padding(
-                padding: const EdgeInsets.all(12),
-                child: content,
-              ),
-            ),
-          );
-        });
-      }
-
-      if (hasServerHistory) {
-        if (filteredLocalHeadIndices.isEmpty && filteredRecordIndices.isEmpty) {
-          return Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8),
-            child: Text(context.tr('No checks match search or filters.')),
-          );
-        }
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            for (final i in filteredLocalHeadIndices) localCard(i, fromHead: true),
-            for (final i in filteredRecordIndices) serverCard(i),
-          ],
-        );
-      }
-
-      if (hasLocalHistory) {
-        if (filteredLocalIndices.isEmpty) {
-          return Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8),
-            child: Text(context.tr('No checks match search or filters.')),
-          );
-        }
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            for (final i in filteredLocalIndices) localCard(i, fromHead: false),
-          ],
-        );
-      }
-
-      return Text(context.tr('No compilation results yet for this file.'));
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          for (final i in filteredIndices) checkCard(i),
+        ],
+      );
     }
 
     Widget filterChip(_HistoryFilter value, String label, IconData icon) {
