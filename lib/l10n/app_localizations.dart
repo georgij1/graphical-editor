@@ -485,6 +485,14 @@ class AppLocalizations {
     'Check': 'Проверка',
     'latest': 'последняя',
     'Current issues': 'Текущие проблемы',
+    'Check report': 'Отчёт о проверке',
+    'Issues in this check': 'Проблемы в этой проверке',
+    'Changes in this check': 'Изменения в этой проверке',
+    'Introduced issues': 'Появившиеся проблемы',
+    'Resolved issues': 'Устранённые проблемы',
+    'No changes compared to previous check.': 'Нет изменений по сравнению с предыдущей проверкой.',
+    'No previous check to compare.': 'Нет предыдущей проверки для сравнения.',
+    'Compared to previous check': 'По сравнению с предыдущей проверкой',
     'Select a file in the project tree to start editing.':
         'Выберите файл в дереве проекта, чтобы начать редактирование.',
     'No open files. Select a file in the project tree.':

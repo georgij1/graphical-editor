@@ -1016,6 +1016,141 @@ class _CompilationHistoryDialogState extends State<_CompilationHistoryDialog> {
     }
   }
 
+  String _issueKey({required int line, required int column, required String kind, required String message}) =>
+      '$line|$column|$kind|$message';
+
+  Future<void> _showCheckReportDialog({
+    required DateTime date,
+    required String? author,
+    required List<({int line, int column, String kind, String message})> issues,
+    required List<({int line, int column, String kind, String message})>? previousIssues,
+  }) async {
+    if (!mounted) return;
+    final currentKeys = issues.map((e) => _issueKey(line: e.line, column: e.column, kind: e.kind, message: e.message)).toSet();
+    final prevKeys = previousIssues
+        ?.map((e) => _issueKey(line: e.line, column: e.column, kind: e.kind, message: e.message))
+        .toSet();
+    final introduced = previousIssues == null
+        ? const <({int line, int column, String kind, String message})>[]
+        : issues
+            .where((e) => !(prevKeys!.contains(_issueKey(line: e.line, column: e.column, kind: e.kind, message: e.message))))
+            .toList();
+    final resolved = previousIssues == null
+        ? const <({int line, int column, String kind, String message})>[]
+        : previousIssues
+            .where((e) => !currentKeys.contains(_issueKey(line: e.line, column: e.column, kind: e.kind, message: e.message)))
+            .toList();
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        final theme = Theme.of(dialogContext);
+        String two(int v) => v.toString().padLeft(2, '0');
+        String fmtDateTime(DateTime t) {
+          final local = t.toLocal();
+          return '${local.year}-${two(local.month)}-${two(local.day)} ${two(local.hour)}:${two(local.minute)}:${two(local.second)}';
+        }
+
+        Widget issueTile(({int line, int column, String kind, String message}) issue, {Color? forceColor}) {
+          final isError = issue.kind == 'error';
+          final color = forceColor ?? (isError ? theme.colorScheme.error : Colors.amber.shade800);
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 6),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Icon(
+                  isError ? Icons.error_outline : Icons.warning_amber_outlined,
+                  size: 14,
+                  color: color,
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    dialogContext.l10n.issueLocation(issue.line, issue.column) + issue.message,
+                    style: TextStyle(fontSize: 12.5, color: color),
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
+
+        final children = <Widget>[
+          Text(
+            widget.path,
+            style: theme.textTheme.labelMedium?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+              fontFamily: 'monospace',
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text('${dialogContext.tr('Check')}: ${fmtDateTime(date)}'),
+          if (author != null && author.trim().isNotEmpty) ...<Widget>[
+            const SizedBox(height: 4),
+            Text('${dialogContext.tr('Author')}: $author'),
+          ],
+          const SizedBox(height: 12),
+          Text(dialogContext.tr('Issues in this check'), style: theme.textTheme.titleSmall),
+          const SizedBox(height: 6),
+          if (issues.isEmpty)
+            Text(dialogContext.tr('No issues found.'))
+          else
+            ...issues.map((e) => issueTile(e)),
+          const SizedBox(height: 14),
+          Text(dialogContext.tr('Changes in this check'), style: theme.textTheme.titleSmall),
+          const SizedBox(height: 6),
+          if (previousIssues == null)
+            Text(dialogContext.tr('No previous check to compare.'))
+          else if (introduced.isEmpty && resolved.isEmpty)
+            Text(dialogContext.tr('No changes compared to previous check.'))
+          else ...<Widget>[
+            if (introduced.isNotEmpty) ...<Widget>[
+              Text(
+                '${dialogContext.tr('Introduced issues')} (${introduced.length})',
+                style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 4),
+              ...introduced.map((e) => issueTile(e)),
+              const SizedBox(height: 8),
+            ],
+            if (resolved.isNotEmpty) ...<Widget>[
+              Text(
+                '${dialogContext.tr('Resolved issues')} (${resolved.length})',
+                style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 4),
+              ...resolved.map((e) => issueTile(e, forceColor: Colors.green.shade700)),
+            ],
+          ],
+        ];
+
+        return AlertDialog(
+          title: Text(dialogContext.tr('Check report')),
+          content: SizedBox(
+            width: 680,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxHeight: 460),
+              child: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: children,
+                ),
+              ),
+            ),
+          ),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: Text(dialogContext.tr('Close')),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -1069,13 +1204,29 @@ class _CompilationHistoryDialogState extends State<_CompilationHistoryDialog> {
             final rec = _records[i];
             final date = rec.date;
             final diags = rec.diagnostics;
-            return Column(
+            final current = diags
+                .map((d) => (line: d.line, column: d.column, kind: d.kind, message: d.message))
+                .toList();
+            final previous = (i + 1 < _records.length)
+                ? _records[i + 1]
+                    .diagnostics
+                    .map((d) => (line: d.line, column: d.column, kind: d.kind, message: d.message))
+                    .toList()
+                : null;
+            final content = Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
-                Text(
-                  '${context.tr('Check')} ${fmtTime(date)}'
-                  '${i == 0 ? ' (${context.tr('latest')})' : ''}',
-                  style: theme.textTheme.titleSmall,
+                Row(
+                  children: <Widget>[
+                    Expanded(
+                      child: Text(
+                        '${context.tr('Check')} ${fmtTime(date)}'
+                        '${i == 0 ? ' (${context.tr('latest')})' : ''}',
+                        style: theme.textTheme.titleSmall,
+                      ),
+                    ),
+                    Icon(Icons.open_in_new, size: 14, color: theme.colorScheme.onSurfaceVariant),
+                  ],
                 ),
                 const SizedBox(height: 6),
                 if (diags.isEmpty)
@@ -1101,37 +1252,99 @@ class _CompilationHistoryDialogState extends State<_CompilationHistoryDialog> {
                   ),
               ],
             );
+            return InkWell(
+              onTap: () => _showCheckReportDialog(
+                date: date,
+                author: rec.author,
+                issues: current,
+                previousIssues: previous,
+              ),
+              mouseCursor: SystemMouseCursors.click,
+              borderRadius: BorderRadius.circular(6),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 2),
+                child: content,
+              ),
+            );
           }),
           if (i != _records.length - 1) const Divider(height: 16),
         ],
       ] else if (_local.isNotEmpty) ...<Widget>[
         for (int i = 0; i < _local.length; i++) ...<Widget>[
-          Text(
-            '${context.tr('Check')} ${fmtTime(_local[i].time)}'
-            '${i == 0 ? ' (${context.tr('latest')})' : ''}',
-            style: theme.textTheme.titleSmall,
-          ),
-          const SizedBox(height: 6),
-          if (_local[i].issues.isEmpty)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 10),
-              child: Text(context.tr('No issues found.')),
-            )
-          else
-            Padding(
-              padding: const EdgeInsets.only(bottom: 10),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: _local[i].issues
-                    .map((issue) => issueTile(
-                          isError: issue.isError,
+          Builder(builder: (context) {
+            final snap = _local[i];
+            final current = snap.issues
+                .map((issue) => (
+                      line: issue.line ?? 1,
+                      column: issue.column ?? 1,
+                      kind: issue.isError ? 'error' : 'warning',
+                      message: issue.render(context.tr),
+                    ))
+                .toList();
+            final previous = (i + 1 < _local.length)
+                ? _local[i + 1]
+                    .issues
+                    .map((issue) => (
                           line: issue.line ?? 1,
                           column: issue.column ?? 1,
+                          kind: issue.isError ? 'error' : 'warning',
                           message: issue.render(context.tr),
                         ))
-                    .toList(),
+                    .toList()
+                : null;
+            final content = Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Row(
+                  children: <Widget>[
+                    Expanded(
+                      child: Text(
+                        '${context.tr('Check')} ${fmtTime(snap.time)}'
+                        '${i == 0 ? ' (${context.tr('latest')})' : ''}',
+                        style: theme.textTheme.titleSmall,
+                      ),
+                    ),
+                    Icon(Icons.open_in_new, size: 14, color: theme.colorScheme.onSurfaceVariant),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                if (snap.issues.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: Text(context.tr('No issues found.')),
+                  )
+                else
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: snap.issues
+                          .map((issue) => issueTile(
+                                isError: issue.isError,
+                                line: issue.line ?? 1,
+                                column: issue.column ?? 1,
+                                message: issue.render(context.tr),
+                              ))
+                          .toList(),
+                    ),
+                  ),
+              ],
+            );
+            return InkWell(
+              onTap: () => _showCheckReportDialog(
+                date: snap.time,
+                author: null,
+                issues: current,
+                previousIssues: previous,
               ),
-            ),
+              mouseCursor: SystemMouseCursors.click,
+              borderRadius: BorderRadius.circular(6),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 2),
+                child: content,
+              ),
+            );
+          }),
           if (i != _local.length - 1) const Divider(height: 16),
         ],
       ] else
