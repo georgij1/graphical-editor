@@ -1753,6 +1753,15 @@ class _CompilationHistoryDialogState extends State<_CompilationHistoryDialog> {
                         initialDateRange: initialRange,
                         helpText: context.tr('Date'),
                         saveText: context.tr('Apply'),
+                        builder: (context, child) {
+                          if (child == null) return const SizedBox.shrink();
+                          return Center(
+                            child: ConstrainedBox(
+                              constraints: const BoxConstraints(maxWidth: 420, maxHeight: 500),
+                              child: child,
+                            ),
+                          );
+                        },
                       );
                       if (!mounted) return;
                       if (picked != null) {
