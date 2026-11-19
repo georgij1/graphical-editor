@@ -99,6 +99,16 @@ class _PomEditorState extends State<PomEditor> {
     return ok;
   }
 
+  void _setSource(String source, {bool apply = true}) {
+    _text.text = source;
+    setState(() {
+      _validation = _validate(_text.text);
+    });
+    if (apply && !_validation.hasErrors) {
+      widget.controller.applyCode(_text.text);
+    }
+  }
+
   void _showMessage(String message) {
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
@@ -107,6 +117,157 @@ class _PomEditorState extends State<PomEditor> {
         behavior: SnackBarBehavior.floating,
         duration: const Duration(seconds: 2),
       ));
+  }
+
+  Future<void> _showAddDependencyDialog() async {
+    final groupCtrl = TextEditingController();
+    final artifactCtrl = TextEditingController();
+    final versionCtrl = TextEditingController();
+    String scope = '';
+    final scopes = const <String>[
+      '',
+      'compile',
+      'provided',
+      'runtime',
+      'test',
+      'system',
+      'import',
+    ];
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (dialogContext, setDialogState) => AlertDialog(
+            title: Text(dialogContext.tr('Add dependency')),
+            content: SizedBox(
+              width: 420,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: <Widget>[
+                  TextField(
+                    controller: groupCtrl,
+                    decoration: InputDecoration(
+                      labelText: dialogContext.tr('Group ID'),
+                    ),
+                    autofocus: true,
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: artifactCtrl,
+                    decoration: InputDecoration(
+                      labelText: dialogContext.tr('Artifact ID'),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: versionCtrl,
+                    decoration: InputDecoration(
+                      labelText: dialogContext.tr('Version'),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  DropdownButtonFormField<String>(
+                    key: ValueKey<String>('scope-$scope'),
+                    initialValue: scope,
+                    decoration: InputDecoration(
+                      labelText: dialogContext.tr('Scope'),
+                    ),
+                    items: [
+                      for (final s in scopes)
+                        DropdownMenuItem<String>(
+                          value: s,
+                          child: Text(s.isEmpty ? '-' : s),
+                        ),
+                    ],
+                    onChanged: (v) => setDialogState(() => scope = v ?? ''),
+                  ),
+                ],
+              ),
+            ),
+            actions: <Widget>[
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(false),
+                child: Text(dialogContext.tr('Cancel')),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.of(dialogContext).pop(true),
+                child: Text(dialogContext.tr('Add')),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+    if (result != true) {
+      groupCtrl.dispose();
+      artifactCtrl.dispose();
+      versionCtrl.dispose();
+      return;
+    }
+    final groupId = groupCtrl.text.trim();
+    final artifactId = artifactCtrl.text.trim();
+    final version = versionCtrl.text.trim();
+    groupCtrl.dispose();
+    artifactCtrl.dispose();
+    versionCtrl.dispose();
+    if (groupId.isEmpty || artifactId.isEmpty) return;
+    _addMavenDependency(
+      groupId: groupId,
+      artifactId: artifactId,
+      version: version,
+      scope: scope.trim(),
+    );
+  }
+
+  void _addMavenDependency({
+    required String groupId,
+    required String artifactId,
+    required String version,
+    required String scope,
+  }) {
+    String esc(String s) => s
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&apos;');
+
+    final buf = StringBuffer();
+    buf.writeln('        <dependency>');
+    buf.writeln('            <groupId>${esc(groupId)}</groupId>');
+    buf.writeln('            <artifactId>${esc(artifactId)}</artifactId>');
+    if (version.isNotEmpty) {
+      buf.writeln('            <version>${esc(version)}</version>');
+    }
+    if (scope.isNotEmpty) {
+      buf.writeln('            <scope>${esc(scope)}</scope>');
+    }
+    buf.write('        </dependency>');
+    final depBlock = buf.toString();
+
+    var source = _text.text;
+    final depsClose = RegExp(r'^(\s*)</dependencies>', multiLine: true);
+    final m = depsClose.firstMatch(source);
+    if (m != null) {
+      final insertAt = m.start;
+      final needsNl = insertAt > 0 && source[insertAt - 1] != '\n';
+      source = source.replaceRange(
+        insertAt,
+        insertAt,
+        '${needsNl ? '\n' : ''}$depBlock\n',
+      );
+    } else {
+      final projectClose = RegExp(r'^(\s*)</project>', multiLine: true);
+      final pm = projectClose.firstMatch(source);
+      final block =
+          '    <dependencies>\n$depBlock\n    </dependencies>\n';
+      if (pm != null) {
+        source = source.replaceRange(pm.start, pm.start, block);
+      } else {
+        source = '$source\n$block';
+      }
+    }
+    _setSource(source);
   }
 
   List<_MavenDependency> _parseDependencies(String source) {
@@ -253,6 +414,7 @@ class _PomEditorState extends State<PomEditor> {
                         child: _DependenciesPanel(
                           dependencies: deps,
                           theme: theme,
+                          onAdd: _showAddDependencyDialog,
                         ),
                       ),
                     ],
@@ -295,10 +457,15 @@ class _MavenDependency {
 }
 
 class _DependenciesPanel extends StatelessWidget {
-  const _DependenciesPanel({required this.dependencies, required this.theme});
+  const _DependenciesPanel({
+    required this.dependencies,
+    required this.theme,
+    this.onAdd,
+  });
 
   final List<_MavenDependency> dependencies;
   final ThemeData theme;
+  final VoidCallback? onAdd;
 
   @override
   Widget build(BuildContext context) {
@@ -323,6 +490,13 @@ class _DependenciesPanel extends StatelessWidget {
                   style: theme.textTheme.titleSmall,
                 ),
                 const Spacer(),
+                if (onAdd != null)
+                  IconButton(
+                    icon: const Icon(Icons.add, size: 18),
+                    tooltip: context.tr('Add dependency'),
+                    visualDensity: VisualDensity.compact,
+                    onPressed: onAdd,
+                  ),
                 Container(
                   padding:
                       const EdgeInsets.symmetric(horizontal: 8, vertical: 2),

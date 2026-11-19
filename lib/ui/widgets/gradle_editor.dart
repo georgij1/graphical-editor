@@ -60,6 +60,14 @@ class _GradleEditorState extends State<GradleEditor> {
     return ok;
   }
 
+  void _setSource(String source, {bool apply = true}) {
+    _text.text = source;
+    setState(() {});
+    if (apply) {
+      widget.controller.applyCode(_text.text);
+    }
+  }
+
   void _showMessage(String message) {
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
@@ -68,6 +76,139 @@ class _GradleEditorState extends State<GradleEditor> {
         behavior: SnackBarBehavior.floating,
         duration: const Duration(seconds: 2),
       ));
+  }
+
+  Future<void> _showAddDependencyDialog() async {
+    final notationCtrl = TextEditingController();
+    String configuration = 'implementation';
+    bool isPlatform = false;
+    final configs = const <String>[
+      'implementation',
+      'api',
+      'compileOnly',
+      'runtimeOnly',
+      'testImplementation',
+      'testCompileOnly',
+      'testRuntimeOnly',
+      'annotationProcessor',
+    ];
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (dialogContext, setDialogState) => AlertDialog(
+            title: Text(dialogContext.tr('Add dependency')),
+            content: SizedBox(
+              width: 420,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: <Widget>[
+                  DropdownButtonFormField<String>(
+                    key: ValueKey<String>('config-$configuration'),
+                    initialValue: configuration,
+                    decoration: InputDecoration(
+                      labelText: dialogContext.tr('Configuration'),
+                    ),
+                    items: [
+                      for (final c in configs)
+                        DropdownMenuItem<String>(value: c, child: Text(c)),
+                    ],
+                    onChanged: (v) =>
+                        setDialogState(() => configuration = v ?? configuration),
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: notationCtrl,
+                    decoration: InputDecoration(
+                      labelText: dialogContext.tr('Dependency notation'),
+                      hintText: 'group:artifact:version',
+                    ),
+                    autofocus: true,
+                  ),
+                  const SizedBox(height: 4),
+                  CheckboxListTile(
+                    contentPadding: EdgeInsets.zero,
+                    value: isPlatform,
+                    onChanged: (v) =>
+                        setDialogState(() => isPlatform = v ?? false),
+                    title: Text(dialogContext.tr('Platform (BOM)')),
+                    controlAffinity: ListTileControlAffinity.leading,
+                    dense: true,
+                  ),
+                ],
+              ),
+            ),
+            actions: <Widget>[
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(false),
+                child: Text(dialogContext.tr('Cancel')),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.of(dialogContext).pop(true),
+                child: Text(dialogContext.tr('Add')),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+    if (result != true) {
+      notationCtrl.dispose();
+      return;
+    }
+    final notation = notationCtrl.text.trim();
+    notationCtrl.dispose();
+    if (notation.isEmpty) return;
+    _addGradleDependency(
+      configuration: configuration,
+      notation: notation,
+      isPlatform: isPlatform,
+    );
+  }
+
+  void _addGradleDependency({
+    required String configuration,
+    required String notation,
+    required bool isPlatform,
+  }) {
+    final escaped = notation.replaceAll("'", "\\'");
+    final line = isPlatform
+        ? "    $configuration platform('$escaped')"
+        : "    $configuration '$escaped'";
+
+    var source = _text.text;
+    final blockStartRe = RegExp(r'\bdependencies\s*\{');
+    final m = blockStartRe.firstMatch(source);
+    if (m != null) {
+      final openBrace = source.indexOf('{', m.start);
+      if (openBrace >= 0) {
+        var depth = 0;
+        var closeBrace = -1;
+        for (var i = openBrace; i < source.length; i++) {
+          final ch = source[i];
+          if (ch == '{') depth++;
+          if (ch == '}') {
+            depth--;
+            if (depth == 0) {
+              closeBrace = i;
+              break;
+            }
+          }
+        }
+        if (closeBrace >= 0) {
+          final before = source.substring(0, closeBrace);
+          final after = source.substring(closeBrace);
+          final needsNl = before.isNotEmpty && !before.endsWith('\n');
+          source = '$before${needsNl ? '\n' : ''}$line\n$after';
+          _setSource(source);
+          return;
+        }
+      }
+    }
+    // No dependencies block found: append one.
+    final suffix = source.endsWith('\n') || source.isEmpty ? '' : '\n';
+    source = '$source$suffix\ndependencies {\n$line\n}\n';
+    _setSource(source);
   }
 
   List<_GradleItem> _parseItems(String source) {
@@ -219,7 +360,10 @@ class _GradleEditorState extends State<GradleEditor> {
                       ),
                       SizedBox(
                         width: previewWidth,
-                        child: _GradlePanel(items: items),
+                        child: _GradlePanel(
+                          items: items,
+                          onAddDependency: _showAddDependencyDialog,
+                        ),
                       ),
                     ],
                   ),
@@ -248,9 +392,10 @@ class _GradleItem {
 }
 
 class _GradlePanel extends StatelessWidget {
-  const _GradlePanel({required this.items});
+  const _GradlePanel({required this.items, this.onAddDependency});
 
   final List<_GradleItem> items;
+  final VoidCallback? onAddDependency;
 
   @override
   Widget build(BuildContext context) {
@@ -258,7 +403,8 @@ class _GradlePanel extends StatelessWidget {
     final plugins = items.where((i) => i.kind == _GradleItemKind.plugin).toList();
     final deps = items.where((i) => i.kind == _GradleItemKind.dependency).toList();
 
-    Widget header(String title, int count, IconData icon) {
+    Widget header(String title, int count, IconData icon,
+        {VoidCallback? onAdd}) {
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
@@ -272,6 +418,13 @@ class _GradlePanel extends StatelessWidget {
             const SizedBox(width: 8),
             Text(title, style: theme.textTheme.titleSmall),
             const Spacer(),
+            if (onAdd != null)
+              IconButton(
+                icon: const Icon(Icons.add, size: 18),
+                tooltip: context.tr('Add dependency'),
+                visualDensity: VisualDensity.compact,
+                onPressed: onAdd,
+              ),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
               decoration: BoxDecoration(
@@ -342,8 +495,9 @@ class _GradlePanel extends StatelessWidget {
           else
             ...plugins.map(itemTile),
           Divider(height: 1, thickness: 1, color: theme.dividerColor),
-          header(
-              context.tr('Dependencies'), deps.length, Icons.account_tree_outlined),
+          header(context.tr('Dependencies'), deps.length,
+              Icons.account_tree_outlined,
+              onAdd: onAddDependency),
           Expanded(
             child: deps.isEmpty
                 ? empty(context.tr('No dependencies found.'))
