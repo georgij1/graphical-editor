@@ -468,6 +468,8 @@ class AppLocalizations {
     'AI chat': 'AI чат',
     'AI chats': 'AI чаты',
     'Restore original script': 'Восстановить оригинальный скрипт',
+    'Switch to Gradle': 'Перейти на Gradle',
+    'Switch to pom.xml': 'Перейти на pom.xml',
     'New chat': 'Новый чат',
     'No chat selected': 'Чат не выбран',
     'Thinking...': 'Думаю...',

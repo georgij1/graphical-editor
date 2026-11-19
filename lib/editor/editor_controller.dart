@@ -206,6 +206,96 @@ class EditorController extends ChangeNotifier {
     notifyListeners();
   }
 
+  bool get canSwitchToGradle {
+    final path = openSource?.path ?? '';
+    final lower = path.toLowerCase();
+    return lower == 'pom.xml' || lower.endsWith('/pom.xml');
+  }
+
+  bool get canSwitchToPom {
+    final path = openSource?.path ?? '';
+    final lower = path.toLowerCase();
+    return lower == 'build.gradle' ||
+        lower.endsWith('/build.gradle') ||
+        lower == 'settings.gradle' ||
+        lower.endsWith('/settings.gradle');
+  }
+
+  void switchToGradle() {
+    final project = _currentProject;
+    if (project == null) return;
+    const buildFiles = BuildFiles();
+    try {
+      final generated = buildFiles.generate(project, BuildTool.gradle);
+      GeneratedFile? buildGradle;
+      for (final f in generated) {
+        final p = f.path;
+        if (p == 'build.gradle' ||
+            p == 'settings.gradle' ||
+            p.endsWith('/build.gradle') ||
+            p.endsWith('/settings.gradle')) {
+          project.sourceOverrides[p] = f.content;
+        }
+        if (p == 'build.gradle' || p.endsWith('/build.gradle')) {
+          buildGradle = f;
+        }
+      }
+      final target = buildGradle ??
+          GeneratedFile(
+            path: 'build.gradle',
+            content: "plugins {\n    id 'java'\n}\n",
+          );
+      showSource(
+        GeneratedFile(
+          path: target.path,
+          content: project.sourceOverrides[target.path] ?? target.content,
+          isJava: false,
+          isXml: false,
+          isFxml: false,
+        ),
+      );
+      _persist();
+      _scheduleSharedPublish();
+      notifyListeners();
+    } catch (_) {}
+  }
+
+  void switchToPom() {
+    final project = _currentProject;
+    if (project == null) return;
+    const buildFiles = BuildFiles();
+    try {
+      final generated = buildFiles.generate(project, BuildTool.maven);
+      GeneratedFile? pom;
+      for (final f in generated) {
+        final p = f.path;
+        if (p == 'pom.xml' || p.endsWith('/pom.xml')) {
+          pom = f;
+          project.sourceOverrides[p] = f.content;
+          break;
+        }
+      }
+      final target = pom ??
+          GeneratedFile(
+            path: 'pom.xml',
+            content: '<?xml version="1.0" encoding="UTF-8"?>\n<project/>',
+            isXml: true,
+          );
+      showSource(
+        GeneratedFile(
+          path: target.path,
+          content: project.sourceOverrides[target.path] ?? target.content,
+          isJava: false,
+          isXml: true,
+          isFxml: false,
+        ),
+      );
+      _persist();
+      _scheduleSharedPublish();
+      notifyListeners();
+    } catch (_) {}
+  }
+
   // Embedded AI chat panel state (shown left of the project tree).
   bool get aiFixPanelOpen => _aiChatPanelOpen;
   bool get aiChatPanelOpen => _aiChatPanelOpen;

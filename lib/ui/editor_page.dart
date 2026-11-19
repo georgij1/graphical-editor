@@ -346,6 +346,18 @@ class _EditorPageState extends State<EditorPage> {
                             icon: const Icon(Icons.restore, size: 18),
                             label: Text(context.tr('Restore original script')),
                           ),
+                        if (_controller.canSwitchToGradle)
+                          TextButton.icon(
+                            onPressed: _controller.switchToGradle,
+                            icon: const Icon(Icons.swap_horiz, size: 18),
+                            label: Text(context.tr('Switch to Gradle')),
+                          ),
+                        if (_controller.canSwitchToPom)
+                          TextButton.icon(
+                            onPressed: _controller.switchToPom,
+                            icon: const Icon(Icons.swap_horiz, size: 18),
+                            label: Text(context.tr('Switch to pom.xml')),
+                          ),
                       ],
                       EditorToolbar(
                         controller: _controller,
