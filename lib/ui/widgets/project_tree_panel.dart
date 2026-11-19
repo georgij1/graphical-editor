@@ -146,7 +146,9 @@ class _ProjectTreePanelState extends State<ProjectTreePanel> {
     // Add build files
     final buildTool =
         project.buildTool == 'gradle' ? BuildTool.gradle : BuildTool.maven;
+    final buildFilePaths = <String>{};
     for (final file in const BuildFiles().generate(project, buildTool)) {
+      buildFilePaths.add(file.path);
       addFile(
         file.path,
         content: project.sourceOverrides[file.path] ?? file.content,
@@ -154,6 +156,25 @@ class _ProjectTreePanelState extends State<ProjectTreePanel> {
         isBuildFile: true,
         isXml: file.path.endsWith('.xml'),
       );
+    }
+    // Defensive: ensure primary build files are always present for the active tool.
+    final requiredBuildFiles = buildTool == BuildTool.gradle
+        ? const <String>['build.gradle', 'settings.gradle']
+        : const <String>['pom.xml'];
+    for (final requiredPath in requiredBuildFiles) {
+      if (buildFilePaths.contains(requiredPath)) continue;
+      for (final file in const BuildFiles().generate(project, buildTool)) {
+        if (file.path == requiredPath) {
+          addFile(
+            file.path,
+            content: project.sourceOverrides[file.path] ?? file.content,
+            isJava: false,
+            isBuildFile: true,
+            isXml: file.path.endsWith('.xml'),
+          );
+          break;
+        }
+      }
     }
 
     // Add project.json
