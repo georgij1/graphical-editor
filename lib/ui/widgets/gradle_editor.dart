@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../build/build_client.dart';
 import '../../editor/editor_controller.dart';
 import '../../l10n/app_localizations.dart';
 
@@ -89,6 +90,21 @@ class _GradleEditorState extends State<GradleEditor> {
     'annotationProcessor',
   ];
 
+  String _localizeValidationMessage(BuildContext ctx, String message) {
+    final key = message.trim();
+    const known = <String>{
+      'Dependency not found in Maven Central',
+      'Dependency version not found in Maven Central',
+      'Group ID and Artifact ID are required',
+      'Invalid dependency coordinates',
+    };
+    if (known.contains(key)) return ctx.tr(key);
+    if (key.startsWith('Could not validate dependency')) {
+      return ctx.tr('Could not validate dependency');
+    }
+    return message;
+  }
+
   Future<_GradleDependencyInput?> _showDependencyDialog({
     required String titleKey,
     _GradleDependencyInput? initial,
@@ -98,79 +114,138 @@ class _GradleEditorState extends State<GradleEditor> {
     String configuration = initial?.configuration ?? 'implementation';
     if (!_configs.contains(configuration)) configuration = 'implementation';
     bool isPlatform = initial?.isPlatform ?? false;
+    bool validating = false;
+    String? errorText;
 
-    final result = await showDialog<bool>(
+    final result = await showDialog<_GradleDependencyInput>(
       context: context,
       builder: (dialogContext) {
         return StatefulBuilder(
-          builder: (dialogContext, setDialogState) => AlertDialog(
-            title: Text(dialogContext.tr(titleKey)),
-            content: SizedBox(
-              width: 420,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: <Widget>[
-                  DropdownButtonFormField<String>(
-                    key: ValueKey<String>('config-$configuration'),
-                    initialValue: configuration,
-                    decoration: InputDecoration(
-                      labelText: dialogContext.tr('Configuration'),
+          builder: (dialogContext, setDialogState) {
+            Future<void> submit() async {
+              final notation = notationCtrl.text.trim();
+              if (notation.isEmpty) {
+                setDialogState(() {
+                  errorText = dialogContext.tr('Dependency notation');
+                });
+                return;
+              }
+              setDialogState(() {
+                validating = true;
+                errorText = null;
+              });
+              try {
+                final client = widget.controller.buildClient ?? BuildClient();
+                await client.validateDependency(notation: notation);
+                if (!dialogContext.mounted) return;
+                Navigator.of(dialogContext).pop(_GradleDependencyInput(
+                  configuration: configuration,
+                  notation: notation,
+                  isPlatform: isPlatform,
+                ));
+              } catch (e) {
+                if (!dialogContext.mounted) return;
+                final msg = e is BuildException ? e.message : e.toString();
+                setDialogState(() {
+                  validating = false;
+                  errorText = _localizeValidationMessage(dialogContext, msg);
+                });
+              }
+            }
+
+            return AlertDialog(
+              title: Text(dialogContext.tr(titleKey)),
+              content: SizedBox(
+                width: 420,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: <Widget>[
+                    DropdownButtonFormField<String>(
+                      key: ValueKey<String>('config-$configuration'),
+                      initialValue: configuration,
+                      decoration: InputDecoration(
+                        labelText: dialogContext.tr('Configuration'),
+                      ),
+                      items: [
+                        for (final c in _configs)
+                          DropdownMenuItem<String>(value: c, child: Text(c)),
+                      ],
+                      onChanged: validating
+                          ? null
+                          : (v) => setDialogState(
+                              () => configuration = v ?? configuration),
                     ),
-                    items: [
-                      for (final c in _configs)
-                        DropdownMenuItem<String>(value: c, child: Text(c)),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: notationCtrl,
+                      enabled: !validating,
+                      decoration: InputDecoration(
+                        labelText: dialogContext.tr('Dependency notation'),
+                        hintText: 'group:artifact:version',
+                      ),
+                      autofocus: true,
+                    ),
+                    const SizedBox(height: 4),
+                    CheckboxListTile(
+                      contentPadding: EdgeInsets.zero,
+                      value: isPlatform,
+                      onChanged: validating
+                          ? null
+                          : (v) =>
+                              setDialogState(() => isPlatform = v ?? false),
+                      title: Text(dialogContext.tr('Platform (BOM)')),
+                      controlAffinity: ListTileControlAffinity.leading,
+                      dense: true,
+                    ),
+                    if (validating) ...<Widget>[
+                      const SizedBox(height: 12),
+                      Row(
+                        children: <Widget>[
+                          const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                                dialogContext.tr('Validating dependency...')),
+                          ),
+                        ],
+                      ),
                     ],
-                    onChanged: (v) =>
-                        setDialogState(() => configuration = v ?? configuration),
-                  ),
-                  const SizedBox(height: 8),
-                  TextField(
-                    controller: notationCtrl,
-                    decoration: InputDecoration(
-                      labelText: dialogContext.tr('Dependency notation'),
-                      hintText: 'group:artifact:version',
-                    ),
-                    autofocus: true,
-                  ),
-                  const SizedBox(height: 4),
-                  CheckboxListTile(
-                    contentPadding: EdgeInsets.zero,
-                    value: isPlatform,
-                    onChanged: (v) =>
-                        setDialogState(() => isPlatform = v ?? false),
-                    title: Text(dialogContext.tr('Platform (BOM)')),
-                    controlAffinity: ListTileControlAffinity.leading,
-                    dense: true,
-                  ),
-                ],
+                    if (errorText != null) ...<Widget>[
+                      const SizedBox(height: 12),
+                      Text(
+                        errorText!,
+                        style: TextStyle(
+                          color: Theme.of(dialogContext).colorScheme.error,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
               ),
-            ),
-            actions: <Widget>[
-              TextButton(
-                onPressed: () => Navigator.of(dialogContext).pop(false),
-                child: Text(dialogContext.tr('Cancel')),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.of(dialogContext).pop(true),
-                child: Text(dialogContext.tr(isEdit ? 'Save' : 'Add')),
-              ),
-            ],
-          ),
+              actions: <Widget>[
+                TextButton(
+                  onPressed: validating
+                      ? null
+                      : () => Navigator.of(dialogContext).pop(),
+                  child: Text(dialogContext.tr('Cancel')),
+                ),
+                FilledButton(
+                  onPressed: validating ? null : submit,
+                  child: Text(dialogContext.tr(isEdit ? 'Save' : 'Add')),
+                ),
+              ],
+            );
+          },
         );
       },
     );
-    if (result != true) {
-      notationCtrl.dispose();
-      return null;
-    }
-    final notation = notationCtrl.text.trim();
     notationCtrl.dispose();
-    if (notation.isEmpty) return null;
-    return _GradleDependencyInput(
-      configuration: configuration,
-      notation: notation,
-      isPlatform: isPlatform,
-    );
+    return result;
   }
 
   Future<void> _showAddDependencyDialog() async {

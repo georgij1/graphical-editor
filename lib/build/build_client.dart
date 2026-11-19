@@ -132,6 +132,62 @@ class BuildClient {
     }
   }
 
+  /// Validates that a dependency exists (checked against Maven Central by backend).
+  /// [notation] can be "group:artifact:version" (Gradle-style). If provided, it
+  /// takes precedence for parsing missing fields.
+  Future<void> validateDependency({
+    String? groupId,
+    String? artifactId,
+    String? version,
+    String? notation,
+  }) async {
+    final params = <String, String>{};
+    if (groupId != null && groupId.trim().isNotEmpty) {
+      params['groupId'] = groupId.trim();
+    }
+    if (artifactId != null && artifactId.trim().isNotEmpty) {
+      params['artifactId'] = artifactId.trim();
+    }
+    if (version != null && version.trim().isNotEmpty) {
+      params['version'] = version.trim();
+    }
+    if (notation != null && notation.trim().isNotEmpty) {
+      params['notation'] = notation.trim();
+    }
+    if (params.isEmpty) {
+      throw BuildException('Dependency coordinates are required');
+    }
+
+    final uri = _url('/build/validate-dependency').replace(queryParameters: params);
+    late http.Response response;
+    try {
+      response = await _http.get(uri).timeout(const Duration(seconds: 12));
+    } catch (error) {
+      throw BuildException('Could not validate dependency: $error');
+    }
+
+    final text = _decode(response.bodyBytes).trim();
+    Map<String, dynamic> decoded = const <String, dynamic>{};
+    try {
+      final d = jsonDecode(text);
+      if (d is Map<String, dynamic>) decoded = d;
+    } catch (_) {}
+
+    final valid = decoded['valid'] == true;
+    if (response.statusCode == 200 && valid) {
+      return;
+    }
+
+    final message = (decoded['message'] as String?)?.trim();
+    if (message != null && message.isNotEmpty) {
+      throw BuildException(message);
+    }
+    if (response.statusCode != 200) {
+      throw BuildException('Could not validate dependency (HTTP ${response.statusCode})');
+    }
+    throw BuildException('Dependency not found');
+  }
+
   /// True when the service answers its health check.
   Future<bool> isAvailable() async {
     try {
