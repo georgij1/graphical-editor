@@ -56,6 +56,7 @@ class Project {
     this.ownerEmail,
     this.revision = 0,
     this.shared = false,
+    this.buildTool = 'maven',
     List<SceneFile>? scenes,
     Map<String, String>? sourceOverrides,
     List<ProjectMember>? members,
@@ -82,6 +83,9 @@ class Project {
 
   /// True when the project is shared with other people.
   bool shared;
+
+  /// Active build system for the project: 'maven' or 'gradle'.
+  String buildTool;
 
   /// People who take part in the project.
   final List<ProjectMember> members;
@@ -137,6 +141,7 @@ class Project {
         if (ownerEmail != null) 'ownerEmail': ownerEmail,
         if (revision > 0) 'revision': revision,
         if (shared) 'shared': true,
+        'buildTool': buildTool,
         if (members.isNotEmpty)
           'members': [for (final m in members) m.toJson()],
         'scenes': scenes.map((s) => s.toJson()).toList(),
@@ -153,6 +158,7 @@ class Project {
         ownerEmail: json['ownerEmail'] as String?,
         revision: (json['revision'] as num?)?.toInt() ?? 0,
         shared: json['shared'] as bool? ?? false,
+        buildTool: (json['buildTool'] as String?) ?? 'maven',
         members: [
           for (final m in (json['members'] as List? ?? []))
             ProjectMember.fromJson(m as Map<String, dynamic>),
@@ -177,6 +183,7 @@ class Project {
         ownerEmail: ownerEmail,
         revision: revision,
         shared: shared,
+        buildTool: buildTool,
         members: [for (final m in members) ProjectMember(email: m.email, role: m.role)],
         scenes: [for (final s in scenes) s.copy()],
         sourceOverrides: Map<String, String>.from(sourceOverrides),

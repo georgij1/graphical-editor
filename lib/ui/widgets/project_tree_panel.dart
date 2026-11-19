@@ -144,7 +144,9 @@ class _ProjectTreePanelState extends State<ProjectTreePanel> {
     }
 
     // Add build files
-    for (final file in const BuildFiles().generate(project, BuildTool.maven)) {
+    final buildTool =
+        project.buildTool == 'gradle' ? BuildTool.gradle : BuildTool.maven;
+    for (final file in const BuildFiles().generate(project, buildTool)) {
       addFile(
         file.path,
         content: project.sourceOverrides[file.path] ?? file.content,
@@ -177,9 +179,7 @@ class _ProjectTreePanelState extends State<ProjectTreePanel> {
     // Add user-created files and empty folders from sourceOverrides
     final standardPaths = <String>{
       ...generatedFiles.map((f) => f.path),
-      ...const BuildFiles()
-          .generate(project, BuildTool.maven)
-          .map((f) => f.path),
+      ...const BuildFiles().generate(project, buildTool).map((f) => f.path),
       'project.json',
       ...project.scenes.map(
         (s) => 'src/main/resources/$pkgDir/${s.name}.fxml',

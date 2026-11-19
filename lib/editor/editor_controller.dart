@@ -221,11 +221,42 @@ class EditorController extends ChangeNotifier {
         lower.endsWith('/settings.gradle');
   }
 
+  void _removeOpenTabsForPaths(Iterable<String> paths) {
+    final toRemove = paths.toSet();
+    if (toRemove.isEmpty || _openTabs.isEmpty) return;
+    final activePath =
+        (_activeTabIndex >= 0 && _activeTabIndex < _openTabs.length)
+            ? _openTabs[_activeTabIndex].path
+            : null;
+    _openTabs.removeWhere((f) => toRemove.contains(f.path));
+    if (_openTabs.isEmpty) {
+      _activeTabIndex = -1;
+      _openSource = null;
+      return;
+    }
+    if (activePath != null && !toRemove.contains(activePath)) {
+      final idx = _openTabs.indexWhere((f) => f.path == activePath);
+      _activeTabIndex = idx >= 0 ? idx : 0;
+    } else {
+      if (_activeTabIndex >= _openTabs.length) {
+        _activeTabIndex = _openTabs.length - 1;
+      }
+      if (_activeTabIndex < 0) _activeTabIndex = 0;
+    }
+    _openSource = _openTabs[_activeTabIndex];
+  }
+
   void switchToGradle() {
     final project = _currentProject;
     if (project == null) return;
     const buildFiles = BuildFiles();
     try {
+      // Remove Maven build file(s).
+      project.sourceOverrides.remove('pom.xml');
+      _removeOpenTabsForPaths(const ['pom.xml']);
+
+      project.buildTool = 'gradle';
+
       final generated = buildFiles.generate(project, BuildTool.gradle);
       GeneratedFile? buildGradle;
       for (final f in generated) {
@@ -265,6 +296,13 @@ class EditorController extends ChangeNotifier {
     if (project == null) return;
     const buildFiles = BuildFiles();
     try {
+      // Remove Gradle build files.
+      project.sourceOverrides.remove('build.gradle');
+      project.sourceOverrides.remove('settings.gradle');
+      _removeOpenTabsForPaths(const ['build.gradle', 'settings.gradle']);
+
+      project.buildTool = 'maven';
+
       final generated = buildFiles.generate(project, BuildTool.maven);
       GeneratedFile? pom;
       for (final f in generated) {
