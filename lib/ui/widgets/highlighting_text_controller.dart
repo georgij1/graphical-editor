@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-enum HighlightLanguage { plain, java, xml, css, shell, batch }
+enum HighlightLanguage { plain, java, xml, css, shell, batch, gradle }
 
 class HighlightingTextEditingController extends TextEditingController {
   HighlightingTextEditingController({
@@ -112,6 +112,17 @@ class HighlightingTextEditingController extends TextEditingController {
           r'(\b\d+\b)',
           multiLine: true,
           caseSensitive: false,
+        );
+      case HighlightLanguage.gradle:
+        return RegExp(
+          r'(?<comment>//[^\n]*|/\*[\s\S]*?\*/)|'
+          r'(?<string>"""[\s\S]*?"""|'
+          r"'''[\s\S]*?'''|"
+          r'"(?:\\.|[^"\\])*"|'
+          r"'(?:\\.|[^'\\])*')|"
+          r'(?<keyword>\b(?:plugins|dependencies|repositories|implementation|api|compileOnly|runtimeOnly|testImplementation|testCompileOnly|testRuntimeOnly|annotationProcessor|kapt|classpath|id|version|group|name|apply|plugin|from|into|include|exclude|project|subprojects|allprojects|buildscript|ext|task|tasks|def|val|var|new|if|else|for|in|while|do|switch|case|break|continue|return|try|catch|finally|throw|throws|import|package|class|interface|enum|extends|implements|static|final|abstract|public|private|protected|void|boolean|int|long|double|float|true|false|null|as|is|in|instanceof|assert|mavenCentral|google|gradlePluginPortal|maven|flatDir|ivy|jcenter|resolutionStrategy|configurations|sourceSets|java|kotlin|application|javafx|modules|mainClass|mainClassName|test|useJUnitPlatform|jar|bootJar|manifest|attributes|files|file|fileTree|platform|enforcedPlatform|constraints)\b)|'
+          r'(?<number>\b\d+(?:\.\d+)?\b)',
+          multiLine: true,
         );
       case HighlightLanguage.plain:
         return RegExp(r'$^');

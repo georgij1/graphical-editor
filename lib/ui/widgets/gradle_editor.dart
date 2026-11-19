@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../../build/build_client.dart';
 import '../../editor/editor_controller.dart';
 import '../../l10n/app_localizations.dart';
+import 'highlighting_text_controller.dart';
 
 /// Editor for Gradle build files (`build.gradle`) with a graphical panel
 /// showing plugins and dependencies.
@@ -17,8 +18,11 @@ class GradleEditor extends StatefulWidget {
 }
 
 class _GradleEditorState extends State<GradleEditor> {
-  late final TextEditingController _text =
-      TextEditingController(text: widget.controller.codeContent);
+  late final HighlightingTextEditingController _text =
+      HighlightingTextEditingController(
+    text: widget.controller.codeContent,
+    language: HighlightLanguage.gradle,
+  );
   final FocusNode _focusNode = FocusNode();
   int _lastEpoch = 0;
   double _previewFraction = 0.45;
@@ -29,6 +33,23 @@ class _GradleEditorState extends State<GradleEditor> {
     _lastEpoch = widget.controller.codeEpoch;
     _text.addListener(_onChanged);
     widget.controller.addListener(_onControllerChanged);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _syncHighlighting();
+    });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _syncHighlighting();
+  }
+
+  void _syncHighlighting() {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final changed = _text.dark != dark || _text.language != HighlightLanguage.gradle;
+    _text.dark = dark;
+    _text.language = HighlightLanguage.gradle;
+    if (changed) _text.refresh();
   }
 
   @override
@@ -46,7 +67,10 @@ class _GradleEditorState extends State<GradleEditor> {
     if (epoch != _lastEpoch) {
       _lastEpoch = epoch;
       _text.text = widget.controller.codeContent;
+      _syncHighlighting();
       setState(() {});
+    } else {
+      _syncHighlighting();
     }
   }
 

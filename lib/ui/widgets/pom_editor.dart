@@ -6,6 +6,7 @@ import '../../build/build_client.dart';
 import '../../editor/code_validator.dart';
 import '../../editor/editor_controller.dart';
 import '../../l10n/app_localizations.dart';
+import 'highlighting_text_controller.dart';
 
 /// Editor for Maven `pom.xml` with a live list of dependencies on the right.
 class PomEditor extends StatefulWidget {
@@ -18,8 +19,11 @@ class PomEditor extends StatefulWidget {
 }
 
 class _PomEditorState extends State<PomEditor> {
-  late final TextEditingController _text =
-      TextEditingController(text: widget.controller.codeContent);
+  late final HighlightingTextEditingController _text =
+      HighlightingTextEditingController(
+    text: widget.controller.codeContent,
+    language: HighlightLanguage.xml,
+  );
   final FocusNode _focusNode = FocusNode();
   int _lastEpoch = 0;
   double _previewFraction = 0.45;
@@ -31,6 +35,23 @@ class _PomEditorState extends State<PomEditor> {
     _lastEpoch = widget.controller.codeEpoch;
     _text.addListener(_onChanged);
     widget.controller.addListener(_onControllerChanged);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _syncHighlighting();
+    });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _syncHighlighting();
+  }
+
+  void _syncHighlighting() {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final changed = _text.dark != dark || _text.language != HighlightLanguage.xml;
+    _text.dark = dark;
+    _text.language = HighlightLanguage.xml;
+    if (changed) _text.refresh();
   }
 
   @override
@@ -49,7 +70,10 @@ class _PomEditorState extends State<PomEditor> {
       _lastEpoch = epoch;
       _text.text = widget.controller.codeContent;
       _validation = _validate(_text.text);
+      _syncHighlighting();
       setState(() {});
+    } else {
+      _syncHighlighting();
     }
   }
 
