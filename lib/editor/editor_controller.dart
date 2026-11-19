@@ -153,7 +153,9 @@ class EditorController extends ChangeNotifier {
     return path == 'run.sh' ||
         path.endsWith('/run.sh') ||
         lower == 'run.bat' ||
-        lower.endsWith('/run.bat');
+        lower.endsWith('/run.bat') ||
+        lower == 'pom.xml' ||
+        lower.endsWith('/pom.xml');
   }
 
   void restoreOriginalRunScript() {
@@ -163,16 +165,22 @@ class EditorController extends ChangeNotifier {
     final lower = path.toLowerCase();
     final isRunSh = path == 'run.sh' || path.endsWith('/run.sh');
     final isRunBat = lower == 'run.bat' || lower.endsWith('/run.bat');
-    if (!isRunSh && !isRunBat) return;
+    final isPom = lower == 'pom.xml' || lower.endsWith('/pom.xml');
+    if (!isRunSh && !isRunBat && !isPom) return;
     final project = _currentProject;
     if (project == null) return;
-    final targetName = isRunBat ? 'run.bat' : 'run.sh';
+    final targetName = isPom ? 'pom.xml' : (isRunBat ? 'run.bat' : 'run.sh');
     const buildFiles = BuildFiles();
-    String original = isRunBat
-        ? '@echo off\r\n'
-        : '#!/usr/bin/env bash\nset -e\ncd "\$(dirname "\$0")"\njava -jar app.jar\n';
+    String original = isPom
+        ? '<?xml version="1.0" encoding="UTF-8"?>\n<project/>'
+        : (isRunBat
+            ? '@echo off\r\n'
+            : '#!/usr/bin/env bash\nset -e\ncd "\$(dirname "\$0")"\njava -jar app.jar\n');
     try {
-      final generated = buildFiles.generate(project, BuildTool.maven);
+      final generated = buildFiles.generate(
+        project,
+        isPom ? BuildTool.maven : BuildTool.maven,
+      );
       for (final f in generated) {
         final fp = f.path.toLowerCase();
         if (fp == targetName || fp.endsWith('/$targetName')) {
