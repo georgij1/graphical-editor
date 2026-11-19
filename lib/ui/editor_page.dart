@@ -349,13 +349,47 @@ class _EditorPageState extends State<EditorPage> {
                         if (_controller.canSwitchToGradle)
                           TextButton.icon(
                             onPressed: _controller.switchToGradle,
-                            icon: const Icon(Icons.swap_horiz, size: 18),
+                            icon: Container(
+                              width: 18,
+                              height: 18,
+                              alignment: Alignment.center,
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF02303A),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: const Text(
+                                'G',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w800,
+                                  height: 1,
+                                ),
+                              ),
+                            ),
                             label: Text(context.tr('Switch to Gradle')),
                           ),
                         if (_controller.canSwitchToPom)
                           TextButton.icon(
                             onPressed: _controller.switchToPom,
-                            icon: const Icon(Icons.swap_horiz, size: 18),
+                            icon: Container(
+                              width: 18,
+                              height: 18,
+                              alignment: Alignment.center,
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFC71A36),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: const Text(
+                                'M',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w800,
+                                  height: 1,
+                                ),
+                              ),
+                            ),
                             label: Text(context.tr('Switch to pom.xml')),
                           ),
                       ],
