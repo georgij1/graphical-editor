@@ -470,6 +470,8 @@ class AppLocalizations {
     'Restore original script': 'Восстановить оригинальный скрипт',
     'Switch to Gradle': 'Перейти на Gradle',
     'Switch to pom.xml': 'Перейти на pom.xml',
+    'Plugins': 'Плагины',
+    'No plugins found.': 'Плагины не найдены.',
     'New chat': 'Новый чат',
     'No chat selected': 'Чат не выбран',
     'Thinking...': 'Думаю...',

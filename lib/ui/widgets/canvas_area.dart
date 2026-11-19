@@ -8,6 +8,7 @@ import 'source_view.dart';
 import 'markdown_editor.dart';
 import 'gitignore_editor.dart';
 import 'pom_editor.dart';
+import 'gradle_editor.dart';
 
 /// The central editing surface. "Code" shows an editable text editor for the
 /// selected file (scene FXML or a generated Java source); "Canvas" shows the
@@ -91,6 +92,11 @@ class CanvasArea extends StatelessWidget {
     final codeName = controller.codePath.split('/').last.toLowerCase();
     if (codeName == 'pom.xml') {
       return PomEditor(controller: controller);
+    }
+
+    // Gradle build files get a dedicated editor with a plugins/dependencies view.
+    if (codeName == 'build.gradle' || codeName == 'settings.gradle') {
+      return GradleEditor(controller: controller);
     }
 
     // project.json is an internal editor manifest and must not be edited.
