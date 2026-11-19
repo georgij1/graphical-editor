@@ -97,10 +97,17 @@ class _GradleEditorState extends State<GradleEditor> {
       'Dependency version not found in Maven Central',
       'Group ID and Artifact ID are required',
       'Invalid dependency coordinates',
+      'Plugin not found in Gradle Plugin Portal',
+      'Plugin version not found in Gradle Plugin Portal',
+      'Plugin ID is required',
+      'Invalid plugin ID',
     };
     if (known.contains(key)) return ctx.tr(key);
     if (key.startsWith('Could not validate dependency')) {
       return ctx.tr('Could not validate dependency');
+    }
+    if (key.startsWith('Could not validate plugin')) {
+      return ctx.tr('Could not validate plugin');
     }
     return message;
   }
@@ -344,6 +351,7 @@ class _GradleEditorState extends State<GradleEditor> {
   }) async {
     final idCtrl = TextEditingController(text: initial?.id ?? '');
     final versionCtrl = TextEditingController(text: initial?.version ?? '');
+    bool validating = false;
     String? errorText;
 
     final result = await showDialog<_GradlePluginInput>(
@@ -351,19 +359,35 @@ class _GradleEditorState extends State<GradleEditor> {
       builder: (dialogContext) {
         return StatefulBuilder(
           builder: (dialogContext, setDialogState) {
-            void submit() {
+            Future<void> submit() async {
               final id = idCtrl.text.trim();
               final version = versionCtrl.text.trim();
               if (id.isEmpty) {
                 setDialogState(() {
-                  errorText = dialogContext.tr('Plugin ID');
+                  errorText = dialogContext.tr('Plugin ID is required');
                 });
                 return;
               }
-              Navigator.of(dialogContext).pop(_GradlePluginInput(
-                id: id,
-                version: version,
-              ));
+              setDialogState(() {
+                validating = true;
+                errorText = null;
+              });
+              try {
+                final client = widget.controller.buildClient ?? BuildClient();
+                await client.validatePlugin(id: id, version: version);
+                if (!dialogContext.mounted) return;
+                Navigator.of(dialogContext).pop(_GradlePluginInput(
+                  id: id,
+                  version: version,
+                ));
+              } catch (e) {
+                if (!dialogContext.mounted) return;
+                final msg = e is BuildException ? e.message : e.toString();
+                setDialogState(() {
+                  validating = false;
+                  errorText = _localizeValidationMessage(dialogContext, msg);
+                });
+              }
             }
 
             return AlertDialog(
@@ -376,6 +400,7 @@ class _GradleEditorState extends State<GradleEditor> {
                   children: <Widget>[
                     TextField(
                       controller: idCtrl,
+                      enabled: !validating,
                       decoration: InputDecoration(
                         labelText: dialogContext.tr('Plugin ID'),
                         hintText: 'java / org.springframework.boot',
@@ -385,11 +410,28 @@ class _GradleEditorState extends State<GradleEditor> {
                     const SizedBox(height: 8),
                     TextField(
                       controller: versionCtrl,
+                      enabled: !validating,
                       decoration: InputDecoration(
                         labelText: dialogContext.tr('Plugin version'),
                         hintText: '3.3.5',
                       ),
                     ),
+                    if (validating) ...<Widget>[
+                      const SizedBox(height: 12),
+                      Row(
+                        children: <Widget>[
+                          const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(dialogContext.tr('Validating plugin...')),
+                          ),
+                        ],
+                      ),
+                    ],
                     if (errorText != null) ...<Widget>[
                       const SizedBox(height: 12),
                       Text(
@@ -404,11 +446,13 @@ class _GradleEditorState extends State<GradleEditor> {
               ),
               actions: <Widget>[
                 TextButton(
-                  onPressed: () => Navigator.of(dialogContext).pop(),
+                  onPressed: validating
+                      ? null
+                      : () => Navigator.of(dialogContext).pop(),
                   child: Text(dialogContext.tr('Cancel')),
                 ),
                 FilledButton(
-                  onPressed: submit,
+                  onPressed: validating ? null : submit,
                   child: Text(dialogContext.tr(isEdit ? 'Save' : 'Add')),
                 ),
               ],

@@ -188,6 +188,50 @@ class BuildClient {
     throw BuildException('Dependency not found');
   }
 
+  /// Validates that a Gradle plugin exists (checked against Gradle Plugin Portal).
+  Future<void> validatePlugin({
+    required String id,
+    String? version,
+  }) async {
+    final pluginId = id.trim();
+    if (pluginId.isEmpty) {
+      throw BuildException('Plugin ID is required');
+    }
+    final params = <String, String>{'id': pluginId};
+    if (version != null && version.trim().isNotEmpty) {
+      params['version'] = version.trim();
+    }
+
+    final uri = _url('/build/validate-plugin').replace(queryParameters: params);
+    late http.Response response;
+    try {
+      response = await _http.get(uri).timeout(const Duration(seconds: 12));
+    } catch (error) {
+      throw BuildException('Could not validate plugin: $error');
+    }
+
+    final text = _decode(response.bodyBytes).trim();
+    Map<String, dynamic> decoded = const <String, dynamic>{};
+    try {
+      final d = jsonDecode(text);
+      if (d is Map<String, dynamic>) decoded = d;
+    } catch (_) {}
+
+    final valid = decoded['valid'] == true;
+    if (response.statusCode == 200 && valid) {
+      return;
+    }
+
+    final message = (decoded['message'] as String?)?.trim();
+    if (message != null && message.isNotEmpty) {
+      throw BuildException(message);
+    }
+    if (response.statusCode != 200) {
+      throw BuildException('Could not validate plugin (HTTP ${response.statusCode})');
+    }
+    throw BuildException('Plugin not found');
+  }
+
   /// True when the service answers its health check.
   Future<bool> isAvailable() async {
     try {

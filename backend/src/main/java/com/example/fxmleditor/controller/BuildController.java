@@ -214,6 +214,100 @@ public class BuildController {
         }
     }
 
+    @GetMapping("/validate-plugin")
+    @Operation(summary = "Validate that a Gradle plugin exists in the Gradle Plugin Portal")
+    public ResponseEntity<?> validatePlugin(
+            @RequestParam(required = false) String id,
+            @RequestParam(required = false) String version) {
+        String pluginId = id == null ? "" : id.trim();
+        String v = version == null ? "" : version.trim();
+
+        if (pluginId.isEmpty()) {
+            return ResponseEntity.badRequest().body(java.util.Map.of(
+                    "valid", false,
+                    "message", "Plugin ID is required"));
+        }
+        if (pluginId.contains("..") || pluginId.contains("/") || pluginId.contains("\\")) {
+            return ResponseEntity.badRequest().body(java.util.Map.of(
+                    "valid", false,
+                    "message", "Invalid plugin ID"));
+        }
+
+        // Core Gradle plugins (e.g. java, application) are distributed with Gradle
+        // and don't have plugin marker artifacts on the Plugin Portal.
+        if (!pluginId.contains(".") && v.isEmpty()) {
+            return ResponseEntity.ok(java.util.Map.of("valid", true));
+        }
+
+        String idPath = pluginId.replace('.', '/');
+        String markerArtifact = pluginId + ".gradle.plugin";
+        String base = "https://plugins.gradle.org/m2/" + idPath + "/" + markerArtifact + "/";
+        java.util.List<String> urls = new java.util.ArrayList<>();
+        if (!v.isEmpty()) {
+            urls.add(base + v + "/" + markerArtifact + "-" + v + ".pom");
+        }
+        urls.add(base + "maven-metadata.xml");
+
+        try {
+            HttpClient client = HttpClient.newBuilder()
+                    .connectTimeout(Duration.ofSeconds(5))
+                    .followRedirects(HttpClient.Redirect.NORMAL)
+                    .build();
+            boolean found = false;
+            for (String url : urls) {
+                if (urlExists(client, url)) {
+                    found = true;
+                    break;
+                }
+            }
+            if (found) {
+                if (!v.isEmpty()) {
+                    String versionPom = base + v + "/" + markerArtifact + "-" + v + ".pom";
+                    if (!urlExists(client, versionPom)) {
+                        return ResponseEntity.ok(java.util.Map.of(
+                                "valid", false,
+                                "message", "Plugin version not found in Gradle Plugin Portal"));
+                    }
+                }
+                return ResponseEntity.ok(java.util.Map.of("valid", true));
+            }
+            return ResponseEntity.ok(java.util.Map.of(
+                    "valid", false,
+                    "message", "Plugin not found in Gradle Plugin Portal"));
+        } catch (Exception e) {
+            return ResponseEntity.status(502).body(java.util.Map.of(
+                    "valid", false,
+                    "message", "Could not validate plugin: " + e.getMessage()));
+        }
+    }
+
+    private boolean urlExists(HttpClient client, String url) {
+        try {
+            HttpRequest req = HttpRequest.newBuilder(URI.create(url))
+                    .timeout(Duration.ofSeconds(6))
+                    .method("HEAD", HttpRequest.BodyPublishers.noBody())
+                    .header("User-Agent", "graphical-editor-plugin-validator")
+                    .build();
+            HttpResponse<Void> resp = client.send(req, HttpResponse.BodyHandlers.discarding());
+            int code = resp.statusCode();
+            if (code >= 200 && code < 300) {
+                return true;
+            }
+            if (code == 405) { // HEAD not allowed, try GET
+                HttpRequest getReq = HttpRequest.newBuilder(URI.create(url))
+                        .timeout(Duration.ofSeconds(6))
+                        .GET()
+                        .header("User-Agent", "graphical-editor-plugin-validator")
+                        .build();
+                HttpResponse<Void> getResp = client.send(getReq, HttpResponse.BodyHandlers.discarding());
+                int gcode = getResp.statusCode();
+                return gcode >= 200 && gcode < 300;
+            }
+        } catch (Exception ignored) {
+        }
+        return false;
+    }
+
     @GetMapping("/health")
     @Operation(summary = "Health check for the build service")
     public ResponseEntity<?> health() {
