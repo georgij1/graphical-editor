@@ -78,26 +78,33 @@ class _GradleEditorState extends State<GradleEditor> {
       ));
   }
 
-  Future<void> _showAddDependencyDialog() async {
-    final notationCtrl = TextEditingController();
-    String configuration = 'implementation';
-    bool isPlatform = false;
-    final configs = const <String>[
-      'implementation',
-      'api',
-      'compileOnly',
-      'runtimeOnly',
-      'testImplementation',
-      'testCompileOnly',
-      'testRuntimeOnly',
-      'annotationProcessor',
-    ];
+  static const List<String> _configs = <String>[
+    'implementation',
+    'api',
+    'compileOnly',
+    'runtimeOnly',
+    'testImplementation',
+    'testCompileOnly',
+    'testRuntimeOnly',
+    'annotationProcessor',
+  ];
+
+  Future<_GradleDependencyInput?> _showDependencyDialog({
+    required String titleKey,
+    _GradleDependencyInput? initial,
+    bool isEdit = false,
+  }) async {
+    final notationCtrl = TextEditingController(text: initial?.notation ?? '');
+    String configuration = initial?.configuration ?? 'implementation';
+    if (!_configs.contains(configuration)) configuration = 'implementation';
+    bool isPlatform = initial?.isPlatform ?? false;
+
     final result = await showDialog<bool>(
       context: context,
       builder: (dialogContext) {
         return StatefulBuilder(
           builder: (dialogContext, setDialogState) => AlertDialog(
-            title: Text(dialogContext.tr('Add dependency')),
+            title: Text(dialogContext.tr(titleKey)),
             content: SizedBox(
               width: 420,
               child: Column(
@@ -110,7 +117,7 @@ class _GradleEditorState extends State<GradleEditor> {
                       labelText: dialogContext.tr('Configuration'),
                     ),
                     items: [
-                      for (final c in configs)
+                      for (final c in _configs)
                         DropdownMenuItem<String>(value: c, child: Text(c)),
                     ],
                     onChanged: (v) =>
@@ -145,7 +152,7 @@ class _GradleEditorState extends State<GradleEditor> {
               ),
               FilledButton(
                 onPressed: () => Navigator.of(dialogContext).pop(true),
-                child: Text(dialogContext.tr('Add')),
+                child: Text(dialogContext.tr(isEdit ? 'Save' : 'Add')),
               ),
             ],
           ),
@@ -154,28 +161,48 @@ class _GradleEditorState extends State<GradleEditor> {
     );
     if (result != true) {
       notationCtrl.dispose();
-      return;
+      return null;
     }
     final notation = notationCtrl.text.trim();
     notationCtrl.dispose();
-    if (notation.isEmpty) return;
-    _addGradleDependency(
+    if (notation.isEmpty) return null;
+    return _GradleDependencyInput(
       configuration: configuration,
       notation: notation,
       isPlatform: isPlatform,
     );
   }
 
-  void _addGradleDependency({
-    required String configuration,
-    required String notation,
-    required bool isPlatform,
-  }) {
-    final escaped = notation.replaceAll("'", "\\'");
-    final line = isPlatform
-        ? "    $configuration platform('$escaped')"
-        : "    $configuration '$escaped'";
+  Future<void> _showAddDependencyDialog() async {
+    final input = await _showDependencyDialog(titleKey: 'Add dependency');
+    if (input == null) return;
+    _addGradleDependency(input);
+  }
 
+  Future<void> _showEditDependencyDialog(_GradleItem item) async {
+    final input = await _showDependencyDialog(
+      titleKey: 'Edit dependency',
+      initial: _GradleDependencyInput(
+        configuration: item.configuration,
+        notation: item.name,
+        isPlatform: item.isPlatform,
+      ),
+      isEdit: true,
+    );
+    if (input == null) return;
+    _replaceGradleDependency(item, input);
+  }
+
+  String _buildDependencyLine(_GradleDependencyInput input) {
+    final escaped = input.notation.replaceAll("'", "\\'");
+    if (input.isPlatform) {
+      return "    ${input.configuration} platform('$escaped')";
+    }
+    return "    ${input.configuration} '$escaped'";
+  }
+
+  void _addGradleDependency(_GradleDependencyInput input) {
+    final line = _buildDependencyLine(input);
     var source = _text.text;
     final blockStartRe = RegExp(r'\bdependencies\s*\{');
     final m = blockStartRe.firstMatch(source);
@@ -211,6 +238,31 @@ class _GradleEditorState extends State<GradleEditor> {
     _setSource(source);
   }
 
+  void _replaceGradleDependency(_GradleItem item, _GradleDependencyInput input) {
+    final source = _text.text;
+    final start = item.matchStart;
+    final end = item.matchEnd;
+    if (start == null || end == null || start < 0 || end > source.length || start >= end) {
+      return;
+    }
+    final line = _buildDependencyLine(input);
+    // matchEnd is set to end-of-line (after newline if present) in parser,
+    // so replacing with "line\n" keeps structure stable.
+    final updated = source.replaceRange(start, end, '$line\n');
+    _setSource(updated);
+  }
+
+  void _deleteGradleDependency(_GradleItem item) {
+    final source = _text.text;
+    final start = item.matchStart;
+    final end = item.matchEnd;
+    if (start == null || end == null || start < 0 || end > source.length || start >= end) {
+      return;
+    }
+    final updated = source.replaceRange(start, end, '');
+    _setSource(updated);
+  }
+
   List<_GradleItem> _parseItems(String source) {
     if (source.trim().isEmpty) return const <_GradleItem>[];
     final items = <_GradleItem>[];
@@ -228,12 +280,14 @@ class _GradleEditorState extends State<GradleEditor> {
         kind: _GradleItemKind.plugin,
         name: id,
         detail: version.isEmpty ? '' : 'version: $version',
+        configuration: '',
+        isPlatform: false,
       ));
     }
 
     // Dependencies: configuration 'group:artifact:version' or with platform(...)
     final depLineRe = RegExp(
-      r'''^\s*([A-Za-z_][A-Za-z0-9_]*)\s+(?:platform\(\s*)?['"]([^'"]+)['"]\s*\)?''',
+      r'''^\s*([A-Za-z_][A-Za-z0-9_]*)\s+(?:platform\(\s*)?['"]([^'"]+)['"]\s*\)?[^\n]*''',
       multiLine: true,
     );
     const depConfigs = <String>{
@@ -254,19 +308,40 @@ class _GradleEditorState extends State<GradleEditor> {
       if (!depConfigs.contains(config)) continue;
       if (coord.isEmpty) continue;
       final isPlatform = m.group(0)?.contains('platform(') ?? false;
+
+      // Compute range covering the whole line including trailing newline if present.
+      var start = m.start;
+      // include leading indentation/newline start already at line start due to ^ with multiLine
+      // find line start (in case)
+      while (start > 0 && source[start - 1] != '\n' && source[start - 1] != '\r') {
+        // keep going back only if regex didn't anchor at line start; but ^ should.
+        break;
+      }
+      var end = m.end;
+      if (end < source.length && source[end] == '\r') end++;
+      if (end < source.length && source[end] == '\n') end++;
+
       items.add(_GradleItem(
         kind: _GradleItemKind.dependency,
         name: coord,
         detail: isPlatform ? '$config · platform' : config,
+        configuration: config,
+        isPlatform: isPlatform,
+        matchStart: m.start,
+        matchEnd: end,
       ));
     }
 
-    // De-duplicate while preserving order
-    final seen = <String>{};
+    // De-duplicate plugins only (keep dependencies as distinct editable entries).
+    final seenPlugins = <String>{};
     final unique = <_GradleItem>[];
     for (final it in items) {
-      final key = '${it.kind}:${it.name}:${it.detail}';
-      if (seen.add(key)) unique.add(it);
+      if (it.kind == _GradleItemKind.plugin) {
+        final key = 'p:${it.name}:${it.detail}';
+        if (seenPlugins.add(key)) unique.add(it);
+      } else {
+        unique.add(it);
+      }
     }
     return unique;
   }
@@ -363,6 +438,8 @@ class _GradleEditorState extends State<GradleEditor> {
                         child: _GradlePanel(
                           items: items,
                           onAddDependency: _showAddDependencyDialog,
+                          onEditDependency: _showEditDependencyDialog,
+                          onDeleteDependency: _deleteGradleDependency,
                         ),
                       ),
                     ],
@@ -377,6 +454,18 @@ class _GradleEditorState extends State<GradleEditor> {
   }
 }
 
+class _GradleDependencyInput {
+  const _GradleDependencyInput({
+    required this.configuration,
+    required this.notation,
+    required this.isPlatform,
+  });
+
+  final String configuration;
+  final String notation;
+  final bool isPlatform;
+}
+
 enum _GradleItemKind { plugin, dependency }
 
 class _GradleItem {
@@ -384,18 +473,33 @@ class _GradleItem {
     required this.kind,
     required this.name,
     required this.detail,
+    required this.configuration,
+    required this.isPlatform,
+    this.matchStart,
+    this.matchEnd,
   });
 
   final _GradleItemKind kind;
   final String name;
   final String detail;
+  final String configuration;
+  final bool isPlatform;
+  final int? matchStart;
+  final int? matchEnd;
 }
 
 class _GradlePanel extends StatelessWidget {
-  const _GradlePanel({required this.items, this.onAddDependency});
+  const _GradlePanel({
+    required this.items,
+    this.onAddDependency,
+    this.onEditDependency,
+    this.onDeleteDependency,
+  });
 
   final List<_GradleItem> items;
   final VoidCallback? onAddDependency;
+  final void Function(_GradleItem item)? onEditDependency;
+  final void Function(_GradleItem item)? onDeleteDependency;
 
   @override
   Widget build(BuildContext context) {
@@ -454,8 +558,11 @@ class _GradlePanel extends StatelessWidget {
           ),
         );
 
-    Widget itemTile(_GradleItem item) {
+    Widget itemTile(_GradleItem item, {bool editable = false}) {
       final isPlugin = item.kind == _GradleItemKind.plugin;
+      final canEdit = editable && onEditDependency != null && item.matchStart != null;
+      final canDelete =
+          editable && onDeleteDependency != null && item.matchStart != null;
       return ListTile(
         dense: true,
         leading: Icon(
@@ -481,6 +588,27 @@ class _GradlePanel extends StatelessWidget {
                   color: theme.colorScheme.onSurfaceVariant,
                 ),
               ),
+        trailing: (canEdit || canDelete)
+            ? Row(
+                mainAxisSize: MainAxisSize.min,
+                children: <Widget>[
+                  if (canEdit)
+                    IconButton(
+                      icon: const Icon(Icons.edit_outlined, size: 18),
+                      tooltip: context.tr('Edit dependency'),
+                      visualDensity: VisualDensity.compact,
+                      onPressed: () => onEditDependency!(item),
+                    ),
+                  if (canDelete)
+                    IconButton(
+                      icon: const Icon(Icons.delete_outline, size: 18),
+                      tooltip: context.tr('Delete'),
+                      visualDensity: VisualDensity.compact,
+                      onPressed: () => onDeleteDependency!(item),
+                    ),
+                ],
+              )
+            : null,
       );
     }
 
@@ -493,7 +621,7 @@ class _GradlePanel extends StatelessWidget {
           if (plugins.isEmpty)
             empty(context.tr('No plugins found.'))
           else
-            ...plugins.map(itemTile),
+            ...plugins.map((p) => itemTile(p)),
           Divider(height: 1, thickness: 1, color: theme.dividerColor),
           header(context.tr('Dependencies'), deps.length,
               Icons.account_tree_outlined,
@@ -506,7 +634,8 @@ class _GradlePanel extends StatelessWidget {
                     itemCount: deps.length,
                     separatorBuilder: (_, _) =>
                         Divider(height: 1, color: theme.dividerColor),
-                    itemBuilder: (context, index) => itemTile(deps[index]),
+                    itemBuilder: (context, index) =>
+                        itemTile(deps[index], editable: true),
                   ),
           ),
         ],

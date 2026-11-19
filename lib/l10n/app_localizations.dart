@@ -473,6 +473,7 @@ class AppLocalizations {
     'Plugins': 'Плагины',
     'No plugins found.': 'Плагины не найдены.',
     'Add dependency': 'Добавить зависимость',
+    'Edit dependency': 'Редактировать зависимость',
     'Group ID': 'Group ID',
     'Artifact ID': 'Artifact ID',
     'Version': 'Версия',

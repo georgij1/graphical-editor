@@ -104,7 +104,8 @@ class _PomEditorState extends State<PomEditor> {
     setState(() {
       _validation = _validate(_text.text);
     });
-    if (apply && !_validation.hasErrors) {
+    if (apply) {
+      // Best effort apply so the list/state stays in sync.
       widget.controller.applyCode(_text.text);
     }
   }
@@ -119,26 +120,32 @@ class _PomEditorState extends State<PomEditor> {
       ));
   }
 
-  Future<void> _showAddDependencyDialog() async {
-    final groupCtrl = TextEditingController();
-    final artifactCtrl = TextEditingController();
-    final versionCtrl = TextEditingController();
-    String scope = '';
-    final scopes = const <String>[
-      '',
-      'compile',
-      'provided',
-      'runtime',
-      'test',
-      'system',
-      'import',
-    ];
+  static const List<String> _scopes = <String>[
+    '',
+    'compile',
+    'provided',
+    'runtime',
+    'test',
+    'system',
+    'import',
+  ];
+
+  Future<_MavenDependencyInput?> _showDependencyDialog({
+    required String titleKey,
+    _MavenDependency? initial,
+  }) async {
+    final groupCtrl = TextEditingController(text: initial?.groupId ?? '');
+    final artifactCtrl = TextEditingController(text: initial?.artifactId ?? '');
+    final versionCtrl = TextEditingController(text: initial?.version ?? '');
+    String scope = initial?.scope ?? '';
+    if (!_scopes.contains(scope)) scope = '';
+
     final result = await showDialog<bool>(
       context: context,
       builder: (dialogContext) {
         return StatefulBuilder(
           builder: (dialogContext, setDialogState) => AlertDialog(
-            title: Text(dialogContext.tr('Add dependency')),
+            title: Text(dialogContext.tr(titleKey)),
             content: SizedBox(
               width: 420,
               child: Column(
@@ -173,7 +180,7 @@ class _PomEditorState extends State<PomEditor> {
                       labelText: dialogContext.tr('Scope'),
                     ),
                     items: [
-                      for (final s in scopes)
+                      for (final s in _scopes)
                         DropdownMenuItem<String>(
                           value: s,
                           child: Text(s.isEmpty ? '-' : s),
@@ -191,7 +198,7 @@ class _PomEditorState extends State<PomEditor> {
               ),
               FilledButton(
                 onPressed: () => Navigator.of(dialogContext).pop(true),
-                child: Text(dialogContext.tr('Add')),
+                child: Text(dialogContext.tr(initial == null ? 'Add' : 'Save')),
               ),
             ],
           ),
@@ -202,29 +209,36 @@ class _PomEditorState extends State<PomEditor> {
       groupCtrl.dispose();
       artifactCtrl.dispose();
       versionCtrl.dispose();
-      return;
+      return null;
     }
-    final groupId = groupCtrl.text.trim();
-    final artifactId = artifactCtrl.text.trim();
-    final version = versionCtrl.text.trim();
+    final input = _MavenDependencyInput(
+      groupId: groupCtrl.text.trim(),
+      artifactId: artifactCtrl.text.trim(),
+      version: versionCtrl.text.trim(),
+      scope: scope.trim(),
+    );
     groupCtrl.dispose();
     artifactCtrl.dispose();
     versionCtrl.dispose();
-    if (groupId.isEmpty || artifactId.isEmpty) return;
-    _addMavenDependency(
-      groupId: groupId,
-      artifactId: artifactId,
-      version: version,
-      scope: scope.trim(),
-    );
+    if (input.groupId.isEmpty || input.artifactId.isEmpty) return null;
+    return input;
   }
 
-  void _addMavenDependency({
-    required String groupId,
-    required String artifactId,
-    required String version,
-    required String scope,
-  }) {
+  Future<void> _showAddDependencyDialog() async {
+    final input = await _showDependencyDialog(titleKey: 'Add dependency');
+    if (input == null) return;
+    _addMavenDependency(input);
+  }
+
+  Future<void> _showEditDependencyDialog(int index, _MavenDependency dep) async {
+    final input =
+        await _showDependencyDialog(titleKey: 'Edit dependency', initial: dep);
+    if (input == null) return;
+    _replaceMavenDependency(index, input, existing: dep);
+  }
+
+  String _buildDependencyXml(_MavenDependencyInput input,
+      {_MavenDependency? existing}) {
     String esc(String s) => s
         .replaceAll('&', '&amp;')
         .replaceAll('<', '&lt;')
@@ -232,19 +246,31 @@ class _PomEditorState extends State<PomEditor> {
         .replaceAll('"', '&quot;')
         .replaceAll("'", '&apos;');
 
+    final type = existing?.type ?? '';
+    final optional = existing?.optional ?? '';
+
     final buf = StringBuffer();
     buf.writeln('        <dependency>');
-    buf.writeln('            <groupId>${esc(groupId)}</groupId>');
-    buf.writeln('            <artifactId>${esc(artifactId)}</artifactId>');
-    if (version.isNotEmpty) {
-      buf.writeln('            <version>${esc(version)}</version>');
+    buf.writeln('            <groupId>${esc(input.groupId)}</groupId>');
+    buf.writeln('            <artifactId>${esc(input.artifactId)}</artifactId>');
+    if (input.version.isNotEmpty) {
+      buf.writeln('            <version>${esc(input.version)}</version>');
     }
-    if (scope.isNotEmpty) {
-      buf.writeln('            <scope>${esc(scope)}</scope>');
+    if (type.isNotEmpty) {
+      buf.writeln('            <type>${esc(type)}</type>');
+    }
+    if (input.scope.isNotEmpty) {
+      buf.writeln('            <scope>${esc(input.scope)}</scope>');
+    }
+    if (optional.isNotEmpty) {
+      buf.writeln('            <optional>${esc(optional)}</optional>');
     }
     buf.write('        </dependency>');
-    final depBlock = buf.toString();
+    return buf.toString();
+  }
 
+  void _addMavenDependency(_MavenDependencyInput input) {
+    final depBlock = _buildDependencyXml(input);
     var source = _text.text;
     final depsClose = RegExp(r'^(\s*)</dependencies>', multiLine: true);
     final m = depsClose.firstMatch(source);
@@ -259,8 +285,7 @@ class _PomEditorState extends State<PomEditor> {
     } else {
       final projectClose = RegExp(r'^(\s*)</project>', multiLine: true);
       final pm = projectClose.firstMatch(source);
-      final block =
-          '    <dependencies>\n$depBlock\n    </dependencies>\n';
+      final block = '    <dependencies>\n$depBlock\n    </dependencies>\n';
       if (pm != null) {
         source = source.replaceRange(pm.start, pm.start, block);
       } else {
@@ -270,14 +295,53 @@ class _PomEditorState extends State<PomEditor> {
     _setSource(source);
   }
 
+  List<RegExpMatch> _dependencyMatches(String source) {
+    final depRe = RegExp(r'<dependency>.*?</dependency>', dotAll: true);
+    return depRe.allMatches(source).toList();
+  }
+
+  void _replaceMavenDependency(int index, _MavenDependencyInput input,
+      {_MavenDependency? existing}) {
+    final source = _text.text;
+    final matches = _dependencyMatches(source);
+    if (index < 0 || index >= matches.length) return;
+    final m = matches[index];
+    final replacement = _buildDependencyXml(input, existing: existing);
+    final updated = source.replaceRange(m.start, m.end, replacement);
+    _setSource(updated);
+  }
+
+  void _deleteMavenDependency(int index) {
+    final source = _text.text;
+    final matches = _dependencyMatches(source);
+    if (index < 0 || index >= matches.length) return;
+    final m = matches[index];
+    var start = m.start;
+    var end = m.end;
+    // Remove surrounding line break/indentation nicely.
+    if (end < source.length && source[end] == '\r') end++;
+    if (end < source.length && source[end] == '\n') end++;
+    // If previous chars are only whitespace on the line, trim them too.
+    var lineStart = start;
+    while (lineStart > 0 && source[lineStart - 1] != '\n' && source[lineStart - 1] != '\r') {
+      lineStart--;
+    }
+    final prefix = source.substring(lineStart, start);
+    if (prefix.trim().isEmpty) {
+      start = lineStart;
+    }
+    final updated = source.replaceRange(start, end, '');
+    _setSource(updated);
+  }
+
   List<_MavenDependency> _parseDependencies(String source) {
     if (source.trim().isEmpty) return const <_MavenDependency>[];
     try {
       final doc = XmlDocument.parse(source);
       final deps = <_MavenDependency>[];
       for (final dep in doc.findAllElements('dependency')) {
-        final inMgmt = dep.ancestors.any((n) =>
-            n is XmlElement && n.name.local == 'dependencyManagement');
+        final inMgmt = dep.ancestors
+            .any((n) => n is XmlElement && n.name.local == 'dependencyManagement');
         deps.add(_MavenDependency(
           groupId: _childText(dep, 'groupId'),
           artifactId: _childText(dep, 'artifactId'),
@@ -340,7 +404,7 @@ class _PomEditorState extends State<PomEditor> {
               builder: (context, constraints) {
                 const dividerWidth = 8.0;
                 const minEditor = 120.0;
-                const minPreview = 200.0;
+                const minPreview = 220.0;
                 final usable = (constraints.maxWidth - dividerWidth)
                     .clamp(0.0, double.infinity);
                 final room = (usable - minEditor).clamp(minPreview, usable);
@@ -415,6 +479,8 @@ class _PomEditorState extends State<PomEditor> {
                           dependencies: deps,
                           theme: theme,
                           onAdd: _showAddDependencyDialog,
+                          onEdit: (i, d) => _showEditDependencyDialog(i, d),
+                          onDelete: (i) => _deleteMavenDependency(i),
                         ),
                       ),
                     ],
@@ -427,6 +493,20 @@ class _PomEditorState extends State<PomEditor> {
       ),
     );
   }
+}
+
+class _MavenDependencyInput {
+  const _MavenDependencyInput({
+    required this.groupId,
+    required this.artifactId,
+    required this.version,
+    required this.scope,
+  });
+
+  final String groupId;
+  final String artifactId;
+  final String version;
+  final String scope;
 }
 
 class _MavenDependency {
@@ -461,11 +541,15 @@ class _DependenciesPanel extends StatelessWidget {
     required this.dependencies,
     required this.theme,
     this.onAdd,
+    this.onEdit,
+    this.onDelete,
   });
 
   final List<_MavenDependency> dependencies;
   final ThemeData theme;
   final VoidCallback? onAdd;
+  final void Function(int index, _MavenDependency dep)? onEdit;
+  final void Function(int index)? onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -543,6 +627,8 @@ class _DependenciesPanel extends StatelessWidget {
                         if (d.optional == 'true') 'optional',
                         if (d.managed) context.tr('dependencyManagement'),
                       ];
+                      final canEdit = !d.managed && onEdit != null;
+                      final canDelete = !d.managed && onDelete != null;
                       return ListTile(
                         dense: true,
                         leading: Icon(
@@ -568,6 +654,27 @@ class _DependenciesPanel extends StatelessWidget {
                                   color: theme.colorScheme.onSurfaceVariant,
                                 ),
                               ),
+                        trailing: (canEdit || canDelete)
+                            ? Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: <Widget>[
+                                  if (canEdit)
+                                    IconButton(
+                                      icon: const Icon(Icons.edit_outlined, size: 18),
+                                      tooltip: context.tr('Edit dependency'),
+                                      visualDensity: VisualDensity.compact,
+                                      onPressed: () => onEdit!(index, d),
+                                    ),
+                                  if (canDelete)
+                                    IconButton(
+                                      icon: const Icon(Icons.delete_outline, size: 18),
+                                      tooltip: context.tr('Delete'),
+                                      visualDensity: VisualDensity.compact,
+                                      onPressed: () => onDelete!(index),
+                                    ),
+                                ],
+                              )
+                            : null,
                       );
                     },
                   ),
@@ -593,7 +700,7 @@ class _PomValidationBar extends StatelessWidget {
       color: theme.colorScheme.errorContainer,
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       child: Text(
-        '${first.line}:${first.column} ${first.message}',
+        '${first.line ?? ''}:${first.column ?? ''} ${first.message}',
         style: TextStyle(
           fontSize: 12,
           color: theme.colorScheme.onErrorContainer,
