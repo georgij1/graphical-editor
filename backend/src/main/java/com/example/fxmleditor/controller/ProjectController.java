@@ -366,6 +366,9 @@ public class ProjectController {
         if (!contentHash.isBlank()) {
             check.put("contentHash", contentHash);
         }
+        if (body.containsKey("content") && body.get("content") != null) {
+            check.put("content", String.valueOf(body.get("content")));
+        }
         history.recordCheck(id, check);
         return ResponseEntity.ok(check);
     }

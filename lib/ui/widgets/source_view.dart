@@ -238,6 +238,7 @@ class _CodeViewState extends State<CodeView> {
             time: DateTime.now(),
             issues: List<ValidationIssue>.unmodifiable(current),
             contentHash: contentHash,
+            content: content,
           ),
         );
         if (history.length > 20) {
@@ -250,6 +251,7 @@ class _CodeViewState extends State<CodeView> {
         file: path,
         diagnostics: diagnostics,
         contentHash: contentHash,
+        content: content,
       );
     } catch (_) {
       if (!mounted || seq != _remoteCheckSeq) return;
@@ -912,10 +914,12 @@ class _CheckSnapshot {
     required this.time,
     required this.issues,
     this.contentHash = '',
+    this.content = '',
   });
   final DateTime time;
   final List<ValidationIssue> issues;
   final String contentHash;
+  final String content;
 }
 
 String _stableContentHash(String s) {
@@ -927,6 +931,70 @@ String _stableContentHash(String s) {
     h2 = (h2 * 131 + c + i) & 0x7fffffff;
   }
   return '${h1.toRadixString(16)}-${h2.toRadixString(16)}-${s.length}';
+}
+
+enum _DiffOpKind { equal, insert, delete }
+
+class _DiffOp {
+  const _DiffOp(this.kind, this.text, {this.oldLine, this.newLine});
+  final _DiffOpKind kind;
+  final String text;
+  final int? oldLine;
+  final int? newLine;
+}
+
+List<_DiffOp> _computeLineDiff(String oldText, String newText) {
+  List<String> splitLines(String s) {
+    if (s.isEmpty) return const <String>[];
+    final normalized = s.replaceAll('\r\n', '\n').replaceAll('\r', '\n');
+    final parts = normalized.split('\n');
+    // Keep trailing empty line semantics stable: if ends with newline, split gives extra ''.
+    if (normalized.endsWith('\n') && parts.isNotEmpty) {
+      return parts.sublist(0, parts.length - 1);
+    }
+    return parts;
+  }
+
+  final a = splitLines(oldText);
+  final b = splitLines(newText);
+  final n = a.length;
+  final m = b.length;
+
+  // LCS DP (O(n*m)) - fine for typical source/check files.
+  final dp = List<List<int>>.generate(n + 1, (_) => List<int>.filled(m + 1, 0));
+  for (int i = n - 1; i >= 0; i--) {
+    for (int j = m - 1; j >= 0; j--) {
+      if (a[i] == b[j]) {
+        dp[i][j] = dp[i + 1][j + 1] + 1;
+      } else {
+        dp[i][j] = dp[i + 1][j] >= dp[i][j + 1] ? dp[i + 1][j] : dp[i][j + 1];
+      }
+    }
+  }
+
+  final ops = <_DiffOp>[];
+  int i = 0, j = 0, oldLine = 1, newLine = 1;
+  while (i < n && j < m) {
+    if (a[i] == b[j]) {
+      ops.add(_DiffOp(_DiffOpKind.equal, a[i], oldLine: oldLine, newLine: newLine));
+      i++; j++; oldLine++; newLine++;
+    } else if (dp[i + 1][j] >= dp[i][j + 1]) {
+      ops.add(_DiffOp(_DiffOpKind.delete, a[i], oldLine: oldLine));
+      i++; oldLine++;
+    } else {
+      ops.add(_DiffOp(_DiffOpKind.insert, b[j], newLine: newLine));
+      j++; newLine++;
+    }
+  }
+  while (i < n) {
+    ops.add(_DiffOp(_DiffOpKind.delete, a[i], oldLine: oldLine));
+    i++; oldLine++;
+  }
+  while (j < m) {
+    ops.add(_DiffOp(_DiffOpKind.insert, b[j], newLine: newLine));
+    j++; newLine++;
+  }
+  return ops;
 }
 
 enum _HistoryFilter { all, success, warnings, errors }
@@ -1067,6 +1135,8 @@ class _CompilationHistoryDialogState extends State<_CompilationHistoryDialog> {
     DateTime? previousDate,
     String contentHash = '',
     String? previousContentHash,
+    String content = '',
+    String? previousContent,
   }) async {
     if (!mounted) return;
     final currentKeys = issues.map((e) => _issueKey(line: e.line, column: e.column, kind: e.kind, message: e.message)).toSet();
@@ -1084,10 +1154,13 @@ class _CompilationHistoryDialogState extends State<_CompilationHistoryDialog> {
             .where((e) => !currentKeys.contains(_issueKey(line: e.line, column: e.column, kind: e.kind, message: e.message)))
             .toList();
     final diagnosticsUnchanged = introduced.isEmpty && resolved.isEmpty;
-    final contentChanged = previousIssues != null &&
+    final contentChangedByHash = previousIssues != null &&
         contentHash.isNotEmpty &&
         (previousContentHash ?? '').isNotEmpty &&
         contentHash != previousContentHash;
+    final prevContentText = previousContent ?? '';
+    final canShowDiff = previousIssues != null && prevContentText.isNotEmpty && content.isNotEmpty;
+    final contentChanged = canShowDiff ? content != prevContentText : contentChangedByHash;
 
     await showDialog<void>(
       context: context,
@@ -1251,6 +1324,236 @@ class _CompilationHistoryDialogState extends State<_CompilationHistoryDialog> {
           ],
         ];
 
+        Widget buildFileDiffSection() {
+          if (previousIssues == null) {
+            return sectionCard(
+              icon: Icons.difference_outlined,
+              title: dialogContext.tr('File changes'),
+              child: Text(dialogContext.tr('No previous check to compare.')),
+            );
+          }
+          if (content.isEmpty) {
+            return sectionCard(
+              icon: Icons.difference_outlined,
+              title: dialogContext.tr('File changes'),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  if (previousDate != null)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Text(
+                        '${dialogContext.tr('Compared to previous check')}: ${fmtDateTime(previousDate)}',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                  Text(dialogContext.tr('File content snapshot is unavailable for this check.')),
+                ],
+              ),
+            );
+          }
+          if (prevContentText.isEmpty) {
+            return sectionCard(
+              icon: Icons.difference_outlined,
+              title: dialogContext.tr('File changes'),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  if (previousDate != null)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Text(
+                        '${dialogContext.tr('Compared to previous check')}: ${fmtDateTime(previousDate)}',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                  if (contentChangedByHash)
+                    Text(dialogContext.tr('Diagnostics unchanged, but file content changed since the previous check.'))
+                  else
+                    Text(dialogContext.tr('File content snapshot is unavailable for the previous check.')),
+                ],
+              ),
+            );
+          }
+
+          final ops = _computeLineDiff(prevContentText, content);
+          final hasChanges = ops.any((o) => o.kind != _DiffOpKind.equal);
+          if (!hasChanges) {
+            return sectionCard(
+              icon: Icons.difference_outlined,
+              title: dialogContext.tr('File changes'),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  if (previousDate != null)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Text(
+                        '${dialogContext.tr('Compared to previous check')}: ${fmtDateTime(previousDate)}',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                  Text(dialogContext.tr('No file content changes compared to the previous check.')),
+                ],
+              ),
+            );
+          }
+
+          // Build compact hunks with context.
+          const contextLines = 2;
+          final show = List<bool>.filled(ops.length, false);
+          for (int i = 0; i < ops.length; i++) {
+            if (ops[i].kind == _DiffOpKind.equal) continue;
+            final start = (i - contextLines) < 0 ? 0 : i - contextLines;
+            final end = (i + contextLines) >= ops.length ? ops.length - 1 : i + contextLines;
+            for (int j = start; j <= end; j++) {
+              show[j] = true;
+            }
+          }
+
+          final rows = <Widget>[];
+          bool inGap = false;
+          for (int i = 0; i < ops.length; i++) {
+            if (!show[i]) {
+              inGap = true;
+              continue;
+            }
+            if (inGap && rows.isNotEmpty) {
+              rows.add(Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Text(
+                  '…',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                    fontFamily: 'monospace',
+                  ),
+                ),
+              ));
+            }
+            inGap = false;
+            final op = ops[i];
+            Color? bg;
+            Color fg = theme.colorScheme.onSurface;
+            String prefix = ' ';
+            Color prefixColor = theme.colorScheme.onSurfaceVariant;
+            if (op.kind == _DiffOpKind.insert) {
+              bg = Colors.green.withValues(alpha: 0.10);
+              fg = Colors.green.shade800;
+              prefix = '+';
+              prefixColor = Colors.green.shade800;
+            } else if (op.kind == _DiffOpKind.delete) {
+              bg = theme.colorScheme.error.withValues(alpha: 0.08);
+              fg = theme.colorScheme.error;
+              prefix = '-';
+              prefixColor = theme.colorScheme.error;
+            }
+            final oldNo = op.oldLine?.toString() ?? '';
+            final newNo = op.newLine?.toString() ?? '';
+            rows.add(Container(
+              width: double.infinity,
+              color: bg,
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  SizedBox(
+                    width: 34,
+                    child: Text(
+                      oldNo,
+                      textAlign: TextAlign.right,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        fontFamily: 'monospace',
+                        color: theme.colorScheme.onSurfaceVariant,
+                        fontSize: 11,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  SizedBox(
+                    width: 34,
+                    child: Text(
+                      newNo,
+                      textAlign: TextAlign.right,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        fontFamily: 'monospace',
+                        color: theme.colorScheme.onSurfaceVariant,
+                        fontSize: 11,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    prefix,
+                    style: TextStyle(
+                      fontFamily: 'monospace',
+                      fontWeight: FontWeight.w700,
+                      color: prefixColor,
+                      fontSize: 12.5,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: SelectableText(
+                      op.text.isEmpty ? ' ' : op.text,
+                      style: TextStyle(
+                        fontFamily: 'monospace',
+                        fontSize: 12.5,
+                        color: fg,
+                        height: 1.35,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ));
+          }
+
+          return sectionCard(
+            icon: Icons.difference_outlined,
+            title: dialogContext.tr('File changes'),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                if (previousDate != null)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Text(
+                      '${dialogContext.tr('Compared to previous check')}: ${fmtDateTime(previousDate)}',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                Container(
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.surface,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.6)),
+                  ),
+                  clipBehavior: Clip.antiAlias,
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(minWidth: 620),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: rows,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
+
         final children = <Widget>[
           fileTag(),
           const SizedBox(height: 12),
@@ -1325,6 +1628,8 @@ class _CompilationHistoryDialogState extends State<_CompilationHistoryDialog> {
                     ],
                   ),
           ),
+          const SizedBox(height: 12),
+          buildFileDiffSection(),
         ];
 
         return AlertDialog(
@@ -1454,6 +1759,7 @@ class _CompilationHistoryDialogState extends State<_CompilationHistoryDialog> {
       List<({int line, int column, String kind, String message})> issues,
       String sig,
       String contentHash,
+      String content,
       bool localOnly,
     })>[];
 
@@ -1463,6 +1769,7 @@ class _CompilationHistoryDialogState extends State<_CompilationHistoryDialog> {
       List<({int line, int column, String kind, String message})> issues,
       String sig,
       String contentHash,
+      String content,
       bool localOnly,
     })>[];
     for (final rec in _records) {
@@ -1473,6 +1780,7 @@ class _CompilationHistoryDialogState extends State<_CompilationHistoryDialog> {
         issues: issues,
         sig: diagSig(issues),
         contentHash: rec.contentHash,
+        content: rec.content,
         localOnly: false,
       ));
     }
@@ -1483,6 +1791,7 @@ class _CompilationHistoryDialogState extends State<_CompilationHistoryDialog> {
       List<({int line, int column, String kind, String message})> issues,
       String sig,
       String contentHash,
+      String content,
       bool localOnly,
     }) localItem) {
       for (final s in serverTimeline) {
@@ -1508,6 +1817,7 @@ class _CompilationHistoryDialogState extends State<_CompilationHistoryDialog> {
         issues: issues,
         sig: diagSig(issues),
         contentHash: snap.contentHash,
+        content: snap.content,
         localOnly: true,
       );
       if (!persistedLocally(item)) {
@@ -1517,7 +1827,7 @@ class _CompilationHistoryDialogState extends State<_CompilationHistoryDialog> {
     timeline.addAll(serverTimeline);
     timeline.sort((a, b) => b.date.compareTo(a.date));
 
-    // Deduplicate identical adjacent-near entries (prefer server-backed, keep content hash).
+    // Deduplicate identical adjacent-near entries (prefer server-backed, keep content/hash).
     // Do not collapse if content hashes differ (same diagnostics but different file state).
     final deduped = <({
       DateTime date,
@@ -1525,6 +1835,7 @@ class _CompilationHistoryDialogState extends State<_CompilationHistoryDialog> {
       List<({int line, int column, String kind, String message})> issues,
       String sig,
       String contentHash,
+      String content,
       bool localOnly,
     })>[];
     for (final item in timeline) {
@@ -1537,14 +1848,18 @@ class _CompilationHistoryDialogState extends State<_CompilationHistoryDialog> {
         if (prev.sig == item.sig && diff <= 10 && !hashesKnownDifferent) {
           if (prev.localOnly && !item.localOnly) {
             deduped[deduped.length - 1] = item;
-          } else if (prev.contentHash.isEmpty && item.contentHash.isNotEmpty) {
+          } else {
+            // Merge missing content/hash info into kept entry.
+            final mergedContent = prev.content.isNotEmpty ? prev.content : item.content;
+            final mergedHash = prev.contentHash.isNotEmpty ? prev.contentHash : item.contentHash;
             deduped[deduped.length - 1] = (
               date: prev.date,
               author: prev.author,
               issues: prev.issues,
               sig: prev.sig,
-              contentHash: item.contentHash,
-              localOnly: prev.localOnly,
+              contentHash: mergedHash,
+              content: mergedContent,
+              localOnly: prev.localOnly && item.localOnly,
             );
           }
           continue;
@@ -1559,6 +1874,7 @@ class _CompilationHistoryDialogState extends State<_CompilationHistoryDialog> {
       List<({int line, int column, String kind, String message})> issues,
       String sig,
       String contentHash,
+      String content,
       bool localOnly,
     }) item) {
       final hasErrors = item.issues.any((d) => d.kind == 'error');
@@ -1671,6 +1987,8 @@ class _CompilationHistoryDialogState extends State<_CompilationHistoryDialog> {
                 previousDate: previousItem?.date,
                 contentHash: item.contentHash,
                 previousContentHash: previousItem?.contentHash,
+                content: item.content,
+                previousContent: previousItem?.content,
               ),
               mouseCursor: SystemMouseCursors.click,
               child: Padding(

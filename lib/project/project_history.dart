@@ -197,6 +197,7 @@ class FileCheckRecord {
     required this.author,
     required this.diagnostics,
     this.contentHash = '',
+    this.content = '',
   });
 
   final String id;
@@ -205,6 +206,7 @@ class FileCheckRecord {
   final String author;
   final List<FileCheckDiagnostic> diagnostics;
   final String contentHash;
+  final String content;
 
   factory FileCheckRecord.fromJson(Map<String, dynamic> json) => FileCheckRecord(
         id: (json['id'] as String?) ?? '',
@@ -213,6 +215,7 @@ class FileCheckRecord {
             DateTime.now().toUtc(),
         author: (json['author'] as String?) ?? '',
         contentHash: (json['contentHash'] as String?) ?? '',
+        content: (json['content'] as String?) ?? '',
         diagnostics: [
           for (final d in (json['diagnostics'] as List? ?? []))
             if (d is Map<String, dynamic>)

@@ -160,7 +160,8 @@ abstract class ApiClient {
       String token, String projectId,
       {required String file,
       required List<FileCheckDiagnostic> diagnostics,
-      String? contentHash});
+      String? contentHash,
+      String? content});
 
   /// Reads the profile of [token]; the result may be null when signed out.
   Future<ApiResult<Profile?>> getProfile(String token);
@@ -632,13 +633,17 @@ class HttpApiClient implements ApiClient {
       String token, String projectId,
       {required String file,
       required List<FileCheckDiagnostic> diagnostics,
-      String? contentHash}) async {
+      String? contentHash,
+      String? content}) async {
     final body = <String, dynamic>{
       'file': file,
       'diagnostics': [for (final d in diagnostics) d.toJson()],
     };
     if (contentHash != null && contentHash.isNotEmpty) {
       body['contentHash'] = contentHash;
+    }
+    if (content != null) {
+      body['content'] = content;
     }
     final result = await _projectRequest(
       'POST',

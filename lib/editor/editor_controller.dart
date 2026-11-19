@@ -3270,6 +3270,7 @@ class EditorController extends ChangeNotifier {
     required String file,
     required List<BuildDiagnostic> diagnostics,
     String? contentHash,
+    String? content,
   }) async {
     final project = _currentProject;
     final token = _token;
@@ -3306,6 +3307,7 @@ class EditorController extends ChangeNotifier {
         file: file,
         diagnostics: fileDiagnostics,
         contentHash: contentHash,
+        content: content,
       );
     } catch (_) {
       // Best effort: keep local in-session history even if persistence fails.

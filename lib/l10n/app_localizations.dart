@@ -493,6 +493,13 @@ class AppLocalizations {
     'No changes compared to previous check.': 'Нет изменений по сравнению с предыдущей проверкой.',
     'Diagnostics unchanged, but file content changed since the previous check.':
         'Диагностики не изменились, но содержимое файла изменилось с момента предыдущей проверки.',
+    'File changes': 'Изменения в файле',
+    'No file content changes compared to the previous check.':
+        'Содержимое файла не изменилось по сравнению с предыдущей проверкой.',
+    'File content snapshot is unavailable for this check.':
+        'Снимок содержимого файла для этой проверки недоступен.',
+    'File content snapshot is unavailable for the previous check.':
+        'Снимок содержимого файла для предыдущей проверки недоступен.',
     'No previous check to compare.': 'Нет предыдущей проверки для сравнения.',
     'Compared to previous check': 'По сравнению с предыдущей проверкой',
     'Search checks': 'Поиск по проверкам',
