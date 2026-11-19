@@ -362,6 +362,10 @@ public class ProjectController {
         } else {
             check.put("diagnostics", List.of());
         }
+        String contentHash = str(body, "contentHash");
+        if (!contentHash.isBlank()) {
+            check.put("contentHash", contentHash);
+        }
         history.recordCheck(id, check);
         return ResponseEntity.ok(check);
     }

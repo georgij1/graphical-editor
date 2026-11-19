@@ -224,6 +224,7 @@ class _CodeViewState extends State<CodeView> {
                 severity: d.isError ? ValidationSeverity.error : ValidationSeverity.warning,
               ))
           .toList();
+      final contentHash = _stableContentHash(content);
       setState(() {
         _remoteIssues = current;
         _remoteCheckInProgress = false;
@@ -236,6 +237,7 @@ class _CodeViewState extends State<CodeView> {
           _CheckSnapshot(
             time: DateTime.now(),
             issues: List<ValidationIssue>.unmodifiable(current),
+            contentHash: contentHash,
           ),
         );
         if (history.length > 20) {
@@ -244,7 +246,11 @@ class _CodeViewState extends State<CodeView> {
       });
       // Persist check/compilation result for this file on the server (best effort).
       // ignore: discarded_futures
-      widget.controller.recordFileCheck(file: path, diagnostics: diagnostics);
+      widget.controller.recordFileCheck(
+        file: path,
+        diagnostics: diagnostics,
+        contentHash: contentHash,
+      );
     } catch (_) {
       if (!mounted || seq != _remoteCheckSeq) return;
       setState(() {
@@ -902,9 +908,25 @@ class _CodeViewState extends State<CodeView> {
 }
 
 class _CheckSnapshot {
-  const _CheckSnapshot({required this.time, required this.issues});
+  const _CheckSnapshot({
+    required this.time,
+    required this.issues,
+    this.contentHash = '',
+  });
   final DateTime time;
   final List<ValidationIssue> issues;
+  final String contentHash;
+}
+
+String _stableContentHash(String s) {
+  var h1 = 0;
+  var h2 = 0;
+  for (var i = 0; i < s.length; i++) {
+    final c = s.codeUnitAt(i);
+    h1 = (h1 * 31 + c) & 0x7fffffff;
+    h2 = (h2 * 131 + c + i) & 0x7fffffff;
+  }
+  return '${h1.toRadixString(16)}-${h2.toRadixString(16)}-${s.length}';
 }
 
 enum _HistoryFilter { all, success, warnings, errors }
@@ -961,6 +983,8 @@ class _CompilationHistoryDialogState extends State<_CompilationHistoryDialog> {
         ..write(r.date.toIso8601String())
         ..write('|')
         ..write(r.file)
+        ..write('|')
+        ..write(r.contentHash)
         ..write('|');
       for (final d in r.diagnostics) {
         buf
@@ -985,6 +1009,8 @@ class _CompilationHistoryDialogState extends State<_CompilationHistoryDialog> {
     for (final s in snaps) {
       buf
         ..write(s.time.millisecondsSinceEpoch)
+        ..write('|')
+        ..write(s.contentHash)
         ..write('|');
       for (final i in s.issues) {
         buf
@@ -1039,6 +1065,8 @@ class _CompilationHistoryDialogState extends State<_CompilationHistoryDialog> {
     required List<({int line, int column, String kind, String message})> issues,
     required List<({int line, int column, String kind, String message})>? previousIssues,
     DateTime? previousDate,
+    String contentHash = '',
+    String? previousContentHash,
   }) async {
     if (!mounted) return;
     final currentKeys = issues.map((e) => _issueKey(line: e.line, column: e.column, kind: e.kind, message: e.message)).toSet();
@@ -1055,6 +1083,11 @@ class _CompilationHistoryDialogState extends State<_CompilationHistoryDialog> {
         : previousIssues
             .where((e) => !currentKeys.contains(_issueKey(line: e.line, column: e.column, kind: e.kind, message: e.message)))
             .toList();
+    final diagnosticsUnchanged = introduced.isEmpty && resolved.isEmpty;
+    final contentChanged = previousIssues != null &&
+        contentHash.isNotEmpty &&
+        (previousContentHash ?? '').isNotEmpty &&
+        contentHash != previousContentHash;
 
     await showDialog<void>(
       context: context,
@@ -1259,7 +1292,10 @@ class _CompilationHistoryDialogState extends State<_CompilationHistoryDialog> {
                             ),
                           ),
                         ),
-                      if (introduced.isEmpty && resolved.isEmpty)
+                      if (diagnosticsUnchanged && contentChanged)
+                        Text(dialogContext.tr(
+                            'Diagnostics unchanged, but file content changed since the previous check.'))
+                      else if (diagnosticsUnchanged)
                         Text(dialogContext.tr('No changes compared to previous check.'))
                       else ...<Widget>[
                         if (introduced.isNotEmpty) ...<Widget>[
@@ -1417,6 +1453,7 @@ class _CompilationHistoryDialogState extends State<_CompilationHistoryDialog> {
       String? author,
       List<({int line, int column, String kind, String message})> issues,
       String sig,
+      String contentHash,
       bool localOnly,
     })>[];
 
@@ -1425,6 +1462,7 @@ class _CompilationHistoryDialogState extends State<_CompilationHistoryDialog> {
       String? author,
       List<({int line, int column, String kind, String message})> issues,
       String sig,
+      String contentHash,
       bool localOnly,
     })>[];
     for (final rec in _records) {
@@ -1434,6 +1472,7 @@ class _CompilationHistoryDialogState extends State<_CompilationHistoryDialog> {
         author: rec.author,
         issues: issues,
         sig: diagSig(issues),
+        contentHash: rec.contentHash,
         localOnly: false,
       ));
     }
@@ -1443,12 +1482,20 @@ class _CompilationHistoryDialogState extends State<_CompilationHistoryDialog> {
       String? author,
       List<({int line, int column, String kind, String message})> issues,
       String sig,
+      String contentHash,
       bool localOnly,
     }) localItem) {
       for (final s in serverTimeline) {
         if (s.sig != localItem.sig) continue;
         final diff = s.date.difference(localItem.date).inSeconds.abs();
-        if (diff <= 10) return true;
+        if (diff <= 10) {
+          if (s.contentHash.isNotEmpty &&
+              localItem.contentHash.isNotEmpty &&
+              s.contentHash != localItem.contentHash) {
+            continue;
+          }
+          return true;
+        }
       }
       return false;
     }
@@ -1460,6 +1507,7 @@ class _CompilationHistoryDialogState extends State<_CompilationHistoryDialog> {
         author: null as String?,
         issues: issues,
         sig: diagSig(issues),
+        contentHash: snap.contentHash,
         localOnly: true,
       );
       if (!persistedLocally(item)) {
@@ -1469,21 +1517,35 @@ class _CompilationHistoryDialogState extends State<_CompilationHistoryDialog> {
     timeline.addAll(serverTimeline);
     timeline.sort((a, b) => b.date.compareTo(a.date));
 
-    // Deduplicate identical adjacent-near entries (prefer server-backed).
+    // Deduplicate identical adjacent-near entries (prefer server-backed, keep content hash).
+    // Do not collapse if content hashes differ (same diagnostics but different file state).
     final deduped = <({
       DateTime date,
       String? author,
       List<({int line, int column, String kind, String message})> issues,
       String sig,
+      String contentHash,
       bool localOnly,
     })>[];
     for (final item in timeline) {
       if (deduped.isNotEmpty) {
         final prev = deduped.last;
         final diff = prev.date.difference(item.date).inSeconds.abs();
-        if (prev.sig == item.sig && diff <= 10) {
+        final hashesKnownDifferent = prev.contentHash.isNotEmpty &&
+            item.contentHash.isNotEmpty &&
+            prev.contentHash != item.contentHash;
+        if (prev.sig == item.sig && diff <= 10 && !hashesKnownDifferent) {
           if (prev.localOnly && !item.localOnly) {
             deduped[deduped.length - 1] = item;
+          } else if (prev.contentHash.isEmpty && item.contentHash.isNotEmpty) {
+            deduped[deduped.length - 1] = (
+              date: prev.date,
+              author: prev.author,
+              issues: prev.issues,
+              sig: prev.sig,
+              contentHash: item.contentHash,
+              localOnly: prev.localOnly,
+            );
           }
           continue;
         }
@@ -1496,6 +1558,7 @@ class _CompilationHistoryDialogState extends State<_CompilationHistoryDialog> {
       String? author,
       List<({int line, int column, String kind, String message})> issues,
       String sig,
+      String contentHash,
       bool localOnly,
     }) item) {
       final hasErrors = item.issues.any((d) => d.kind == 'error');
@@ -1606,6 +1669,8 @@ class _CompilationHistoryDialogState extends State<_CompilationHistoryDialog> {
                 issues: item.issues,
                 previousIssues: previous,
                 previousDate: previousItem?.date,
+                contentHash: item.contentHash,
+                previousContentHash: previousItem?.contentHash,
               ),
               mouseCursor: SystemMouseCursors.click,
               child: Padding(

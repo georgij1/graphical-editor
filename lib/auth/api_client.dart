@@ -158,7 +158,9 @@ abstract class ApiClient {
   /// Records a live file check/compilation result.
   Future<ApiResult<FileCheckRecord>> recordFileCheck(
       String token, String projectId,
-      {required String file, required List<FileCheckDiagnostic> diagnostics});
+      {required String file,
+      required List<FileCheckDiagnostic> diagnostics,
+      String? contentHash});
 
   /// Reads the profile of [token]; the result may be null when signed out.
   Future<ApiResult<Profile?>> getProfile(String token);
@@ -628,15 +630,21 @@ class HttpApiClient implements ApiClient {
   @override
   Future<ApiResult<FileCheckRecord>> recordFileCheck(
       String token, String projectId,
-      {required String file, required List<FileCheckDiagnostic> diagnostics}) async {
+      {required String file,
+      required List<FileCheckDiagnostic> diagnostics,
+      String? contentHash}) async {
+    final body = <String, dynamic>{
+      'file': file,
+      'diagnostics': [for (final d in diagnostics) d.toJson()],
+    };
+    if (contentHash != null && contentHash.isNotEmpty) {
+      body['contentHash'] = contentHash;
+    }
     final result = await _projectRequest(
       'POST',
       '/projects/$projectId/checks',
       token,
-      body: <String, dynamic>{
-        'file': file,
-        'diagnostics': [for (final d in diagnostics) d.toJson()],
-      },
+      body: body,
     );
     if (!result.isOk || result.value == null) {
       return ApiResult<FileCheckRecord>.failure(result.status, result.message);

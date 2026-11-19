@@ -3269,6 +3269,7 @@ class EditorController extends ChangeNotifier {
   Future<void> recordFileCheck({
     required String file,
     required List<BuildDiagnostic> diagnostics,
+    String? contentHash,
   }) async {
     final project = _currentProject;
     final token = _token;
@@ -3304,6 +3305,7 @@ class EditorController extends ChangeNotifier {
         project.id,
         file: file,
         diagnostics: fileDiagnostics,
+        contentHash: contentHash,
       );
     } catch (_) {
       // Best effort: keep local in-session history even if persistence fails.

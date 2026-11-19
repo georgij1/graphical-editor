@@ -491,6 +491,8 @@ class AppLocalizations {
     'Introduced issues': 'Появившиеся проблемы',
     'Resolved issues': 'Устранённые проблемы',
     'No changes compared to previous check.': 'Нет изменений по сравнению с предыдущей проверкой.',
+    'Diagnostics unchanged, but file content changed since the previous check.':
+        'Диагностики не изменились, но содержимое файла изменилось с момента предыдущей проверки.',
     'No previous check to compare.': 'Нет предыдущей проверки для сравнения.',
     'Compared to previous check': 'По сравнению с предыдущей проверкой',
     'Search checks': 'Поиск по проверкам',
