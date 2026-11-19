@@ -1038,6 +1038,7 @@ class _CompilationHistoryDialogState extends State<_CompilationHistoryDialog> {
     required String? author,
     required List<({int line, int column, String kind, String message})> issues,
     required List<({int line, int column, String kind, String message})>? previousIssues,
+    DateTime? previousDate,
   }) async {
     if (!mounted) return;
     final currentKeys = issues.map((e) => _issueKey(line: e.line, column: e.column, kind: e.kind, message: e.message)).toSet();
@@ -1245,36 +1246,48 @@ class _CompilationHistoryDialogState extends State<_CompilationHistoryDialog> {
             title: dialogContext.tr('Changes in this check'),
             child: previousIssues == null
                 ? Text(dialogContext.tr('No previous check to compare.'))
-                : (introduced.isEmpty && resolved.isEmpty)
-                    ? Text(dialogContext.tr('No changes compared to previous check.'))
-                    : Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: <Widget>[
-                          if (introduced.isNotEmpty) ...<Widget>[
-                            Text(
-                              '${dialogContext.tr('Introduced issues')} (${introduced.length})',
-                              style: theme.textTheme.bodyMedium?.copyWith(
-                                fontWeight: FontWeight.w700,
-                                color: theme.colorScheme.error,
-                              ),
+                : Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      if (previousDate != null)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: Text(
+                            '${dialogContext.tr('Compared to previous check')}: ${fmtDateTime(previousDate)}',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
                             ),
-                            const SizedBox(height: 6),
-                            ...introduced.map((e) => issueTile(e)),
-                            if (resolved.isNotEmpty) const SizedBox(height: 8),
-                          ],
-                          if (resolved.isNotEmpty) ...<Widget>[
-                            Text(
-                              '${dialogContext.tr('Resolved issues')} (${resolved.length})',
-                              style: theme.textTheme.bodyMedium?.copyWith(
-                                fontWeight: FontWeight.w700,
-                                color: Colors.green.shade700,
-                              ),
+                          ),
+                        ),
+                      if (introduced.isEmpty && resolved.isEmpty)
+                        Text(dialogContext.tr('No changes compared to previous check.'))
+                      else ...<Widget>[
+                        if (introduced.isNotEmpty) ...<Widget>[
+                          Text(
+                            '${dialogContext.tr('Introduced issues')} (${introduced.length})',
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              fontWeight: FontWeight.w700,
+                              color: theme.colorScheme.error,
                             ),
-                            const SizedBox(height: 6),
-                            ...resolved.map((e) => issueTile(e, forceColor: Colors.green.shade700)),
-                          ],
+                          ),
+                          const SizedBox(height: 6),
+                          ...introduced.map((e) => issueTile(e)),
+                          if (resolved.isNotEmpty) const SizedBox(height: 8),
                         ],
-                      ),
+                        if (resolved.isNotEmpty) ...<Widget>[
+                          Text(
+                            '${dialogContext.tr('Resolved issues')} (${resolved.length})',
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              fontWeight: FontWeight.w700,
+                              color: Colors.green.shade700,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          ...resolved.map((e) => issueTile(e, forceColor: Colors.green.shade700)),
+                        ],
+                      ],
+                    ],
+                  ),
           ),
         ];
 
@@ -1542,7 +1555,8 @@ class _CompilationHistoryDialogState extends State<_CompilationHistoryDialog> {
           final statusIcon = item.issues.isEmpty
               ? Icons.check_circle_outline
               : (hasErrors ? Icons.error_outline : Icons.warning_amber_outlined);
-          final previous = (i + 1 < deduped.length) ? deduped[i + 1].issues : null;
+          final previousItem = (i + 1 < deduped.length) ? deduped[i + 1] : null;
+          final previous = previousItem?.issues;
           final isLatestOverall = i == 0;
           final content = Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -1591,6 +1605,7 @@ class _CompilationHistoryDialogState extends State<_CompilationHistoryDialog> {
                 author: item.author,
                 issues: item.issues,
                 previousIssues: previous,
+                previousDate: previousItem?.date,
               ),
               mouseCursor: SystemMouseCursors.click,
               child: Padding(
