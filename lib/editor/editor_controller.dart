@@ -2543,7 +2543,9 @@ class EditorController extends ChangeNotifier {
       ..package = remote.package
       ..mainClass = remote.mainClass
       ..description = remote.description
-      ..revision = remote.revision;
+      ..revision = remote.revision
+      ..shared = remote.shared
+      ..buildTool = remote.buildTool;
     project.replaceMembers(remote.members);
     project.scenes
       ..clear()
@@ -2551,6 +2553,7 @@ class EditorController extends ChangeNotifier {
     project.sourceOverrides
       ..clear()
       ..addAll(remote.sourceOverrides);
+    project.sanitizeBuildSystem();
 
     final active = _activeScene;
     if (active != null) {

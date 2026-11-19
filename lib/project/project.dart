@@ -104,6 +104,22 @@ class Project {
       ..addAll(value);
   }
 
+  /// Keeps build-system files consistent with [buildTool] by removing build
+  /// files that belong to the opposite tool from [sourceOverrides]. This
+  /// prevents stale files (e.g. both `pom.xml` and `build.gradle`) from
+  /// lingering across saves/reloads or remote sync.
+  void sanitizeBuildSystem() {
+    if (buildTool != 'maven' && buildTool != 'gradle') {
+      buildTool = 'maven';
+    }
+    if (buildTool == 'gradle') {
+      sourceOverrides.remove('pom.xml');
+    } else {
+      sourceOverrides.remove('build.gradle');
+      sourceOverrides.remove('settings.gradle');
+    }
+  }
+
   final List<SceneFile> scenes;
 
   /// Hand-edited copies of generated Java sources, keyed by file path. When a
@@ -148,30 +164,34 @@ class Project {
         if (sourceOverrides.isNotEmpty) 'sources': sourceOverrides,
       };
 
-  factory Project.fromJson(Map<String, dynamic> json) => Project(
-        id: json['id'] as String,
-        name: json['name'] as String,
-        package: (json['package'] as String?) ?? '',
-        mainClass: (json['mainClass'] as String?) ?? 'MainApp',
-        description: (json['description'] as String?) ?? '',
-        ownerId: json['ownerId'] as String?,
-        ownerEmail: json['ownerEmail'] as String?,
-        revision: (json['revision'] as num?)?.toInt() ?? 0,
-        shared: json['shared'] as bool? ?? false,
-        buildTool: (json['buildTool'] as String?) ?? 'maven',
-        members: [
-          for (final m in (json['members'] as List? ?? []))
-            ProjectMember.fromJson(m as Map<String, dynamic>),
-        ],
-        scenes: [
-          for (final s in (json['scenes'] as List? ?? []))
-            SceneFile.fromJson(s as Map<String, dynamic>),
-        ],
-        sourceOverrides: {
-          for (final e in (json['sources'] as Map? ?? {}).entries)
-            e.key as String: e.value as String,
-        },
-      );
+  factory Project.fromJson(Map<String, dynamic> json) {
+    final project = Project(
+      id: json['id'] as String,
+      name: json['name'] as String,
+      package: (json['package'] as String?) ?? '',
+      mainClass: (json['mainClass'] as String?) ?? 'MainApp',
+      description: (json['description'] as String?) ?? '',
+      ownerId: json['ownerId'] as String?,
+      ownerEmail: json['ownerEmail'] as String?,
+      revision: (json['revision'] as num?)?.toInt() ?? 0,
+      shared: json['shared'] as bool? ?? false,
+      buildTool: (json['buildTool'] as String?) ?? 'maven',
+      members: [
+        for (final m in (json['members'] as List? ?? []))
+          ProjectMember.fromJson(m as Map<String, dynamic>),
+      ],
+      scenes: [
+        for (final s in (json['scenes'] as List? ?? []))
+          SceneFile.fromJson(s as Map<String, dynamic>),
+      ],
+      sourceOverrides: {
+        for (final e in (json['sources'] as Map? ?? {}).entries)
+          e.key as String: e.value as String,
+      },
+    );
+    project.sanitizeBuildSystem();
+    return project;
+  }
 
   Project copy() => Project(
         id: id,

@@ -212,7 +212,8 @@ class _ProjectTreePanelState extends State<ProjectTreePanel> {
         // Check if this is an empty folder (ends with /)
         if (entry.key.endsWith('/')) {
           // Create folder structure without adding a file
-          final parts = entry.key.substring(0, entry.key.length - 1).split('/');
+          final parts =
+              entry.key.substring(0, entry.key.length - 1).split('/');
           var dir = root;
           for (final part in parts) {
             dir = dir.dirs.putIfAbsent(
@@ -221,6 +222,16 @@ class _ProjectTreePanelState extends State<ProjectTreePanel> {
             );
           }
         } else {
+          // Ignore build-system files that belong to the opposite tool; only the
+          // active build system's files should be shown.
+          final p = entry.key;
+          final isOpposingBuildFile = buildTool == BuildTool.gradle
+              ? (p == 'pom.xml' || p.endsWith('/pom.xml'))
+              : (p == 'build.gradle' ||
+                  p == 'settings.gradle' ||
+                  p.endsWith('/build.gradle') ||
+                  p.endsWith('/settings.gradle'));
+          if (isOpposingBuildFile) continue;
           addFile(
             entry.key,
             content: entry.value,
