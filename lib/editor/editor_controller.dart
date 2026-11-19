@@ -201,7 +201,7 @@ class EditorController extends ChangeNotifier {
       _openTabs[_activeTabIndex] = _openSource!;
     }
     _codeEpoch++;
-    _persist();
+    _persist(explicit: true);
     _scheduleSharedPublish();
     notifyListeners();
   }
@@ -285,7 +285,7 @@ class EditorController extends ChangeNotifier {
           isFxml: false,
         ),
       );
-      _persist();
+      _persist(explicit: true);
       _scheduleSharedPublish();
       notifyListeners();
     } catch (_) {}
@@ -328,7 +328,7 @@ class EditorController extends ChangeNotifier {
           isFxml: false,
         ),
       );
-      _persist();
+      _persist(explicit: true);
       _scheduleSharedPublish();
       notifyListeners();
     } catch (_) {}
