@@ -211,6 +211,272 @@ class _GitignoreEditorState extends State<GitignoreEditor> {
     return rb.localToGlobal(Offset(16 + caret.dx, 16 + caret.dy));
   }
 
+  // --------------------------- Rules management ---------------------------
+
+  void _setSourceText(String source, {bool apply = true}) {
+    _text.text = source;
+    setState(() {
+      _validation = _validate(_text.text);
+    });
+    if (apply) {
+      widget.controller.applyCode(_text.text);
+    }
+  }
+
+  void _replaceRuleLine(_GitignoreRuleEntry entry, String newPattern) {
+    final source = _text.text;
+    if (entry.lineStart < 0 ||
+        entry.lineEnd > source.length ||
+        entry.lineStart > entry.lineEnd) {
+      return;
+    }
+    final updated =
+        source.replaceRange(entry.lineStart, entry.lineEnd, newPattern.trim());
+    _setSourceText(updated);
+  }
+
+  void _deleteRuleLine(_GitignoreRuleEntry entry) {
+    var source = _text.text;
+    if (entry.lineStart < 0 ||
+        entry.lineEnd > source.length ||
+        entry.lineStart > entry.lineEnd) {
+      return;
+    }
+    var start = entry.lineStart;
+    var end = entry.lineEnd;
+    // Remove trailing newline if present; otherwise remove preceding newline.
+    if (end < source.length && source[end] == '\n') {
+      end += 1;
+    } else if (end < source.length && source[end] == '\r') {
+      end += 1;
+      if (end < source.length && source[end] == '\n') end += 1;
+    } else if (start > 0 && source[start - 1] == '\n') {
+      start -= 1;
+      if (start > 0 && source[start - 1] == '\r') start -= 1;
+    }
+    final updated = source.replaceRange(start, end, '');
+    _setSourceText(updated);
+  }
+
+  void _appendRule(String pattern) {
+    final p = pattern.trim();
+    if (p.isEmpty) return;
+    var source = _text.text;
+    if (source.isEmpty) {
+      source = '$p\n';
+    } else if (source.endsWith('\n')) {
+      source = '$source$p\n';
+    } else {
+      source = '$source\n$p\n';
+    }
+    _setSourceText(source);
+  }
+
+  Future<void> _showAddPatternDialog({_GitignoreRuleEntry? initial}) async {
+    final ctrl = TextEditingController(text: initial?.pattern ?? '');
+    String? errorText;
+    final result = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (dialogContext, setDialogState) {
+            void submit() {
+              final value = ctrl.text.trim();
+              if (value.isEmpty) {
+                setDialogState(() {
+                  errorText = dialogContext.tr('Pattern is required');
+                });
+                return;
+              }
+              if (value.contains('\n') || value.contains('\r')) {
+                setDialogState(() {
+                  errorText = dialogContext.tr('Invalid pattern');
+                });
+                return;
+              }
+              Navigator.of(dialogContext).pop(value);
+            }
+
+            return AlertDialog(
+              title: Text(dialogContext
+                  .tr(initial == null ? 'Add pattern' : 'Edit pattern')),
+              content: SizedBox(
+                width: 420,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: <Widget>[
+                    TextField(
+                      controller: ctrl,
+                      autofocus: true,
+                      decoration: InputDecoration(
+                        labelText: dialogContext.tr('Pattern'),
+                        hintText: 'build/, *.log, !keep.txt',
+                      ),
+                      onChanged: (_) {
+                        if (errorText != null) {
+                          setDialogState(() => errorText = null);
+                        }
+                      },
+                      onSubmitted: (_) => submit(),
+                    ),
+                    if (errorText != null) ...<Widget>[
+                      const SizedBox(height: 12),
+                      Text(
+                        errorText!,
+                        style: TextStyle(
+                          color: Theme.of(dialogContext).colorScheme.error,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              actions: <Widget>[
+                TextButton(
+                  onPressed: () => Navigator.of(dialogContext).pop(),
+                  child: Text(dialogContext.tr('Cancel')),
+                ),
+                FilledButton(
+                  onPressed: submit,
+                  child: Text(dialogContext.tr('Save')),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+    ctrl.dispose();
+    if (result == null) return;
+    if (initial == null) {
+      _appendRule(result);
+    } else {
+      _replaceRuleLine(initial, result);
+    }
+  }
+
+  void _collectProjectPaths(
+    Project project,
+    Set<String> files,
+    Set<String> dirs,
+  ) {
+    for (final f in JavaGenerator.generate(project)) {
+      files.add(f.path);
+    }
+    final pkgDir = JavaGenerator.packageDir(project);
+    for (final s in project.scenes) {
+      files.add('src/main/resources/$pkgDir/${s.name}.fxml');
+    }
+    for (final key in project.sourceOverrides.keys) {
+      if (key.endsWith('/')) {
+        dirs.add(key.substring(0, key.length - 1));
+      } else {
+        files.add(key);
+      }
+    }
+    // Derive ancestor directories for all files/dirs.
+    final all = <String>{...files, ...dirs};
+    for (final p in all.toList()) {
+      final parts = p.split('/');
+      for (var i = 1; i < parts.length; i++) {
+        dirs.add(parts.sublist(0, i).join('/'));
+      }
+    }
+    dirs.removeWhere((d) => d.isEmpty);
+  }
+
+  Future<void> _showAddPathDialog({required bool folder}) async {
+    final project = widget.controller.currentProject;
+    if (project == null) return;
+    final files = <String>{};
+    final dirs = <String>{};
+    _collectProjectPaths(project, files, dirs);
+    final paths = (folder ? dirs : files).toList()..sort();
+    final selected = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) {
+        String query = '';
+        return StatefulBuilder(
+          builder: (dialogContext, setDialogState) {
+            final filtered = query.trim().isEmpty
+                ? paths
+                : paths
+                    .where((p) =>
+                        p.toLowerCase().contains(query.trim().toLowerCase()))
+                    .toList();
+            return AlertDialog(
+              title: Text(dialogContext.tr(
+                  folder ? 'Select folder to ignore' : 'Select file to ignore')),
+              content: SizedBox(
+                width: 520,
+                height: 420,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: <Widget>[
+                    TextField(
+                      autofocus: true,
+                      decoration: InputDecoration(
+                        labelText: dialogContext.tr('Search'),
+                        prefixIcon: const Icon(Icons.search),
+                      ),
+                      onChanged: (v) => setDialogState(() => query = v),
+                    ),
+                    const SizedBox(height: 8),
+                    Expanded(
+                      child: filtered.isEmpty
+                          ? Center(
+                              child: Text(dialogContext.tr(folder
+                                  ? 'No folders found.'
+                                  : 'No files found.')),
+                            )
+                          : ListView.builder(
+                              itemCount: filtered.length,
+                              itemBuilder: (context, index) {
+                                final path = filtered[index];
+                                final isDir = folder;
+                                return ListTile(
+                                  dense: true,
+                                  leading: Icon(
+                                    isDir
+                                        ? Icons.folder_outlined
+                                        : Icons.insert_drive_file_outlined,
+                                    size: 18,
+                                  ),
+                                  title: Text(
+                                    path,
+                                    style: const TextStyle(
+                                      fontFamily: 'monospace',
+                                      fontSize: 12.5,
+                                    ),
+                                  ),
+                                  onTap: () =>
+                                      Navigator.of(dialogContext).pop(path),
+                                );
+                              },
+                            ),
+                    ),
+                  ],
+                ),
+              ),
+              actions: <Widget>[
+                TextButton(
+                  onPressed: () => Navigator.of(dialogContext).pop(),
+                  child: Text(dialogContext.tr('Cancel')),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+    if (selected == null) return;
+    final pattern = folder
+        ? (selected.endsWith('/') ? selected : '$selected/')
+        : selected;
+    _appendRule(pattern);
+  }
+
   @override
   Widget build(BuildContext context) {
     final controller = widget.controller;
@@ -302,20 +568,19 @@ class _GitignoreEditorState extends State<GitignoreEditor> {
                       ),
                       SizedBox(
                         width: previewWidth,
-                        child: Container(
-                          color: theme.colorScheme.surface,
-                          padding: const EdgeInsets.all(8),
-                          child: project == null
-                              ? Center(
-                                  child: Text(
-                                    context.tr('No project open.'),
-                                    style: theme.textTheme.bodyMedium,
-                                  ),
-                                )
-                              : _GitignoreTreeView(
-                                  project: project,
-                                  rulesText: _text.text,
-                                ),
+                        child: _GitignoreRulesPanel(
+                          project: project,
+                          rulesText: _text.text,
+                          onAddPattern: () => _showAddPatternDialog(),
+                          onAddFile: project == null
+                              ? null
+                              : () => _showAddPathDialog(folder: false),
+                          onAddFolder: project == null
+                              ? null
+                              : () => _showAddPathDialog(folder: true),
+                          onEditRule: (entry) =>
+                              _showAddPatternDialog(initial: entry),
+                          onDeleteRule: _deleteRuleLine,
                         ),
                       ),
                     ],
@@ -327,6 +592,228 @@ class _GitignoreEditorState extends State<GitignoreEditor> {
         ],
       ),
     );
+  }
+}
+
+class _GitignoreRuleEntry {
+  const _GitignoreRuleEntry({
+    required this.pattern,
+    required this.lineStart,
+    required this.lineEnd,
+  });
+
+  final String pattern;
+  final int lineStart;
+  final int lineEnd;
+}
+
+class _GitignoreRulesPanel extends StatelessWidget {
+  const _GitignoreRulesPanel({
+    required this.project,
+    required this.rulesText,
+    required this.onAddPattern,
+    required this.onAddFile,
+    required this.onAddFolder,
+    required this.onEditRule,
+    required this.onDeleteRule,
+  });
+
+  final Project? project;
+  final String rulesText;
+  final VoidCallback onAddPattern;
+  final VoidCallback? onAddFile;
+  final VoidCallback? onAddFolder;
+  final void Function(_GitignoreRuleEntry entry) onEditRule;
+  final void Function(_GitignoreRuleEntry entry) onDeleteRule;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final entries = _parseRuleEntriesStatic(rulesText);
+
+    Widget iconAction({
+      required IconData icon,
+      required String tooltip,
+      required VoidCallback? onPressed,
+    }) {
+      return IconButton(
+        icon: Icon(icon, size: 18),
+        tooltip: tooltip,
+        visualDensity: VisualDensity.compact,
+        onPressed: onPressed,
+      );
+    }
+
+    return Container(
+      color: theme.colorScheme.surface,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              border: Border(bottom: BorderSide(color: theme.dividerColor)),
+            ),
+            child: Row(
+              children: <Widget>[
+                Icon(Icons.rule_folder_outlined,
+                    size: 16, color: theme.colorScheme.primary),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    context.tr('Ignore rules'),
+                    style: theme.textTheme.titleSmall,
+                  ),
+                ),
+                iconAction(
+                  icon: Icons.note_add_outlined,
+                  tooltip: context.tr('Add pattern'),
+                  onPressed: onAddPattern,
+                ),
+                iconAction(
+                  icon: Icons.insert_drive_file_outlined,
+                  tooltip: context.tr('Add file'),
+                  onPressed: onAddFile,
+                ),
+                iconAction(
+                  icon: Icons.create_new_folder_outlined,
+                  tooltip: context.tr('Add folder'),
+                  onPressed: onAddFolder,
+                ),
+                Container(
+                  margin: const EdgeInsets.only(left: 4),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.primaryContainer,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    '${entries.length}',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: theme.colorScheme.onPrimaryContainer,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          SizedBox(
+            height: 220,
+            child: entries.isEmpty
+                ? Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Text(
+                      context.tr('No ignore rules found.'),
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  )
+                : ListView.separated(
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    itemCount: entries.length,
+                    separatorBuilder: (_, _) =>
+                        Divider(height: 1, color: theme.dividerColor),
+                    itemBuilder: (context, index) {
+                      final entry = entries[index];
+                      final negated = entry.pattern.startsWith('!');
+                      return ListTile(
+                        dense: true,
+                        leading: Icon(
+                          negated
+                              ? Icons.remove_circle_outline
+                              : Icons.block_outlined,
+                          size: 18,
+                          color: negated
+                              ? theme.colorScheme.tertiary
+                              : theme.colorScheme.primary,
+                        ),
+                        title: Text(
+                          entry.pattern,
+                          style: const TextStyle(
+                            fontFamily: 'monospace',
+                            fontSize: 12.5,
+                          ),
+                        ),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: <Widget>[
+                            IconButton(
+                              icon: const Icon(Icons.edit_outlined, size: 18),
+                              tooltip: context.tr('Edit'),
+                              visualDensity: VisualDensity.compact,
+                              onPressed: () => onEditRule(entry),
+                            ),
+                            IconButton(
+                              icon:
+                                  const Icon(Icons.delete_outline, size: 18),
+                              tooltip: context.tr('Delete'),
+                              visualDensity: VisualDensity.compact,
+                              onPressed: () => onDeleteRule(entry),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+          ),
+          Divider(height: 1, thickness: 1, color: theme.dividerColor),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            child: Row(
+              children: <Widget>[
+                Icon(Icons.visibility_outlined,
+                    size: 16, color: theme.colorScheme.onSurfaceVariant),
+                const SizedBox(width: 8),
+                Text(
+                  context.tr('Ignored files preview'),
+                  style: theme.textTheme.labelLarge,
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: project == null
+                ? Center(
+                    child: Text(
+                      context.tr('No project open.'),
+                      style: theme.textTheme.bodyMedium,
+                    ),
+                  )
+                : Padding(
+                    padding: const EdgeInsets.all(8),
+                    child: _GitignoreTreeView(
+                      project: project!,
+                      rulesText: rulesText,
+                    ),
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  static List<_GitignoreRuleEntry> _parseRuleEntriesStatic(String source) {
+    final entries = <_GitignoreRuleEntry>[];
+    final lines = source.split('\n');
+    var offset = 0;
+    for (var i = 0; i < lines.length; i++) {
+      final line = lines[i];
+      final lineStart = offset;
+      final lineEnd = offset + line.length;
+      final trimmed = line.trim();
+      if (trimmed.isNotEmpty && !trimmed.startsWith('#')) {
+        entries.add(_GitignoreRuleEntry(
+          pattern: trimmed,
+          lineStart: lineStart,
+          lineEnd: lineEnd,
+        ));
+      }
+      offset = lineEnd + 1;
+    }
+    return entries;
   }
 }
 
@@ -368,7 +855,7 @@ class _GitignoreTreeView extends StatelessWidget {
     // patterns such as `target/` or `*.log` are visible in the preview even
     // when no matching file exists in the project yet. They are kept separate
     // from the real project tree to avoid confusing indentation.
-    for (final raw in rulesText.split('\\n')) {
+    for (final raw in rulesText.split('\n')) {
       final v = _virtualPathFromRule(raw);
       if (v == null) continue;
       final isDir = v.endsWith('/');
@@ -456,6 +943,53 @@ class _GitignoreTreeView extends StatelessWidget {
       );
     }
 
+    Widget buildVirtualRow(String path, bool isDir) {
+      final ignored = _isIgnored(path, isDir, rules);
+      return Padding(
+        padding: const EdgeInsets.only(top: 2, bottom: 2),
+        child: Row(
+          children: <Widget>[
+            Icon(
+              isDir ? Icons.folder_outlined : Icons.insert_drive_file_outlined,
+              size: 14,
+              color: ignored
+                  ? theme.colorScheme.onSurfaceVariant
+                  : (isDir
+                      ? theme.colorScheme.primary
+                      : theme.colorScheme.onSurface),
+            ),
+            const SizedBox(width: 4),
+            Expanded(
+              child: Text(
+                path,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: ignored
+                      ? theme.colorScheme.onSurfaceVariant
+                      : theme.colorScheme.onSurface,
+                  decoration:
+                      ignored ? TextDecoration.lineThrough : TextDecoration.none,
+                ),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            if (ignored)
+              Padding(
+                padding: const EdgeInsets.only(left: 4),
+                child: Text(
+                  context.tr('ignored'),
+                  style: TextStyle(
+                    fontSize: 10,
+                    color: theme.colorScheme.error,
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
+              ),
+          ],
+        ),
+      );
+    }
+
     final realRoots = roots;
     return SingleChildScrollView(
       child: Column(
@@ -463,8 +997,7 @@ class _GitignoreTreeView extends StatelessWidget {
         children: <Widget>[
           for (final r in realRoots) buildNode(r, 0),
           if (virtualPaths.isNotEmpty) ...<Widget>[
-            for (final v in virtualPaths)
-              _buildVirtualRow(context, theme, v.path, v.isDir, rules),
+            for (final v in virtualPaths) buildVirtualRow(v.path, v.isDir),
           ],
         ],
       ),
@@ -472,59 +1005,6 @@ class _GitignoreTreeView extends StatelessWidget {
   }
 }
 
-  Widget _buildVirtualRow(
-    BuildContext context,
-    ThemeData theme,
-    String path,
-    bool isDir,
-    List<String> rules,
-  ) {
-    final ignored = _isIgnored(path, isDir, rules);
-    return Padding(
-      padding: const EdgeInsets.only(top: 2, bottom: 2),
-      child: Row(
-        children: <Widget>[
-          Icon(
-            isDir ? Icons.folder_outlined : Icons.insert_drive_file_outlined,
-            size: 14,
-            color: ignored
-                ? theme.colorScheme.onSurfaceVariant
-                : (isDir
-                    ? theme.colorScheme.primary
-                    : theme.colorScheme.onSurface),
-          ),
-          const SizedBox(width: 4),
-          Expanded(
-            child: Text(
-              path,
-              style: TextStyle(
-                fontSize: 12,
-                color: ignored
-                    ? theme.colorScheme.onSurfaceVariant
-                    : theme.colorScheme.onSurface,
-                decoration: ignored
-                    ? TextDecoration.lineThrough
-                    : TextDecoration.none,
-              ),
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-          if (ignored)
-            Padding(
-              padding: const EdgeInsets.only(left: 4),
-              child: Text(
-                context.tr('ignored'),
-                style: TextStyle(
-                  fontSize: 10,
-                  color: theme.colorScheme.error,
-                  fontStyle: FontStyle.italic,
-                ),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
 
 /// Validation bar for the .gitignore editor.
 class _GitignoreValidationBar extends StatelessWidget {
