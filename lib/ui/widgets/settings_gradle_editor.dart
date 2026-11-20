@@ -248,6 +248,27 @@ class _SettingsGradleEditorState extends State<SettingsGradleEditor> {
     return '${h1.toRadixString(16)}-${h2.toRadixString(16)}-${s.length}';
   }
 
+  void _jumpToDiagnostic(BuildDiagnostic diagnostic) {
+    final line = diagnostic.line < 1 ? 1 : diagnostic.line;
+    final col = diagnostic.column < 1 ? 1 : diagnostic.column;
+    final text = _text.text;
+    final lines = text.split('\n');
+    var offset = 0;
+    for (var i = 0; i < line - 1 && i < lines.length; i++) {
+      offset += lines[i].length + 1; // +1 for '\n'
+    }
+    if (line - 1 < lines.length) {
+      final lineLen = lines[line - 1].length;
+      final colOffset = (col - 1).clamp(0, lineLen);
+      offset += colOffset;
+    } else {
+      offset = text.length;
+    }
+    offset = offset.clamp(0, text.length);
+    _text.selection = TextSelection.collapsed(offset: offset);
+    _focusNode.requestFocus();
+  }
+
   // ------------------------------- Parsing -------------------------------
 
   _RootProjectNameMatch? _parseRootProjectName(String source) {
@@ -583,6 +604,7 @@ class _SettingsGradleEditorState extends State<SettingsGradleEditor> {
           _SettingsGradleCheckBar(
             issues: _remoteIssues,
             checking: _remoteCheckInProgress,
+            onTapIssue: _jumpToDiagnostic,
           ),
           Expanded(
             child: LayoutBuilder(
@@ -943,10 +965,12 @@ class _SettingsGradleCheckBar extends StatelessWidget {
   const _SettingsGradleCheckBar({
     required this.issues,
     required this.checking,
+    this.onTapIssue,
   });
 
   final List<BuildDiagnostic> issues;
   final bool checking;
+  final void Function(BuildDiagnostic issue)? onTapIssue;
 
   @override
   Widget build(BuildContext context) {
@@ -1032,12 +1056,18 @@ class _SettingsGradleCheckBar extends StatelessWidget {
                 final issueColor =
                     issue.isError ? theme.colorScheme.error : warnColor;
                 final loc = issue.line > 0 ? 'Line ${issue.line}: ' : '';
-                return Padding(
+                final row = Padding(
                   padding: const EdgeInsets.only(left: 20, bottom: 2),
                   child: Text(
                     '$loc${issue.message}',
                     style: TextStyle(fontSize: 11.5, color: issueColor),
                   ),
+                );
+                if (onTapIssue == null) return row;
+                return InkWell(
+                  onTap: () => onTapIssue!(issue),
+                  mouseCursor: SystemMouseCursors.click,
+                  child: row,
                 );
               },
             ),
