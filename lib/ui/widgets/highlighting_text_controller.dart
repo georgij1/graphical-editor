@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-enum HighlightLanguage { plain, java, xml, css, shell, batch, gradle }
+enum HighlightLanguage { plain, java, xml, css, shell, batch, gradle, gitignore }
 
 class HighlightingTextEditingController extends TextEditingController {
   HighlightingTextEditingController({
@@ -124,6 +124,14 @@ class HighlightingTextEditingController extends TextEditingController {
           r'(?<number>\b\d+(?:\.\d+)?\b)',
           multiLine: true,
         );
+      case HighlightLanguage.gitignore:
+        return RegExp(
+          r'(?<comment>^\s*#.*$)|'
+          r'(?<negation>^\s*!)|'
+          r'(?<glob>\*\*|\*|\?|\[(?:\\.|[^\]\n])*\])|'
+          r'(?<escape>\\.)',
+          multiLine: true,
+        );
       case HighlightLanguage.plain:
         return RegExp(r'$^');
     }
@@ -202,6 +210,15 @@ class HighlightingTextEditingController extends TextEditingController {
       color = isDark ? const Color(0xFFC586C0) : const Color(0xFF800080);
     } else if (has('variable')) {
       color = isDark ? const Color(0xFF9CDCFE) : const Color(0xFF001080);
+      weight = FontWeight.w600;
+    } else if (has('negation')) {
+      color = isDark ? const Color(0xFFC586C0) : const Color(0xFFAF00DB);
+      weight = FontWeight.w700;
+    } else if (has('glob')) {
+      color = isDark ? const Color(0xFFDCDCAA) : const Color(0xFF795E26);
+      weight = FontWeight.w600;
+    } else if (has('escape')) {
+      color = isDark ? const Color(0xFF4EC9B0) : const Color(0xFF267F99);
       weight = FontWeight.w600;
     }
     return TextStyle(color: color, fontWeight: weight);

@@ -6,6 +6,7 @@ import '../../editor/editor_controller.dart';
 import '../../l10n/app_localizations.dart';
 import '../../project/java_generator.dart';
 import '../../project/project.dart';
+import 'highlighting_text_controller.dart';
 
 /// Editor for `.gitignore` files. The left pane is the editable text; the
 /// right pane renders the project tree and highlights the files/folders that
@@ -20,8 +21,11 @@ class GitignoreEditor extends StatefulWidget {
 }
 
 class _GitignoreEditorState extends State<GitignoreEditor> {
-  late final TextEditingController _text =
-      TextEditingController(text: widget.controller.codeContent);
+  late final HighlightingTextEditingController _text =
+      HighlightingTextEditingController(
+    text: widget.controller.codeContent,
+    language: HighlightLanguage.gitignore,
+  );
   final FocusNode _focusNode = FocusNode();
   int _lastEpoch = 0;
   double _previewFraction = 0.5;
@@ -36,6 +40,24 @@ class _GitignoreEditorState extends State<GitignoreEditor> {
     _text.addListener(_onChanged);
     widget.controller.addListener(_onControllerChanged);
     _focusNode.addListener(_onFocusChanged);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _syncHighlighting();
+    });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _syncHighlighting();
+  }
+
+  void _syncHighlighting() {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final changed =
+        _text.dark != dark || _text.language != HighlightLanguage.gitignore;
+    _text.dark = dark;
+    _text.language = HighlightLanguage.gitignore;
+    if (changed) _text.refresh();
   }
 
   @override
@@ -56,7 +78,10 @@ class _GitignoreEditorState extends State<GitignoreEditor> {
       _lastEpoch = epoch;
       _text.text = widget.controller.codeContent;
       _validation = _validate(_text.text);
+      _syncHighlighting();
       setState(() {});
+    } else {
+      _syncHighlighting();
     }
   }
 
@@ -218,6 +243,7 @@ class _GitignoreEditorState extends State<GitignoreEditor> {
     setState(() {
       _validation = _validate(_text.text);
     });
+    _syncHighlighting();
     if (apply) {
       widget.controller.applyCode(_text.text);
     }
