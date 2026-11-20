@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../build/build_client.dart';
 import '../../editor/editor_controller.dart';
 import '../../l10n/app_localizations.dart';
 import 'highlighting_text_controller.dart';
@@ -28,6 +31,10 @@ class _SettingsGradleEditorState extends State<SettingsGradleEditor> {
   bool _syncingScroll = false;
   int _lastEpoch = 0;
   double _previewFraction = 0.45;
+  Timer? _remoteCheckTimer;
+  bool _remoteCheckInProgress = false;
+  int _remoteCheckSeq = 0;
+  List<BuildDiagnostic> _remoteIssues = const <BuildDiagnostic>[];
 
   @override
   void initState() {
@@ -37,7 +44,10 @@ class _SettingsGradleEditorState extends State<SettingsGradleEditor> {
     widget.controller.addListener(_onControllerChanged);
     _editorScrollController.addListener(_onEditorScroll);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _syncHighlighting();
+      if (mounted) {
+        _syncHighlighting();
+        _scheduleRemoteCheck();
+      }
     });
   }
 
@@ -73,6 +83,8 @@ class _SettingsGradleEditorState extends State<SettingsGradleEditor> {
 
   @override
   void dispose() {
+    _remoteCheckTimer?.cancel();
+    _remoteCheckSeq++;
     _editorScrollController.removeListener(_onEditorScroll);
     widget.controller.removeListener(_onControllerChanged);
     _text.removeListener(_onChanged);
@@ -90,6 +102,7 @@ class _SettingsGradleEditorState extends State<SettingsGradleEditor> {
       _lastEpoch = epoch;
       _text.text = widget.controller.codeContent;
       _syncHighlighting();
+      _scheduleRemoteCheck();
       setState(() {});
     } else {
       _syncHighlighting();
@@ -98,6 +111,7 @@ class _SettingsGradleEditorState extends State<SettingsGradleEditor> {
 
   void _onChanged() {
     setState(() {});
+    _scheduleRemoteCheck();
   }
 
   bool _apply() {
@@ -111,6 +125,8 @@ class _SettingsGradleEditorState extends State<SettingsGradleEditor> {
   void _setSource(String source, {bool apply = true}) {
     _text.text = source;
     setState(() {});
+    _syncHighlighting();
+    _scheduleRemoteCheck();
     if (apply) {
       widget.controller.applyCode(_text.text);
     }
@@ -126,6 +142,110 @@ class _SettingsGradleEditorState extends State<SettingsGradleEditor> {
           duration: const Duration(seconds: 2),
         ),
       );
+  }
+
+  // --------------------------- Remote checks -----------------------------
+
+  void _scheduleRemoteCheck() {
+    _remoteCheckTimer?.cancel();
+    if (widget.controller.currentProject == null) {
+      if (_remoteIssues.isNotEmpty || _remoteCheckInProgress) {
+        if (mounted) {
+          setState(() {
+            _remoteIssues = const <BuildDiagnostic>[];
+            _remoteCheckInProgress = false;
+          });
+        }
+      } else {
+        _remoteIssues = const <BuildDiagnostic>[];
+        _remoteCheckInProgress = false;
+      }
+      return;
+    }
+    final path = widget.controller.codePath;
+    final content = _text.text;
+    if (!_remoteCheckInProgress && mounted) {
+      setState(() => _remoteCheckInProgress = true);
+    } else {
+      _remoteCheckInProgress = true;
+    }
+    _remoteCheckTimer = Timer(const Duration(milliseconds: 900), () {
+      _runRemoteCheck(path: path, content: content);
+    });
+  }
+
+  Future<void> _runRemoteCheck({
+    required String path,
+    required String content,
+  }) async {
+    if (!mounted || widget.controller.currentProject == null) {
+      if (mounted) {
+        setState(() => _remoteCheckInProgress = false);
+      } else {
+        _remoteCheckInProgress = false;
+      }
+      return;
+    }
+    final seq = ++_remoteCheckSeq;
+    try {
+      final diagnostics = await widget.controller.runBackendCheck(
+        path: path,
+        content: content,
+      );
+      if (!mounted || seq != _remoteCheckSeq) return;
+      if (widget.controller.codePath != path) return;
+
+      bool matchesPath(String diagFile, String currentPath) {
+        String norm(String s) => s.replaceAll('\\', '/');
+        final df = norm(diagFile);
+        final cp = norm(currentPath);
+        if (df == cp) return true;
+        if (df.endsWith('/$cp') || cp.endsWith('/$df')) return true;
+        if (df.endsWith(cp) &&
+            (df.length == cp.length || df[df.length - cp.length - 1] == '/')) {
+          return true;
+        }
+        if (cp.endsWith(df) &&
+            (cp.length == df.length || cp[cp.length - df.length - 1] == '/')) {
+          return true;
+        }
+        final dfBase = df.split('/').last;
+        final cpBase = cp.split('/').last;
+        if (dfBase == cpBase && (df == cpBase || cp == dfBase)) return true;
+        return false;
+      }
+
+      final current =
+          diagnostics.where((d) => matchesPath(d.file, path)).toList();
+      final contentHash = _stableContentHash(content);
+      setState(() {
+        _remoteIssues = current;
+        _remoteCheckInProgress = false;
+      });
+      // Persist check/compilation result for this file on the server (best effort).
+      // ignore: discarded_futures
+      widget.controller.recordFileCheck(
+        file: path,
+        diagnostics: diagnostics,
+        contentHash: contentHash,
+        content: content,
+      );
+    } catch (_) {
+      if (!mounted || seq != _remoteCheckSeq) return;
+      setState(() => _remoteCheckInProgress = false);
+      // Backend unavailable or check failed: keep previous state cleared by UI logic.
+    }
+  }
+
+  String _stableContentHash(String s) {
+    var h1 = 0;
+    var h2 = 0;
+    for (var i = 0; i < s.length; i++) {
+      final c = s.codeUnitAt(i);
+      h1 = (h1 * 31 + c) & 0x7fffffff;
+      h2 = (h2 * 131 + c + i) & 0x7fffffff;
+    }
+    return '${h1.toRadixString(16)}-${h2.toRadixString(16)}-${s.length}';
   }
 
   // ------------------------------- Parsing -------------------------------
@@ -460,6 +580,10 @@ class _SettingsGradleEditorState extends State<SettingsGradleEditor> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
+          _SettingsGradleCheckBar(
+            issues: _remoteIssues,
+            checking: _remoteCheckInProgress,
+          ),
           Expanded(
             child: LayoutBuilder(
               builder: (context, constraints) {
@@ -810,6 +934,115 @@ class _LineNumberGutter extends StatelessWidget {
             style: style,
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _SettingsGradleCheckBar extends StatelessWidget {
+  const _SettingsGradleCheckBar({
+    required this.issues,
+    required this.checking,
+  });
+
+  final List<BuildDiagnostic> issues;
+  final bool checking;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    if (issues.isEmpty) {
+      final color = checking ? theme.colorScheme.tertiary : theme.colorScheme.primary;
+      return Container(
+        width: double.infinity,
+        color: color.withValues(alpha: 0.08),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+        child: Row(
+          children: <Widget>[
+            if (checking)
+              SizedBox(
+                width: 14,
+                height: 14,
+                child: CircularProgressIndicator(strokeWidth: 2, color: color),
+              )
+            else
+              Icon(Icons.check_circle_outline, size: 14, color: color),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Text(
+                context.tr(checking ? 'Checking...' : 'No issues found.'),
+                style: TextStyle(fontSize: 11.5, color: color),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final errors = issues.where((d) => d.isError).length;
+    final warnings = issues.length - errors;
+    final hasErrors = errors > 0;
+    final warnColor = Colors.amber.shade800;
+    final color = hasErrors ? theme.colorScheme.error : warnColor;
+
+    return Container(
+      width: double.infinity,
+      color: color.withValues(alpha: 0.08),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Row(
+            children: <Widget>[
+              if (checking)
+                SizedBox(
+                  width: 14,
+                  height: 14,
+                  child: CircularProgressIndicator(strokeWidth: 2, color: color),
+                )
+              else
+                Icon(
+                  hasErrors ? Icons.error_outline : Icons.warning_amber_outlined,
+                  size: 14,
+                  color: color,
+                ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  context.l10n.validationSummary(errors, warnings),
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w600,
+                    color: color,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 2),
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxHeight: 80),
+            child: ListView.builder(
+              shrinkWrap: true,
+              padding: EdgeInsets.zero,
+              itemCount: issues.length,
+              itemBuilder: (context, index) {
+                final issue = issues[index];
+                final issueColor =
+                    issue.isError ? theme.colorScheme.error : warnColor;
+                final loc = issue.line > 0 ? 'Line ${issue.line}: ' : '';
+                return Padding(
+                  padding: const EdgeInsets.only(left: 20, bottom: 2),
+                  child: Text(
+                    '$loc${issue.message}',
+                    style: TextStyle(fontSize: 11.5, color: issueColor),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
       ),
     );
   }

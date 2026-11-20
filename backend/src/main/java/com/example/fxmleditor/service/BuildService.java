@@ -283,6 +283,7 @@ public class BuildService {
 
             result.addAll(checkShellScripts(root));
             result.addAll(checkBatchScripts(root));
+            result.addAll(checkGradleScripts(root));
             return result;
         } finally {
             deleteRecursively(work);
@@ -459,6 +460,164 @@ public class BuildService {
         }
         if (result.isEmpty() && output != null && !output.isBlank()) {
             result.add(new Diagnostic(rel, 1, 1, "error", output.strip()));
+        }
+        return result;
+    }
+
+    private List<Diagnostic> checkGradleScripts(Path root) {
+        List<Diagnostic> result = new ArrayList<>();
+        List<Path> scripts = new ArrayList<>();
+        try (var walk = Files.walk(root)) {
+            walk.filter(Files::isRegularFile)
+                    .filter(p -> p.getFileName().toString().toLowerCase().endsWith(".gradle"))
+                    .forEach(scripts::add);
+        } catch (IOException ignored) {
+            return result;
+        }
+        for (Path script : scripts) {
+            String rel = relativizeToRoot(script.toString(), root);
+            try {
+                String content = Files.readString(script, StandardCharsets.UTF_8);
+                result.addAll(checkGradleDelimiters(rel, content));
+            } catch (Exception ignored) {
+            }
+        }
+        return result;
+    }
+
+    private List<Diagnostic> checkGradleDelimiters(String rel, String content) {
+        List<Diagnostic> result = new ArrayList<>();
+        String src = content.replace("\r\n", "\n").replace('\r', '\n');
+        int n = src.length();
+        Deque<int[]> stack = new ArrayDeque<>(); // [type, line]
+        final int PAREN = 1, BRACE = 2, BRACKET = 3;
+        boolean lineComment = false;
+        boolean blockComment = false;
+        boolean sq = false, dq = false, sq3 = false, dq3 = false;
+        boolean escape = false;
+        int line = 1;
+        int i = 0;
+        while (i < n) {
+            char c = src.charAt(i);
+            char next = i + 1 < n ? src.charAt(i + 1) : '\0';
+            char next2 = i + 2 < n ? src.charAt(i + 2) : '\0';
+
+            if (c == '\n') {
+                line++;
+                lineComment = false;
+                if (!sq3 && !dq3) {
+                    sq = false;
+                    dq = false;
+                }
+                escape = false;
+                i++;
+                continue;
+            }
+
+            if (lineComment) { i++; continue; }
+
+            if (blockComment) {
+                if (c == '*' && next == '/') {
+                    blockComment = false;
+                    i += 2;
+                } else {
+                    i++;
+                }
+                continue;
+            }
+
+            if (sq3) {
+                if (!escape && c == '\'' && next == '\'' && next2 == '\'') {
+                    sq3 = false;
+                    i += 3;
+                } else {
+                    escape = !escape && c == '\\';
+                    i++;
+                }
+                continue;
+            }
+            if (dq3) {
+                if (!escape && c == '"' && next == '"' && next2 == '"') {
+                    dq3 = false;
+                    i += 3;
+                } else {
+                    escape = !escape && c == '\\';
+                    i++;
+                }
+                continue;
+            }
+            if (sq) {
+                if (!escape && c == '\'') {
+                    sq = false;
+                }
+                escape = !escape && c == '\\';
+                i++;
+                continue;
+            }
+            if (dq) {
+                if (!escape && c == '"') {
+                    dq = false;
+                }
+                escape = !escape && c == '\\';
+                i++;
+                continue;
+            }
+
+            // not in string/comment
+            if (c == '/' && next == '/') {
+                lineComment = true;
+                i += 2;
+                continue;
+            }
+            if (c == '/' && next == '*') {
+                blockComment = true;
+                i += 2;
+                continue;
+            }
+            if (c == '\'' && next == '\'' && next2 == '\'') {
+                sq3 = true;
+                escape = false;
+                i += 3;
+                continue;
+            }
+            if (c == '"' && next == '"' && next2 == '"') {
+                dq3 = true;
+                escape = false;
+                i += 3;
+                continue;
+            }
+            if (c == '\'') { sq = true; escape = false; i++; continue; }
+            if (c == '"') { dq = true; escape = false; i++; continue; }
+
+            if (c == '(') stack.push(new int[]{PAREN, line});
+            else if (c == '{') stack.push(new int[]{BRACE, line});
+            else if (c == '[') stack.push(new int[]{BRACKET, line});
+            else if (c == ')' || c == '}' || c == ']') {
+                int type = c == ')' ? PAREN : (c == '}' ? BRACE : BRACKET);
+                if (stack.isEmpty() || stack.peek()[0] != type) {
+                    String name = type == PAREN ? "')'" : (type == BRACE ? "'}'" : "']'");
+                    result.add(new Diagnostic(rel, line, 1, "error",
+                            "Unexpected closing delimiter " + name + "."));
+                } else {
+                    stack.pop();
+                }
+            }
+            i++;
+        }
+
+        if (sq3 || dq3) {
+            result.add(new Diagnostic(rel, line, 1, "error", "Unclosed string literal."));
+        } else if (sq || dq) {
+            result.add(new Diagnostic(rel, line, 1, "error", "Unclosed string literal."));
+        } else if (blockComment) {
+            result.add(new Diagnostic(rel, line, 1, "error", "Unclosed block comment."));
+        }
+
+        while (!stack.isEmpty()) {
+            int[] open = stack.removeLast(); // report from outermost to innermost
+            String name = open[0] == PAREN ? "'('" : (open[0] == BRACE ? "'{'" : "'['");
+            result.add(new Diagnostic(rel, open[1], 1, "error",
+                    "Unclosed delimiter " + name + "."));
         }
         return result;
     }
