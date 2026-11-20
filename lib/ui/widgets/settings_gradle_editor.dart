@@ -232,39 +232,93 @@ class _SettingsGradleEditorState extends State<SettingsGradleEditor> {
     return v.trim();
   }
 
+  String? _validateIncludeName(String raw, {String? originalName}) {
+    final name = _normalizeIncludeName(raw);
+    if (name.isEmpty) return 'Module name is required';
+    final valid = RegExp(r'^:?[A-Za-z0-9_.\-]+(?::[A-Za-z0-9_.\-]+)*$');
+    if (!valid.hasMatch(name)) return 'Invalid module name';
+    final existing = _parseIncludes(_text.text).map((e) => e.name).toList();
+    for (final e in existing) {
+      if (e == name && name != originalName) {
+        return 'Module is already included';
+      }
+    }
+    return null;
+  }
+
   Future<String?> _showIncludeDialog({
     required String titleKey,
     String initial = '',
+    String? originalName,
   }) async {
     final ctrl = TextEditingController(text: initial);
+    String? errorText;
     final result = await showDialog<String>(
       context: context,
       builder: (dialogContext) {
-        return AlertDialog(
-          title: Text(dialogContext.tr(titleKey)),
-          content: SizedBox(
-            width: 420,
-            child: TextField(
-              controller: ctrl,
-              autofocus: true,
-              decoration: InputDecoration(
-                labelText: dialogContext.tr('Module name'),
-                hintText: ":app",
+        return StatefulBuilder(
+          builder: (dialogContext, setDialogState) {
+            void submit() {
+              final err = _validateIncludeName(
+                ctrl.text,
+                originalName: originalName,
+              );
+              if (err != null) {
+                setDialogState(() {
+                  errorText = dialogContext.tr(err);
+                });
+                return;
+              }
+              final name = _normalizeIncludeName(ctrl.text);
+              Navigator.of(dialogContext).pop(name);
+            }
+
+            return AlertDialog(
+              title: Text(dialogContext.tr(titleKey)),
+              content: SizedBox(
+                width: 420,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: <Widget>[
+                    TextField(
+                      controller: ctrl,
+                      autofocus: true,
+                      decoration: InputDecoration(
+                        labelText: dialogContext.tr('Module name'),
+                        hintText: ':app',
+                      ),
+                      onChanged: (_) {
+                        if (errorText != null) {
+                          setDialogState(() => errorText = null);
+                        }
+                      },
+                      onSubmitted: (_) => submit(),
+                    ),
+                    if (errorText != null) ...<Widget>[
+                      const SizedBox(height: 12),
+                      Text(
+                        errorText!,
+                        style: TextStyle(
+                          color: Theme.of(dialogContext).colorScheme.error,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
               ),
-              onSubmitted: (_) =>
-                  Navigator.of(dialogContext).pop(ctrl.text.trim()),
-            ),
-          ),
-          actions: <Widget>[
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(),
-              child: Text(dialogContext.tr('Cancel')),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.of(dialogContext).pop(ctrl.text.trim()),
-              child: Text(dialogContext.tr('Save')),
-            ),
-          ],
+              actions: <Widget>[
+                TextButton(
+                  onPressed: () => Navigator.of(dialogContext).pop(),
+                  child: Text(dialogContext.tr('Cancel')),
+                ),
+                FilledButton(
+                  onPressed: submit,
+                  child: Text(dialogContext.tr('Save')),
+                ),
+              ],
+            );
+          },
         );
       },
     );
@@ -293,13 +347,11 @@ class _SettingsGradleEditorState extends State<SettingsGradleEditor> {
     final input = await _showIncludeDialog(
       titleKey: 'Edit module',
       initial: item.name,
+      originalName: item.name,
     );
     if (input == null) return;
     final name = _normalizeIncludeName(input);
-    if (name.isEmpty) {
-      _deleteInclude(item);
-      return;
-    }
+    if (name.isEmpty) return;
     final escaped = name.replaceAll("'", "\\'");
     final replacement = "'$escaped'";
     final source = _text.text;
