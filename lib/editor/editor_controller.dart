@@ -1596,7 +1596,17 @@ class EditorController extends ChangeNotifier {
       _authStatus = AuthStatus.signedOut;
       await loadWorkspace();
     } else {
-      if (fetch.isOk) _adoptServerWorkspace(fetch.value);
+      if (fetch.isOk) {
+        final hasLocal = _projects.isNotEmpty || _looseDocument != null;
+        final remoteHasProjects = fetch.value != null && fetch.value!.trim().isNotEmpty;
+        if (!hasLocal && remoteHasProjects) {
+          _adoptServerWorkspace(fetch.value);
+        } else if (hasLocal) {
+          // Prefer the device's local workspace on session restore so recent
+          // local edits are not reverted by a stale server copy, then sync up.
+          unawaited(_pushWorkingCopy());
+        }
+      }
       _authStatus = AuthStatus.signedIn;
       unawaited(refreshProfile());
       unawaited(loadSharedProjects());
