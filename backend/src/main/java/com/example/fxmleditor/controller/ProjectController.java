@@ -383,6 +383,9 @@ public class ProjectController {
         p.mainClass = str(body, "mainClass");
         if (p.mainClass.isEmpty()) p.mainClass = existing == null ? "MainApp" : existing.mainClass;
         p.description = str(body, "description");
+        p.buildTool = str(body, "buildTool");
+        if (p.buildTool.isEmpty()) p.buildTool = existing == null ? "maven" : (existing.buildTool == null || existing.buildTool.isEmpty() ? "maven" : existing.buildTool);
+        if (!"gradle".equals(p.buildTool) && !"maven".equals(p.buildTool)) p.buildTool = "maven";
         p.ownerId = existing == null ? uid : existing.ownerId;
         p.ownerEmail = existing == null ? email : existing.ownerEmail;
         p.revision = existing == null ? 0 : existing.revision;

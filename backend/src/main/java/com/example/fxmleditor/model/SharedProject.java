@@ -19,6 +19,7 @@ public class SharedProject {
     public String ownerId = "";
     public String ownerEmail = "";
     public int revision = 1;
+    public String buildTool = "maven";
     public String inviteToken;
     public String inviteRole = "editor";
     public List<ProjectMember> members = new ArrayList<>();
