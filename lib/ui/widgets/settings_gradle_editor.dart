@@ -23,6 +23,9 @@ class _SettingsGradleEditorState extends State<SettingsGradleEditor> {
     language: HighlightLanguage.gradle,
   );
   final FocusNode _focusNode = FocusNode();
+  final ScrollController _editorScrollController = ScrollController();
+  final ScrollController _gutterScrollController = ScrollController();
+  bool _syncingScroll = false;
   int _lastEpoch = 0;
   double _previewFraction = 0.45;
 
@@ -32,9 +35,25 @@ class _SettingsGradleEditorState extends State<SettingsGradleEditor> {
     _lastEpoch = widget.controller.codeEpoch;
     _text.addListener(_onChanged);
     widget.controller.addListener(_onControllerChanged);
+    _editorScrollController.addListener(_onEditorScroll);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _syncHighlighting();
     });
+  }
+
+  void _onEditorScroll() {
+    if (_syncingScroll) return;
+    if (!_gutterScrollController.hasClients ||
+        !_editorScrollController.hasClients) {
+      return;
+    }
+    _syncingScroll = true;
+    final target = _editorScrollController.offset.clamp(
+      0.0,
+      _gutterScrollController.position.maxScrollExtent,
+    );
+    _gutterScrollController.jumpTo(target);
+    _syncingScroll = false;
   }
 
   @override
@@ -54,10 +73,13 @@ class _SettingsGradleEditorState extends State<SettingsGradleEditor> {
 
   @override
   void dispose() {
+    _editorScrollController.removeListener(_onEditorScroll);
     widget.controller.removeListener(_onControllerChanged);
     _text.removeListener(_onChanged);
     _text.dispose();
     _focusNode.dispose();
+    _editorScrollController.dispose();
+    _gutterScrollController.dispose();
     super.dispose();
   }
 
@@ -461,24 +483,44 @@ class _SettingsGradleEditorState extends State<SettingsGradleEditor> {
                           color: dark
                               ? const Color(0xFF1E1E1E)
                               : const Color(0xFFFBFBFB),
-                          child: TextField(
-                            controller: _text,
-                            focusNode: _focusNode,
-                            maxLines: null,
-                            expands: true,
-                            textAlignVertical: TextAlignVertical.top,
-                            style: TextStyle(
-                              fontFamily: 'monospace',
-                              fontSize: 12.5,
-                              height: 1.45,
-                              color: dark
-                                  ? const Color(0xFFE6E6E6)
-                                  : const Color(0xFF1F1F1F),
-                            ),
-                            decoration: const InputDecoration(
-                              border: InputBorder.none,
-                              contentPadding: EdgeInsets.all(16),
-                            ),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: <Widget>[
+                              _LineNumberGutter(
+                                controller: _gutterScrollController,
+                                lineCount:
+                                    '\n'.allMatches(_text.text).length + 1,
+                                dark: dark,
+                              ),
+                              Container(
+                                width: 1,
+                                color: dark
+                                    ? const Color(0xFF2D2D2D)
+                                    : const Color(0xFFE0E0E0),
+                              ),
+                              Expanded(
+                                child: TextField(
+                                  controller: _text,
+                                  focusNode: _focusNode,
+                                  scrollController: _editorScrollController,
+                                  maxLines: null,
+                                  expands: true,
+                                  textAlignVertical: TextAlignVertical.top,
+                                  style: TextStyle(
+                                    fontFamily: 'monospace',
+                                    fontSize: 12.5,
+                                    height: 1.45,
+                                    color: dark
+                                        ? const Color(0xFFE6E6E6)
+                                        : const Color(0xFF1F1F1F),
+                                  ),
+                                  decoration: const InputDecoration(
+                                    border: InputBorder.none,
+                                    contentPadding: EdgeInsets.all(16),
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ),
@@ -728,6 +770,46 @@ class _SettingsPanel extends StatelessWidget {
                   ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _LineNumberGutter extends StatelessWidget {
+  const _LineNumberGutter({
+    required this.controller,
+    required this.lineCount,
+    required this.dark,
+  });
+
+  final ScrollController controller;
+  final int lineCount;
+  final bool dark;
+
+  @override
+  Widget build(BuildContext context) {
+    final count = lineCount < 1 ? 1 : lineCount;
+    final text = List<String>.generate(count, (i) => '${i + 1}').join('\n');
+    final style = TextStyle(
+      fontFamily: 'monospace',
+      fontSize: 12.5,
+      height: 1.45,
+      color: dark ? const Color(0xFF858585) : const Color(0xFF6E7681),
+    );
+    return SizedBox(
+      width: 48,
+      child: SingleChildScrollView(
+        controller: controller,
+        physics: const NeverScrollableScrollPhysics(),
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        child: Padding(
+          padding: const EdgeInsets.only(right: 8, left: 8),
+          child: Text(
+            text,
+            textAlign: TextAlign.right,
+            style: style,
+          ),
+        ),
       ),
     );
   }
