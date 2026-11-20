@@ -45,7 +45,7 @@ class _CodeViewState extends State<CodeView> {
   int _remoteCheckSeq = 0;
   List<ValidationIssue> _remoteIssues = const <ValidationIssue>[];
   bool _remoteCheckInProgress = false;
-  final Map<String, List<_CheckSnapshot>> _checkHistoryByPath = <String, List<_CheckSnapshot>>{};
+  final Map<String, List<CheckSnapshot>> _checkHistoryByPath = <String, List<CheckSnapshot>>{};
 
   static const List<String> _javaSuggestions = <String>[
     'abstract',
@@ -230,11 +230,11 @@ class _CodeViewState extends State<CodeView> {
         _remoteCheckInProgress = false;
         final history = _checkHistoryByPath.putIfAbsent(
           path,
-          () => <_CheckSnapshot>[],
+          () => <CheckSnapshot>[],
         );
         history.insert(
           0,
-          _CheckSnapshot(
+          CheckSnapshot(
             time: DateTime.now(),
             issues: List<ValidationIssue>.unmodifiable(current),
             contentHash: contentHash,
@@ -797,8 +797,8 @@ class _CodeViewState extends State<CodeView> {
             validation: _effectiveValidation,
             checking: _remoteCheckInProgress && _supportsRemoteCheck,
             filePath: widget.controller.codePath,
-            history: List<_CheckSnapshot>.unmodifiable(
-              _checkHistoryByPath[widget.controller.codePath] ?? const <_CheckSnapshot>[],
+            history: List<CheckSnapshot>.unmodifiable(
+              _checkHistoryByPath[widget.controller.codePath] ?? const <CheckSnapshot>[],
             ),
             onShowHistory: () => _showCompilationHistoryDialog(
               widget.controller.codePath,
@@ -897,11 +897,11 @@ class _CodeViewState extends State<CodeView> {
     await showDialog<void>(
       context: context,
       builder: (dialogContext) {
-        return _CompilationHistoryDialog(
+        return CompilationHistoryDialog(
           path: path,
           controller: widget.controller,
-          localSnapshots: () => List<_CheckSnapshot>.from(
-            _checkHistoryByPath[path] ?? const <_CheckSnapshot>[],
+          localSnapshots: () => List<CheckSnapshot>.from(
+            _checkHistoryByPath[path] ?? const <CheckSnapshot>[],
           ),
         );
       },
@@ -909,8 +909,8 @@ class _CodeViewState extends State<CodeView> {
   }
 }
 
-class _CheckSnapshot {
-  const _CheckSnapshot({
+class CheckSnapshot {
+  const CheckSnapshot({
     required this.time,
     required this.issues,
     this.contentHash = '',
@@ -997,10 +997,11 @@ List<_DiffOp> _computeLineDiff(String oldText, String newText) {
   return ops;
 }
 
-enum _HistoryFilter { all, success, warnings, errors }
+enum HistoryFilter { all, success, warnings, errors }
 
-class _CompilationHistoryDialog extends StatefulWidget {
-  const _CompilationHistoryDialog({
+class CompilationHistoryDialog extends StatefulWidget {
+  const CompilationHistoryDialog({
+    super.key,
     required this.path,
     required this.controller,
     required this.localSnapshots,
@@ -1008,22 +1009,22 @@ class _CompilationHistoryDialog extends StatefulWidget {
 
   final String path;
   final EditorController controller;
-  final List<_CheckSnapshot> Function() localSnapshots;
+  final List<CheckSnapshot> Function() localSnapshots;
 
   @override
-  State<_CompilationHistoryDialog> createState() => _CompilationHistoryDialogState();
+  State<CompilationHistoryDialog> createState() => CompilationHistoryDialogState();
 }
 
-class _CompilationHistoryDialogState extends State<_CompilationHistoryDialog> {
+class CompilationHistoryDialogState extends State<CompilationHistoryDialog> {
   Timer? _timer;
   bool _loading = true;
   List<FileCheckRecord> _records = const <FileCheckRecord>[];
   String _recordsHash = '';
   String _localHash = '';
-  List<_CheckSnapshot> _local = const <_CheckSnapshot>[];
+  List<CheckSnapshot> _local = const <CheckSnapshot>[];
   final TextEditingController _searchController = TextEditingController();
   String _query = '';
-  _HistoryFilter _filter = _HistoryFilter.all;
+  HistoryFilter _filter = HistoryFilter.all;
   DateTimeRange? _dateRange;
 
   @override
@@ -1072,7 +1073,7 @@ class _CompilationHistoryDialogState extends State<_CompilationHistoryDialog> {
     return buf.toString().hashCode.toString();
   }
 
-  String _hashLocal(List<_CheckSnapshot> snaps) {
+  String _hashLocal(List<CheckSnapshot> snaps) {
     final buf = StringBuffer();
     for (final s in snaps) {
       buf
@@ -1666,13 +1667,13 @@ class _CompilationHistoryDialogState extends State<_CompilationHistoryDialog> {
 
   bool _matchesFilter({required bool isEmpty, required bool hasErrors}) {
     switch (_filter) {
-      case _HistoryFilter.all:
+      case HistoryFilter.all:
         return true;
-      case _HistoryFilter.success:
+      case HistoryFilter.success:
         return isEmpty;
-      case _HistoryFilter.warnings:
+      case HistoryFilter.warnings:
         return !isEmpty && !hasErrors;
-      case _HistoryFilter.errors:
+      case HistoryFilter.errors:
         return hasErrors;
     }
   }
@@ -1741,7 +1742,7 @@ class _CompilationHistoryDialogState extends State<_CompilationHistoryDialog> {
         .toList();
 
     // Use raw diagnostic messages for comparison so local/server entries are comparable.
-    List<({int line, int column, String kind, String message})> localIssues(_CheckSnapshot snap) => snap.issues
+    List<({int line, int column, String kind, String message})> localIssues(CheckSnapshot snap) => snap.issues
         .map((issue) => (
               line: issue.line ?? 1,
               column: issue.column ?? 1,
@@ -2009,7 +2010,7 @@ class _CompilationHistoryDialogState extends State<_CompilationHistoryDialog> {
       );
     }
 
-    Widget filterChip(_HistoryFilter value, String label, IconData icon) {
+    Widget filterChip(HistoryFilter value, String label, IconData icon) {
       final selected = _filter == value;
       return ChoiceChip(
         label: Row(
@@ -2095,10 +2096,10 @@ class _CompilationHistoryDialogState extends State<_CompilationHistoryDialog> {
                 spacing: 8,
                 runSpacing: 8,
                 children: <Widget>[
-                  filterChip(_HistoryFilter.all, context.tr('All'), Icons.filter_list),
-                  filterChip(_HistoryFilter.success, context.tr('Successful'), Icons.check_circle_outline),
-                  filterChip(_HistoryFilter.errors, context.tr('With errors'), Icons.error_outline),
-                  filterChip(_HistoryFilter.warnings, context.tr('With warnings'), Icons.warning_amber_outlined),
+                  filterChip(HistoryFilter.all, context.tr('All'), Icons.filter_list),
+                  filterChip(HistoryFilter.success, context.tr('Successful'), Icons.check_circle_outline),
+                  filterChip(HistoryFilter.errors, context.tr('With errors'), Icons.error_outline),
+                  filterChip(HistoryFilter.warnings, context.tr('With warnings'), Icons.warning_amber_outlined),
                   FilterChip(
                     label: Row(
                       mainAxisSize: MainAxisSize.min,
@@ -2173,14 +2174,14 @@ class _ValidationBar extends StatelessWidget {
     required this.validation,
     this.checking = false,
     this.filePath,
-    this.history = const <_CheckSnapshot>[],
+    this.history = const <CheckSnapshot>[],
     this.onShowHistory,
   });
 
   final ValidationResult validation;
   final bool checking;
   final String? filePath;
-  final List<_CheckSnapshot> history;
+  final List<CheckSnapshot> history;
   final VoidCallback? onShowHistory;
 
   @override

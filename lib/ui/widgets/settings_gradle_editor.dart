@@ -4,9 +4,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../build/build_client.dart';
+import '../../editor/code_validator.dart';
 import '../../editor/editor_controller.dart';
 import '../../l10n/app_localizations.dart';
 import 'highlighting_text_controller.dart';
+import 'source_view.dart' show CheckSnapshot, CompilationHistoryDialog;
 
 /// Dedicated editor for `settings.gradle` with graphical controls for common
 /// Gradle settings (root project name and included projects/modules).
@@ -35,6 +37,7 @@ class _SettingsGradleEditorState extends State<SettingsGradleEditor> {
   bool _remoteCheckInProgress = false;
   int _remoteCheckSeq = 0;
   List<BuildDiagnostic> _remoteIssues = const <BuildDiagnostic>[];
+  final List<CheckSnapshot> _checkHistory = <CheckSnapshot>[];
 
   @override
   void initState() {
@@ -218,9 +221,31 @@ class _SettingsGradleEditorState extends State<SettingsGradleEditor> {
       final current =
           diagnostics.where((d) => matchesPath(d.file, path)).toList();
       final contentHash = _stableContentHash(content);
+      final snapshotIssues = current
+          .map((d) => ValidationIssue(
+                d.message,
+                line: d.line,
+                column: d.column,
+                severity: d.isError
+                    ? ValidationSeverity.error
+                    : ValidationSeverity.warning,
+              ))
+          .toList();
       setState(() {
         _remoteIssues = current;
         _remoteCheckInProgress = false;
+        _checkHistory.insert(
+          0,
+          CheckSnapshot(
+            time: DateTime.now(),
+            issues: List<ValidationIssue>.unmodifiable(snapshotIssues),
+            contentHash: contentHash,
+            content: content,
+          ),
+        );
+        if (_checkHistory.length > 20) {
+          _checkHistory.removeRange(20, _checkHistory.length);
+        }
       });
       // Persist check/compilation result for this file on the server (best effort).
       // ignore: discarded_futures
@@ -248,25 +273,19 @@ class _SettingsGradleEditorState extends State<SettingsGradleEditor> {
     return '${h1.toRadixString(16)}-${h2.toRadixString(16)}-${s.length}';
   }
 
-  void _jumpToDiagnostic(BuildDiagnostic diagnostic) {
-    final line = diagnostic.line < 1 ? 1 : diagnostic.line;
-    final col = diagnostic.column < 1 ? 1 : diagnostic.column;
-    final text = _text.text;
-    final lines = text.split('\n');
-    var offset = 0;
-    for (var i = 0; i < line - 1 && i < lines.length; i++) {
-      offset += lines[i].length + 1; // +1 for '\n'
-    }
-    if (line - 1 < lines.length) {
-      final lineLen = lines[line - 1].length;
-      final colOffset = (col - 1).clamp(0, lineLen);
-      offset += colOffset;
-    } else {
-      offset = text.length;
-    }
-    offset = offset.clamp(0, text.length);
-    _text.selection = TextSelection.collapsed(offset: offset);
-    _focusNode.requestFocus();
+  Future<void> _showCompilationHistoryDialog() async {
+    final path = widget.controller.codePath;
+    if (!mounted || path.isEmpty) return;
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return CompilationHistoryDialog(
+          path: path,
+          controller: widget.controller,
+          localSnapshots: () => List<CheckSnapshot>.from(_checkHistory),
+        );
+      },
+    );
   }
 
   // ------------------------------- Parsing -------------------------------
@@ -604,7 +623,7 @@ class _SettingsGradleEditorState extends State<SettingsGradleEditor> {
           _SettingsGradleCheckBar(
             issues: _remoteIssues,
             checking: _remoteCheckInProgress,
-            onTapIssue: _jumpToDiagnostic,
+            onTap: _showCompilationHistoryDialog,
           ),
           Expanded(
             child: LayoutBuilder(
@@ -965,12 +984,12 @@ class _SettingsGradleCheckBar extends StatelessWidget {
   const _SettingsGradleCheckBar({
     required this.issues,
     required this.checking,
-    this.onTapIssue,
+    this.onTap,
   });
 
   final List<BuildDiagnostic> issues;
   final bool checking;
-  final void Function(BuildDiagnostic issue)? onTapIssue;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -978,7 +997,7 @@ class _SettingsGradleCheckBar extends StatelessWidget {
 
     if (issues.isEmpty) {
       final color = checking ? theme.colorScheme.tertiary : theme.colorScheme.primary;
-      return Container(
+      final row = Container(
         width: double.infinity,
         color: color.withValues(alpha: 0.08),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
@@ -1002,6 +1021,12 @@ class _SettingsGradleCheckBar extends StatelessWidget {
           ],
         ),
       );
+      if (onTap == null) return row;
+      return InkWell(
+        onTap: onTap,
+        mouseCursor: SystemMouseCursors.click,
+        child: row,
+      );
     }
 
     final errors = issues.where((d) => d.isError).length;
@@ -1010,7 +1035,7 @@ class _SettingsGradleCheckBar extends StatelessWidget {
     final warnColor = Colors.amber.shade800;
     final color = hasErrors ? theme.colorScheme.error : warnColor;
 
-    return Container(
+    final body = Container(
       width: double.infinity,
       color: color.withValues(alpha: 0.08),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
@@ -1056,24 +1081,25 @@ class _SettingsGradleCheckBar extends StatelessWidget {
                 final issueColor =
                     issue.isError ? theme.colorScheme.error : warnColor;
                 final loc = issue.line > 0 ? 'Line ${issue.line}: ' : '';
-                final row = Padding(
+                return Padding(
                   padding: const EdgeInsets.only(left: 20, bottom: 2),
                   child: Text(
                     '$loc${issue.message}',
                     style: TextStyle(fontSize: 11.5, color: issueColor),
                   ),
                 );
-                if (onTapIssue == null) return row;
-                return InkWell(
-                  onTap: () => onTapIssue!(issue),
-                  mouseCursor: SystemMouseCursors.click,
-                  child: row,
-                );
               },
             ),
           ),
         ],
       ),
+    );
+
+    if (onTap == null) return body;
+    return InkWell(
+      onTap: onTap,
+      mouseCursor: SystemMouseCursors.click,
+      child: body,
     );
   }
 }
