@@ -81,6 +81,7 @@ class _PomEditorState extends State<PomEditor> {
     setState(() {
       _validation = _validate(_text.text);
     });
+    widget.controller.applyCode(_text.text);
   }
 
   ValidationResult _validate(String source) {

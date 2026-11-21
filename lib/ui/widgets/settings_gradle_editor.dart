@@ -114,6 +114,7 @@ class _SettingsGradleEditorState extends State<SettingsGradleEditor> {
 
   void _onChanged() {
     setState(() {});
+    widget.controller.applyCode(_text.text);
     _scheduleRemoteCheck();
   }
 

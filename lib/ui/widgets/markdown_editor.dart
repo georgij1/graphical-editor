@@ -143,6 +143,7 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
     setState(() {
       _validation = validation;
     });
+    widget.controller.applyCode(_text.text);
     _updateSuggestions(_text.text);
     _scheduleRecordLocalCheck(_text.text, validation);
   }
