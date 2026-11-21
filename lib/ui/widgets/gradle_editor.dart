@@ -1,10 +1,14 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../build/build_client.dart';
+import '../../editor/code_validator.dart';
 import '../../editor/editor_controller.dart';
 import '../../l10n/app_localizations.dart';
 import 'highlighting_text_controller.dart';
+import 'source_view.dart' show CheckSnapshot, CompilationHistoryDialog;
 
 /// Editor for Gradle build files (`build.gradle`) with a graphical panel
 /// showing plugins and dependencies.
@@ -24,8 +28,16 @@ class _GradleEditorState extends State<GradleEditor> {
     language: HighlightLanguage.gradle,
   );
   final FocusNode _focusNode = FocusNode();
+  final ScrollController _editorScrollController = ScrollController();
+  final ScrollController _gutterScrollController = ScrollController();
+  bool _syncingScroll = false;
   int _lastEpoch = 0;
   double _previewFraction = 0.45;
+  Timer? _remoteCheckTimer;
+  bool _remoteCheckInProgress = false;
+  int _remoteCheckSeq = 0;
+  List<BuildDiagnostic> _remoteIssues = const <BuildDiagnostic>[];
+  final List<CheckSnapshot> _checkHistory = <CheckSnapshot>[];
 
   @override
   void initState() {
@@ -33,9 +45,28 @@ class _GradleEditorState extends State<GradleEditor> {
     _lastEpoch = widget.controller.codeEpoch;
     _text.addListener(_onChanged);
     widget.controller.addListener(_onControllerChanged);
+    _editorScrollController.addListener(_onEditorScroll);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _syncHighlighting();
+      if (mounted) {
+        _syncHighlighting();
+        _scheduleRemoteCheck();
+      }
     });
+  }
+
+  void _onEditorScroll() {
+    if (_syncingScroll) return;
+    if (!_gutterScrollController.hasClients ||
+        !_editorScrollController.hasClients) {
+      return;
+    }
+    _syncingScroll = true;
+    final target = _editorScrollController.offset.clamp(
+      0.0,
+      _gutterScrollController.position.maxScrollExtent,
+    );
+    _gutterScrollController.jumpTo(target);
+    _syncingScroll = false;
   }
 
   @override
@@ -54,10 +85,15 @@ class _GradleEditorState extends State<GradleEditor> {
 
   @override
   void dispose() {
+    _remoteCheckTimer?.cancel();
+    _remoteCheckSeq++;
+    _editorScrollController.removeListener(_onEditorScroll);
     widget.controller.removeListener(_onControllerChanged);
     _text.removeListener(_onChanged);
     _text.dispose();
     _focusNode.dispose();
+    _editorScrollController.dispose();
+    _gutterScrollController.dispose();
     super.dispose();
   }
 
@@ -68,6 +104,7 @@ class _GradleEditorState extends State<GradleEditor> {
       _lastEpoch = epoch;
       _text.text = widget.controller.codeContent;
       _syncHighlighting();
+      _scheduleRemoteCheck();
       setState(() {});
     } else {
       _syncHighlighting();
@@ -76,6 +113,7 @@ class _GradleEditorState extends State<GradleEditor> {
 
   void _onChanged() {
     setState(() {});
+    _scheduleRemoteCheck();
   }
 
   bool _apply() {
@@ -88,6 +126,8 @@ class _GradleEditorState extends State<GradleEditor> {
   void _setSource(String source, {bool apply = true}) {
     _text.text = source;
     setState(() {});
+    _syncHighlighting();
+    _scheduleRemoteCheck();
     if (apply) {
       widget.controller.applyCode(_text.text);
     }
@@ -134,6 +174,145 @@ class _GradleEditorState extends State<GradleEditor> {
       return ctx.tr('Could not validate plugin');
     }
     return message;
+  }
+
+  // --------------------------- Remote checks -----------------------------
+
+  void _scheduleRemoteCheck() {
+    _remoteCheckTimer?.cancel();
+    if (widget.controller.currentProject == null) {
+      if (_remoteIssues.isNotEmpty || _remoteCheckInProgress) {
+        if (mounted) {
+          setState(() {
+            _remoteIssues = const <BuildDiagnostic>[];
+            _remoteCheckInProgress = false;
+          });
+        }
+      } else {
+        _remoteIssues = const <BuildDiagnostic>[];
+        _remoteCheckInProgress = false;
+      }
+      return;
+    }
+    final path = widget.controller.codePath;
+    final content = _text.text;
+    if (!_remoteCheckInProgress && mounted) {
+      setState(() => _remoteCheckInProgress = true);
+    } else {
+      _remoteCheckInProgress = true;
+    }
+    _remoteCheckTimer = Timer(const Duration(milliseconds: 900), () {
+      _runRemoteCheck(path: path, content: content);
+    });
+  }
+
+  Future<void> _runRemoteCheck({
+    required String path,
+    required String content,
+  }) async {
+    if (!mounted || widget.controller.currentProject == null) {
+      if (mounted) {
+        setState(() => _remoteCheckInProgress = false);
+      } else {
+        _remoteCheckInProgress = false;
+      }
+      return;
+    }
+    final seq = ++_remoteCheckSeq;
+    try {
+      final diagnostics = await widget.controller.runBackendCheck(
+        path: path,
+        content: content,
+      );
+      if (!mounted || seq != _remoteCheckSeq) return;
+      if (widget.controller.codePath != path) return;
+
+      bool matchesPath(String diagFile, String currentPath) {
+        String norm(String s) => s.replaceAll('\\', '/');
+        final df = norm(diagFile);
+        final cp = norm(currentPath);
+        if (df == cp) return true;
+        if (df.endsWith('/$cp') || cp.endsWith('/$df')) return true;
+        if (df.endsWith(cp) &&
+            (df.length == cp.length || df[df.length - cp.length - 1] == '/')) {
+          return true;
+        }
+        if (cp.endsWith(df) &&
+            (cp.length == df.length || cp[cp.length - df.length - 1] == '/')) {
+          return true;
+        }
+        final dfBase = df.split('/').last;
+        final cpBase = cp.split('/').last;
+        if (dfBase == cpBase && (df == cpBase || cp == dfBase)) return true;
+        return false;
+      }
+
+      final current =
+          diagnostics.where((d) => matchesPath(d.file, path)).toList();
+      final contentHash = _stableContentHash(content);
+      final snapshotIssues = current
+          .map((d) => ValidationIssue(
+                d.message,
+                line: d.line,
+                column: d.column,
+                severity: d.isError
+                    ? ValidationSeverity.error
+                    : ValidationSeverity.warning,
+              ))
+          .toList();
+      setState(() {
+        _remoteIssues = current;
+        _remoteCheckInProgress = false;
+        _checkHistory.insert(
+          0,
+          CheckSnapshot(
+            time: DateTime.now(),
+            issues: List<ValidationIssue>.unmodifiable(snapshotIssues),
+            contentHash: contentHash,
+            content: content,
+          ),
+        );
+        if (_checkHistory.length > 20) {
+          _checkHistory.removeRange(20, _checkHistory.length);
+        }
+      });
+      // ignore: discarded_futures
+      widget.controller.recordFileCheck(
+        file: path,
+        diagnostics: diagnostics,
+        contentHash: contentHash,
+        content: content,
+      );
+    } catch (_) {
+      if (!mounted || seq != _remoteCheckSeq) return;
+      setState(() => _remoteCheckInProgress = false);
+    }
+  }
+
+  Future<void> _showCompilationHistoryDialog() async {
+    final path = widget.controller.codePath;
+    if (!mounted || path.isEmpty) return;
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return CompilationHistoryDialog(
+          path: path,
+          controller: widget.controller,
+          localSnapshots: () => List<CheckSnapshot>.from(_checkHistory),
+        );
+      },
+    );
+  }
+
+  String _stableContentHash(String s) {
+    var h1 = 0;
+    var h2 = 0;
+    for (var i = 0; i < s.length; i++) {
+      final c = s.codeUnitAt(i);
+      h1 = (h1 * 31 + c) & 0x7fffffff;
+      h2 = (h2 * 131 + c + i) & 0x7fffffff;
+    }
+    return '${h1.toRadixString(16)}-${h2.toRadixString(16)}-${s.length}';
   }
 
   // ---------------------------- Dependencies ----------------------------
@@ -687,6 +866,11 @@ class _GradleEditorState extends State<GradleEditor> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
+          _GradleCheckBar(
+            issues: _remoteIssues,
+            checking: _remoteCheckInProgress,
+            onTap: _showCompilationHistoryDialog,
+          ),
           Expanded(
             child: LayoutBuilder(
               builder: (context, constraints) {
@@ -710,24 +894,44 @@ class _GradleEditorState extends State<GradleEditor> {
                           color: dark
                               ? const Color(0xFF1E1E1E)
                               : const Color(0xFFFBFBFB),
-                          child: TextField(
-                            controller: _text,
-                            focusNode: _focusNode,
-                            maxLines: null,
-                            expands: true,
-                            textAlignVertical: TextAlignVertical.top,
-                            style: TextStyle(
-                              fontFamily: 'monospace',
-                              fontSize: 12.5,
-                              height: 1.45,
-                              color: dark
-                                  ? const Color(0xFFE6E6E6)
-                                  : const Color(0xFF1F1F1F),
-                            ),
-                            decoration: const InputDecoration(
-                              border: InputBorder.none,
-                              contentPadding: EdgeInsets.all(16),
-                            ),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: <Widget>[
+                              _GradleLineNumberGutter(
+                                controller: _gutterScrollController,
+                                lineCount:
+                                    '\n'.allMatches(_text.text).length + 1,
+                                dark: dark,
+                              ),
+                              Container(
+                                width: 1,
+                                color: dark
+                                    ? const Color(0xFF2D2D2D)
+                                    : const Color(0xFFE0E0E0),
+                              ),
+                              Expanded(
+                                child: TextField(
+                                  controller: _text,
+                                  focusNode: _focusNode,
+                                  scrollController: _editorScrollController,
+                                  maxLines: null,
+                                  expands: true,
+                                  textAlignVertical: TextAlignVertical.top,
+                                  style: TextStyle(
+                                    fontFamily: 'monospace',
+                                    fontSize: 12.5,
+                                    height: 1.45,
+                                    color: dark
+                                        ? const Color(0xFFE6E6E6)
+                                        : const Color(0xFF1F1F1F),
+                                  ),
+                                  decoration: const InputDecoration(
+                                    border: InputBorder.none,
+                                    contentPadding: EdgeInsets.all(16),
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ),
@@ -1012,6 +1216,157 @@ class _GradlePanel extends StatelessWidget {
                   ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _GradleCheckBar extends StatelessWidget {
+  const _GradleCheckBar({
+    required this.issues,
+    required this.checking,
+    this.onTap,
+  });
+
+  final List<BuildDiagnostic> issues;
+  final bool checking;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    if (issues.isEmpty) {
+      final color = checking ? theme.colorScheme.tertiary : theme.colorScheme.primary;
+      final row = Container(
+        width: double.infinity,
+        color: color.withValues(alpha: 0.08),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+        child: Row(
+          children: <Widget>[
+            if (checking)
+              SizedBox(
+                width: 14,
+                height: 14,
+                child: CircularProgressIndicator(strokeWidth: 2, color: color),
+              )
+            else
+              Icon(Icons.check_circle_outline, size: 14, color: color),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Text(
+                context.tr(checking ? 'Checking...' : 'No issues found.'),
+                style: TextStyle(fontSize: 11.5, color: color),
+              ),
+            ),
+          ],
+        ),
+      );
+      if (onTap == null) return row;
+      return InkWell(onTap: onTap, mouseCursor: SystemMouseCursors.click, child: row);
+    }
+
+    final errors = issues.where((d) => d.isError).length;
+    final warnings = issues.length - errors;
+    final hasErrors = errors > 0;
+    final warnColor = Colors.amber.shade800;
+    final color = hasErrors ? theme.colorScheme.error : warnColor;
+
+    final body = Container(
+      width: double.infinity,
+      color: color.withValues(alpha: 0.08),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Row(
+            children: <Widget>[
+              if (checking)
+                SizedBox(
+                  width: 14,
+                  height: 14,
+                  child: CircularProgressIndicator(strokeWidth: 2, color: color),
+                )
+              else
+                Icon(
+                  hasErrors ? Icons.error_outline : Icons.warning_amber_outlined,
+                  size: 14,
+                  color: color,
+                ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  context.l10n.validationSummary(errors, warnings),
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w600,
+                    color: color,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 2),
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxHeight: 80),
+            child: ListView.builder(
+              shrinkWrap: true,
+              padding: EdgeInsets.zero,
+              itemCount: issues.length,
+              itemBuilder: (context, index) {
+                final issue = issues[index];
+                final issueColor = issue.isError ? theme.colorScheme.error : warnColor;
+                final loc = issue.line > 0 ? 'Line ${issue.line}: ' : '';
+                return Padding(
+                  padding: const EdgeInsets.only(left: 20, bottom: 2),
+                  child: Text(
+                    '$loc${issue.message}',
+                    style: TextStyle(fontSize: 11.5, color: issueColor),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (onTap == null) return body;
+    return InkWell(onTap: onTap, mouseCursor: SystemMouseCursors.click, child: body);
+  }
+}
+
+class _GradleLineNumberGutter extends StatelessWidget {
+  const _GradleLineNumberGutter({
+    required this.controller,
+    required this.lineCount,
+    required this.dark,
+  });
+
+  final ScrollController controller;
+  final int lineCount;
+  final bool dark;
+
+  @override
+  Widget build(BuildContext context) {
+    final count = lineCount < 1 ? 1 : lineCount;
+    final text = List<String>.generate(count, (i) => '${i + 1}').join('\n');
+    final style = TextStyle(
+      fontFamily: 'monospace',
+      fontSize: 12.5,
+      height: 1.45,
+      color: dark ? const Color(0xFF858585) : const Color(0xFF6E7681),
+    );
+    return SizedBox(
+      width: 48,
+      child: SingleChildScrollView(
+        controller: controller,
+        physics: const NeverScrollableScrollPhysics(),
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        child: Padding(
+          padding: const EdgeInsets.only(right: 8, left: 8),
+          child: Text(text, textAlign: TextAlign.right, style: style),
+        ),
       ),
     );
   }
