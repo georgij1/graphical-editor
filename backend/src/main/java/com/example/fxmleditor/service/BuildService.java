@@ -479,6 +479,10 @@ public class BuildService {
             try {
                 String content = Files.readString(script, StandardCharsets.UTF_8);
                 result.addAll(checkGradleDelimiters(rel, content));
+                String fileName = script.getFileName().toString().toLowerCase();
+                if (fileName.equals("settings.gradle")) {
+                    result.addAll(checkSettingsGradleProperties(rel, content));
+                }
             } catch (Exception ignored) {
             }
         }
@@ -620,6 +624,54 @@ public class BuildService {
             String name = open[0] == PAREN ? "'('" : (open[0] == BRACE ? "'{'" : "'['");
             result.add(new Diagnostic(rel, open[1], 1, "error",
                     "Unclosed delimiter " + name + "."));
+        }
+        return result;
+    }
+
+    private List<Diagnostic> checkSettingsGradleProperties(String rel, String content) {
+        List<Diagnostic> result = new ArrayList<>();
+        Set<String> known = Set.of("name", "buildfilename", "projectdir", "path", "children", "parent");
+        String src = content.replace("\r\n", "\n").replace('\r', '\n');
+        String[] lines = src.split("\n", -1);
+        boolean blockComment = false;
+        Pattern rootProjectProp = Pattern.compile("\\brootProject\\s*\\.\\s*([A-Za-z_][A-Za-z0-9_]*)");
+        for (int i = 0; i < lines.length; i++) {
+            String scan = lines[i];
+            if (blockComment) {
+                int end = scan.indexOf("*/");
+                if (end < 0) continue;
+                scan = scan.substring(end + 2);
+                blockComment = false;
+            }
+            while (true) {
+                int bs = scan.indexOf("/*");
+                if (bs < 0) break;
+                int be = scan.indexOf("*/", bs + 2);
+                if (be > bs) {
+                    scan = scan.substring(0, bs) + " " + scan.substring(be + 2);
+                } else {
+                    scan = scan.substring(0, bs);
+                    blockComment = true;
+                    break;
+                }
+            }
+            int sl = scan.indexOf("//");
+            if (sl >= 0) scan = scan.substring(0, sl);
+            // Strip string literals to reduce false positives.
+            scan = scan.replaceAll("\"(?:\\\\.|[^\"\\\\])*\"", "\"\"");
+            scan = scan.replaceAll("'(?:\\\\.|[^'\\\\])*'", "''");
+
+            Matcher m = rootProjectProp.matcher(scan);
+            while (m.find()) {
+                String prop = m.group(1);
+                String propLower = prop.toLowerCase();
+                if (known.contains(propLower)) continue;
+                int after = m.end();
+                while (after < scan.length() && Character.isWhitespace(scan.charAt(after))) after++;
+                if (after < scan.length() && scan.charAt(after) == '(') continue;
+                result.add(new Diagnostic(rel, i + 1, m.start(1) + 1, "error",
+                        "Unknown settings.gradle property: rootProject." + prop));
+            }
         }
         return result;
     }
