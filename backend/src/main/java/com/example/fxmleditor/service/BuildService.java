@@ -674,12 +674,43 @@ public class BuildService {
             }
 
             String trimmed = scan.trim();
-            if (trimmed.matches("(?U)^[\\p{L}_$][\\p{L}\\p{N}_$]*$")) {
-                Set<String> allowedBare = Set.of(
-                        "true", "false", "null", "gradle", "settings", "rootProject");
-                if (!allowedBare.contains(trimmed)) {
-                    result.add(new Diagnostic(rel, i + 1, 1, "error",
-                            "Unknown property or reference in settings.gradle: " + trimmed));
+            if (!trimmed.isEmpty()) {
+                Matcher firstIdentMatcher = Pattern
+                        .compile("(?U)^([\\p{L}_$][\\p{L}\\p{N}_$]*)")
+                        .matcher(trimmed);
+                if (firstIdentMatcher.find()) {
+                    String first = firstIdentMatcher.group(1);
+                    Set<String> allowedFirst = Set.of(
+                            "rootProject", "include", "includeBuild", "includeFlat",
+                            "pluginManagement", "plugins", "dependencyResolutionManagement",
+                            "buildCache", "enableFeaturePreview", "gradle", "settings",
+                            "import", "package", "def", "var", "final",
+                            "if", "else", "for", "while", "do", "switch", "case", "default",
+                            "try", "catch", "finally", "return", "throw", "throws", "assert",
+                            "break", "continue", "new", "class", "interface", "enum", "trait",
+                            "void", "boolean", "byte", "char", "short", "int", "long", "float", "double",
+                            "public", "private", "protected", "static", "abstract", "synchronized",
+                            "volatile", "transient", "native", "strictfp", "extends", "implements",
+                            "this", "super", "true", "false", "null",
+                            "println", "print", "printf", "apply", "buildscript",
+                            "allprojects", "subprojects", "project", "configure",
+                            "ext", "properties", "logger", "file", "uri", "files",
+                            "mkdir", "delete", "copy", "exec", "javaexec", "ant",
+                            "task", "tasks", "getRootProject", "getGradle", "getSettings",
+                            "System", "Collections", "Arrays", "Objects", "String",
+                            "Integer", "Long", "Double", "Boolean", "Character");
+                    boolean startsUpper = !first.isEmpty() && Character.isUpperCase(first.charAt(0));
+                    boolean isAllowed = allowedFirst.contains(first) || startsUpper || first.startsWith("$");
+                    if (!isAllowed) {
+                        boolean bareOrDottedChain = trimmed.matches(
+                                "(?U)^[\\p{L}_$][\\p{L}\\p{N}_$]*(?:\\s*\\.\\s*[\\p{L}_$][\\p{L}\\p{N}_$]*)*\\s*$");
+                        boolean dottedAssignment = trimmed.matches(
+                                "(?U)^[\\p{L}_$][\\p{L}\\p{N}_$]*(?:\\s*\\.\\s*[\\p{L}_$][\\p{L}\\p{N}_$]*)*\\s*[+\\-*/%]?=.*$");
+                        if (bareOrDottedChain || dottedAssignment) {
+                            result.add(new Diagnostic(rel, i + 1, 1, "error",
+                                    "Unknown property or reference in settings.gradle: " + first));
+                        }
+                    }
                 }
             }
         }
