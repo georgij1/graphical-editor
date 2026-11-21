@@ -703,7 +703,7 @@ public class BuildService {
                     boolean isAllowed = allowedFirst.contains(first) || startsUpper || first.startsWith("$");
                     if (!isAllowed) {
                         boolean bareOrDottedChain = trimmed.matches(
-                                "(?U)^[\\p{L}_$][\\p{L}\\p{N}_$]*(?:\\s*\\.\\s*[\\p{L}_$][\\p{L}\\p{N}_$]*)*\\s*$");
+                                "(?U)^[\\p{L}_$][\\p{L}\\p{N}_$]*(?:\\s*\\.\\s*[\\p{L}_$][\\p{L}\\p{N}_$]*)*\\s*\\.?\\s*$");
                         boolean dottedAssignment = trimmed.matches(
                                 "(?U)^[\\p{L}_$][\\p{L}\\p{N}_$]*(?:\\s*\\.\\s*[\\p{L}_$][\\p{L}\\p{N}_$]*)*\\s*[+\\-*/%]?=.*$");
                         if (bareOrDottedChain || dottedAssignment) {
