@@ -731,13 +731,12 @@ class _AiChatPanelState extends State<AiChatPanel> {
             ),
             child: (!isUser && msg.content.trim().isEmpty && _busy)
                 ? _ThinkingIndicator(elapsedSeconds: _elapsedSeconds)
-                : SelectableText(
-                    msg.content.isEmpty ? '...' : msg.content,
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: msg.content.isEmpty ? theme.hintColor : null,
-                    ),
-                  ),
+                : isUser
+                    ? SelectableText(
+                        msg.content,
+                        style: const TextStyle(fontSize: 13),
+                      )
+                    : _AssistantMessageContent(text: msg.content),
           ),
           if (!isUser && msg.content.trim().isNotEmpty)
             Padding(
@@ -935,6 +934,159 @@ class _ThinkingIndicatorState extends State<_ThinkingIndicator>
           ),
         ),
       ],
+    );
+  }
+}
+class _AssistantMessageContent extends StatelessWidget {
+  const _AssistantMessageContent({required this.text});
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final segments = _parseSegments(text);
+    if (segments.isEmpty) {
+      return SelectableText(text, style: const TextStyle(fontSize: 13));
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        for (final seg in segments)
+          if (seg.isCode)
+            _CodeBlock(code: seg.content, language: seg.language)
+          else if (seg.content.trim().isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: SelectableText(
+                seg.content.trim(),
+                style: const TextStyle(fontSize: 13, height: 1.4),
+              ),
+            ),
+      ],
+    );
+  }
+
+  static List<_MessageSegment> _parseSegments(String text) {
+    final re = RegExp(r'```([^\n`]*)\n?([\s\S]*?)```', multiLine: true);
+    final segments = <_MessageSegment>[];
+    var last = 0;
+    for (final m in re.allMatches(text)) {
+      if (m.start > last) {
+        final plain = text.substring(last, m.start);
+        if (plain.trim().isNotEmpty) {
+          segments.add(_MessageSegment(content: plain, isCode: false));
+        }
+      }
+      final lang = (m.group(1) ?? '').trim();
+      final code = (m.group(2) ?? '').replaceAll(RegExp(r'\n$'), '');
+      segments.add(_MessageSegment(content: code, isCode: true, language: lang));
+      last = m.end;
+    }
+    if (last < text.length) {
+      final tail = text.substring(last);
+      if (tail.trim().isNotEmpty) {
+        segments.add(_MessageSegment(content: tail, isCode: false));
+      }
+    }
+    if (segments.isEmpty && text.trim().isNotEmpty) {
+      segments.add(_MessageSegment(content: text, isCode: false));
+    }
+    return segments;
+  }
+}
+
+class _MessageSegment {
+  const _MessageSegment({required this.content, required this.isCode, this.language = ''});
+  final String content;
+  final bool isCode;
+  final String language;
+}
+
+class _CodeBlock extends StatelessWidget {
+  const _CodeBlock({required this.code, required this.language});
+  final String code;
+  final String language;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final bg = isDark ? const Color(0xFF1E1E1E) : const Color(0xFFF6F8FA);
+    final border = isDark ? const Color(0xFF3C3C3C) : const Color(0xFFD0D7DE);
+    final headerBg = isDark ? const Color(0xFF2D2D2D) : const Color(0xFFEAEEF2);
+    final label = language.isEmpty ? 'code' : language;
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 8),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+              color: headerBg,
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(7)),
+            ),
+            child: Row(
+              children: <Widget>[
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                const Spacer(),
+                InkWell(
+                  borderRadius: BorderRadius.circular(4),
+                  onTap: () {
+                    Clipboard.setData(ClipboardData(text: code));
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(context.tr('AI result copied to clipboard.')),
+                        behavior: SnackBarBehavior.floating,
+                        duration: const Duration(seconds: 2),
+                      ),
+                    );
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: <Widget>[
+                        Icon(Icons.copy, size: 13, color: theme.colorScheme.onSurfaceVariant),
+                        const SizedBox(width: 4),
+                        Text(
+                          context.tr('Copy'),
+                          style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurfaceVariant),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.all(10),
+            child: SelectableText(
+              code,
+              style: TextStyle(
+                fontFamily: 'monospace',
+                fontSize: 12.5,
+                height: 1.45,
+                color: isDark ? const Color(0xFFD4D4D4) : const Color(0xFF24292F),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
