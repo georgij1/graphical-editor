@@ -1,10 +1,14 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../build/build_client.dart';
 import '../../editor/code_validator.dart';
 import '../../editor/editor_controller.dart';
 import '../../l10n/app_localizations.dart';
 import 'markdown_parser.dart';
+import 'source_view.dart' show CheckSnapshot, CompilationHistoryDialog;
 
 /// Markdown editor with live preview. The left pane is an editable text
 /// field, the right pane renders the Markdown as Flutter widgets in
@@ -22,12 +26,17 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
   late final TextEditingController _text =
       TextEditingController(text: widget.controller.codeContent);
   final FocusNode _focusNode = FocusNode();
+  final ScrollController _editorScrollController = ScrollController();
+  final ScrollController _gutterScrollController = ScrollController();
+  bool _syncingScroll = false;
   int _lastEpoch = 0;
   late ValidationResult _validation = _validate(_text.text);
   OverlayEntry? _overlayEntry;
   List<String> _suggestions = <String>[];
   int _suggestionStart = 0;
   double _previewFraction = 0.5;
+  final List<CheckSnapshot> _checkHistory = <CheckSnapshot>[];
+  Timer? _checkRecordTimer;
 
   static const List<String> _mdSuggestions = <String>[
     '# Heading 1',
@@ -58,16 +67,37 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
     _text.addListener(_onChanged);
     widget.controller.addListener(_onControllerChanged);
     _focusNode.addListener(_onFocusChanged);
+    _editorScrollController.addListener(_onEditorScroll);
+    _recordLocalCheckSnapshot(_text.text, _validation);
+  }
+
+  void _onEditorScroll() {
+    if (_syncingScroll) return;
+    if (!_gutterScrollController.hasClients ||
+        !_editorScrollController.hasClients) {
+      return;
+    }
+    _syncingScroll = true;
+    final target = _editorScrollController.offset.clamp(
+      0.0,
+      _gutterScrollController.position.maxScrollExtent,
+    );
+    _gutterScrollController.jumpTo(target);
+    _syncingScroll = false;
   }
 
   @override
   void dispose() {
+    _checkRecordTimer?.cancel();
+    _editorScrollController.removeListener(_onEditorScroll);
     _hideSuggestions();
     widget.controller.removeListener(_onControllerChanged);
     _text.removeListener(_onChanged);
     _focusNode.removeListener(_onFocusChanged);
     _text.dispose();
     _focusNode.dispose();
+    _editorScrollController.dispose();
+    _gutterScrollController.dispose();
     super.dispose();
   }
 
@@ -78,15 +108,18 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
       _lastEpoch = epoch;
       _text.text = widget.controller.codeContent;
       _validation = _validate(_text.text);
+      _recordLocalCheckSnapshot(_text.text, _validation);
       setState(() {});
     }
   }
 
   void _onChanged() {
+    final validation = _validate(_text.text);
     setState(() {
-      _validation = _validate(_text.text);
+      _validation = validation;
     });
     _updateSuggestions(_text.text);
+    _scheduleRecordLocalCheck(_text.text, validation);
   }
 
   bool _apply() {
@@ -117,6 +150,89 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
 
   ValidationResult _validate(String source) =>
       CodeValidator.validateMarkdown(source);
+
+  void _scheduleRecordLocalCheck(String content, ValidationResult validation) {
+    _checkRecordTimer?.cancel();
+    _checkRecordTimer = Timer(const Duration(milliseconds: 800), () {
+      if (!mounted) return;
+      _recordLocalCheckSnapshot(content, validation);
+    });
+  }
+
+  void _recordLocalCheckSnapshot(String content, ValidationResult validation) {
+    final path = widget.controller.codePath;
+    if (path.isEmpty) return;
+    final contentHash = _stableContentHash(content);
+    final issues = validation.issues
+        .map((e) => ValidationIssue(
+              e.message,
+              line: e.line,
+              column: e.column,
+              severity: e.severity,
+            ))
+        .toList(growable: false);
+    final snapshot = CheckSnapshot(
+      time: DateTime.now(),
+      issues: issues,
+      contentHash: contentHash,
+      content: content,
+    );
+    setState(() {
+      if (_checkHistory.isNotEmpty &&
+          _checkHistory.first.contentHash == snapshot.contentHash &&
+          _checkHistory.first.issues.length == snapshot.issues.length) {
+        // Skip identical consecutive snapshot.
+      } else {
+        _checkHistory.insert(0, snapshot);
+        if (_checkHistory.length > 20) {
+          _checkHistory.removeRange(20, _checkHistory.length);
+        }
+      }
+    });
+
+    final diagnostics = validation.issues
+        .map((e) => BuildDiagnostic(
+              file: path,
+              line: e.line ?? 1,
+              column: e.column ?? 1,
+              kind: e.isError ? 'error' : 'warning',
+              message: e.message,
+            ))
+        .toList(growable: false);
+    // ignore: discarded_futures
+    widget.controller.recordFileCheck(
+      file: path,
+      diagnostics: diagnostics,
+      contentHash: contentHash,
+      content: content,
+    );
+  }
+
+  Future<void> _showCompilationHistoryDialog() async {
+    final path = widget.controller.codePath;
+    if (!mounted || path.isEmpty) return;
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return CompilationHistoryDialog(
+          path: path,
+          controller: widget.controller,
+          localSnapshots: () => List<CheckSnapshot>.from(_checkHistory),
+        );
+      },
+    );
+  }
+
+  String _stableContentHash(String s) {
+    var h1 = 0;
+    var h2 = 0;
+    for (var i = 0; i < s.length; i++) {
+      final c = s.codeUnitAt(i);
+      h1 = (h1 * 31 + c) & 0x7fffffff;
+      h2 = (h2 * 131 + c + i) & 0x7fffffff;
+    }
+    return '${h1.toRadixString(16)}-${h2.toRadixString(16)}-${s.length}';
+  }
 
   void _onFocusChanged() {
     if (!_focusNode.hasFocus) _hideSuggestions();
@@ -307,7 +423,10 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
-          _MarkdownValidationBar(validation: _validation),
+          _MarkdownValidationBar(
+            validation: _validation,
+            onTap: _showCompilationHistoryDialog,
+          ),
           Expanded(
             child: LayoutBuilder(
               builder: (context, constraints) {
@@ -330,24 +449,44 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
                           color: dark
                               ? const Color(0xFF1E1E1E)
                               : const Color(0xFFFBFBFB),
-                          child: TextField(
-                            controller: _text,
-                            focusNode: _focusNode,
-                            maxLines: null,
-                            expands: true,
-                            textAlignVertical: TextAlignVertical.top,
-                            style: TextStyle(
-                              fontFamily: 'monospace',
-                              fontSize: 12.5,
-                              height: 1.45,
-                              color: dark
-                                  ? const Color(0xFFE6E6E6)
-                                  : const Color(0xFF1F1F1F),
-                            ),
-                            decoration: const InputDecoration(
-                              border: InputBorder.none,
-                              contentPadding: EdgeInsets.all(16),
-                            ),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: <Widget>[
+                              _MarkdownLineNumberGutter(
+                                controller: _gutterScrollController,
+                                lineCount:
+                                    '\n'.allMatches(_text.text).length + 1,
+                                dark: dark,
+                              ),
+                              Container(
+                                width: 1,
+                                color: dark
+                                    ? const Color(0xFF2D2D2D)
+                                    : const Color(0xFFE0E0E0),
+                              ),
+                              Expanded(
+                                child: TextField(
+                                  controller: _text,
+                                  focusNode: _focusNode,
+                                  scrollController: _editorScrollController,
+                                  maxLines: null,
+                                  expands: true,
+                                  textAlignVertical: TextAlignVertical.top,
+                                  style: TextStyle(
+                                    fontFamily: 'monospace',
+                                    fontSize: 12.5,
+                                    height: 1.45,
+                                    color: dark
+                                        ? const Color(0xFFE6E6E6)
+                                        : const Color(0xFF1F1F1F),
+                                  ),
+                                  decoration: const InputDecoration(
+                                    border: InputBorder.none,
+                                    contentPadding: EdgeInsets.all(16),
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ),
@@ -417,18 +556,28 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
 
 /// Validation bar for the Markdown editor.
 class _MarkdownValidationBar extends StatelessWidget {
-  const _MarkdownValidationBar({required this.validation});
+  const _MarkdownValidationBar({required this.validation, this.onTap});
 
   final ValidationResult validation;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final issues = validation.issues;
 
+    Widget wrap(Widget child) {
+      if (onTap == null) return child;
+      return InkWell(
+        onTap: onTap,
+        mouseCursor: SystemMouseCursors.click,
+        child: child,
+      );
+    }
+
     if (issues.isEmpty) {
       final color = theme.colorScheme.primary;
-      return Container(
+      return wrap(Container(
         width: double.infinity,
         color: color.withValues(alpha: 0.08),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
@@ -442,13 +591,13 @@ class _MarkdownValidationBar extends StatelessWidget {
             ),
           ],
         ),
-      );
+      ));
     }
 
     final hasErrors = validation.hasErrors;
     final warnColor = Colors.amber.shade800;
     final color = hasErrors ? theme.colorScheme.error : warnColor;
-    return Container(
+    return wrap(Container(
       width: double.infinity,
       color: color.withValues(alpha: 0.08),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
@@ -498,6 +647,42 @@ class _MarkdownValidationBar extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    ));
+  }
+}
+
+class _MarkdownLineNumberGutter extends StatelessWidget {
+  const _MarkdownLineNumberGutter({
+    required this.controller,
+    required this.lineCount,
+    required this.dark,
+  });
+
+  final ScrollController controller;
+  final int lineCount;
+  final bool dark;
+
+  @override
+  Widget build(BuildContext context) {
+    final count = lineCount < 1 ? 1 : lineCount;
+    final text = List<String>.generate(count, (i) => '${i + 1}').join('\n');
+    final style = TextStyle(
+      fontFamily: 'monospace',
+      fontSize: 12.5,
+      height: 1.45,
+      color: dark ? const Color(0xFF858585) : const Color(0xFF6E7681),
+    );
+    return SizedBox(
+      width: 48,
+      child: SingleChildScrollView(
+        controller: controller,
+        physics: const NeverScrollableScrollPhysics(),
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        child: Padding(
+          padding: const EdgeInsets.only(right: 8, left: 8),
+          child: Text(text, textAlign: TextAlign.right, style: style),
+        ),
       ),
     );
   }
