@@ -54,7 +54,8 @@ class _AiChatPanelState extends State<AiChatPanel> {
     if (prompt == null || !mounted) return;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      _send(prompt);
+      _input.text = prompt;
+      _input.selection = TextSelection.collapsed(offset: prompt.length);
     });
   }
 
