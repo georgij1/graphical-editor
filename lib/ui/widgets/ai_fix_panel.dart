@@ -54,8 +54,7 @@ class _AiChatPanelState extends State<AiChatPanel> {
     if (prompt == null || !mounted) return;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      _input.text = prompt;
-      _send();
+      _send(prompt);
     });
   }
 
@@ -355,9 +354,9 @@ class _AiChatPanelState extends State<AiChatPanel> {
     return buf.toString();
   }
 
-  Future<void> _send() async {
+  Future<void> _send([String? textOverride]) async {
     final modelId = _selectedModelId;
-    final text = _input.text.trim();
+    final text = (textOverride ?? _input.text).trim();
     if (modelId == null || text.isEmpty || _busy) return;
     final model = _modelName(modelId);
     final baseUrl = _modelBaseUrl(modelId);
@@ -368,7 +367,7 @@ class _AiChatPanelState extends State<AiChatPanel> {
       _busy = true;
       _elapsedSeconds = 0;
     });
-    _input.clear();
+    if (textOverride == null) _input.clear();
     widget.controller.addAiChatMessage(
       chat.id,
       AiChatMessage(role: AiChatRole.user, content: text, timestamp: DateTime.now()),

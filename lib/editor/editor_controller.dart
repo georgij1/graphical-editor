@@ -417,6 +417,7 @@ class EditorController extends ChangeNotifier {
   void requestGenerateTestsForCurrentFile() {
     final path = codePath;
     final source = codeContent;
+    createAiChat();
     openAiChatPanel(
       contextPath: path.isEmpty ? null : path,
       contextSource: source.isEmpty ? null : source,
