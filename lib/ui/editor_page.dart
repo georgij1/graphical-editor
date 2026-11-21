@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../auth/login_screen.dart';
+import '../build/build_client.dart';
 import '../editor/editor_controller.dart';
 import '../l10n/app_localizations.dart';
 import 'widgets/canvas_area.dart';
@@ -136,6 +137,135 @@ class _EditorPageState extends State<EditorPage> {
   }
 
   void _showCode() => _controller.editSceneSource();
+
+  Future<void> _runCurrentTest() async {
+    final path = _controller.codePath;
+    if (path.isEmpty) return;
+
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        content: Row(
+          children: <Widget>[
+            const SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(strokeWidth: 2.5),
+            ),
+            const SizedBox(width: 14),
+            Expanded(child: Text(context.tr('Running test...'))),
+          ],
+        ),
+      ),
+    );
+
+    BuildTestResult? result;
+    String? error;
+    try {
+      result = await _controller.runBackendTest(path: path);
+    } on BuildException catch (e) {
+      error = e.message;
+    } catch (e) {
+      error = e.toString();
+    }
+
+    if (!mounted) return;
+    Navigator.of(context, rootNavigator: true).pop(); // close loading
+
+    final output = result?.output ?? error ?? 'Unknown error';
+    final success = result?.success ?? false;
+    final command = result?.command ?? '';
+    final exitCode = result?.exitCode;
+
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) {
+        final theme = Theme.of(ctx);
+        final color = success ? Colors.green : theme.colorScheme.error;
+        return AlertDialog(
+          title: Row(
+            children: <Widget>[
+              Icon(success ? Icons.check_circle_outline : Icons.error_outline, color: color),
+              const SizedBox(width: 8),
+              Expanded(child: Text(context.tr(success ? 'Test passed' : 'Test failed'))),
+              if (exitCode != null)
+                Text(
+                  'exit $exitCode',
+                  style: theme.textTheme.bodySmall?.copyWith(color: theme.hintColor),
+                ),
+            ],
+          ),
+          content: SizedBox(
+            width: 760,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: <Widget>[
+                if (command.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Text(
+                      command,
+                      style: TextStyle(
+                        fontFamily: 'monospace',
+                        fontSize: 12,
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxHeight: 420),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: theme.brightness == Brightness.dark
+                          ? const Color(0xFF1E1E1E)
+                          : const Color(0xFFF6F8FA),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: theme.dividerColor),
+                    ),
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.all(12),
+                      child: SelectableText(
+                        output.isEmpty ? '(no output)' : output,
+                        style: TextStyle(
+                          fontFamily: 'monospace',
+                          fontSize: 12.5,
+                          height: 1.4,
+                          color: theme.brightness == Brightness.dark
+                              ? const Color(0xFFD4D4D4)
+                              : const Color(0xFF24292F),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () {
+                Clipboard.setData(ClipboardData(text: output));
+                ScaffoldMessenger.of(ctx).showSnackBar(
+                  SnackBar(
+                    content: Text(context.tr('Copied to clipboard.')),
+                    behavior: SnackBarBehavior.floating,
+                    duration: const Duration(seconds: 2),
+                  ),
+                );
+              },
+              child: Text(context.tr('Copy')),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: Text(context.tr('Close')),
+            ),
+          ],
+        );
+      },
+    );
+  }
 
   Future<void> _attachStylesheet(BuildContext context) async {
     final paths = _controller.projectStylesheetPaths;
@@ -345,6 +475,12 @@ class _EditorPageState extends State<EditorPage> {
                             onPressed: _controller.requestGenerateTestsForCurrentFile,
                             icon: const Icon(Icons.fact_check_outlined, size: 18),
                             label: Text(context.tr('Generate test')),
+                          ),
+                        if (_controller.isOpenJavaTestFile)
+                          TextButton.icon(
+                            onPressed: _runCurrentTest,
+                            icon: const Icon(Icons.play_arrow_rounded, size: 18),
+                            label: Text(context.tr('Run test')),
                           ),
                         if (_controller.canRestoreOriginalRunScript)
                           TextButton.icon(

@@ -40,6 +40,29 @@ class BuildDiagnostic {
   }
 }
 
+class BuildTestResult {
+  const BuildTestResult({
+    required this.success,
+    required this.exitCode,
+    required this.output,
+    required this.command,
+  });
+
+  final bool success;
+  final int exitCode;
+  final String output;
+  final String command;
+
+  factory BuildTestResult.fromJson(Map<String, dynamic> json) {
+    return BuildTestResult(
+      success: json['success'] == true,
+      exitCode: (json['exitCode'] as num?)?.toInt() ?? -1,
+      output: (json['output'] as String?) ?? '',
+      command: (json['command'] as String?) ?? '',
+    );
+  }
+}
+
 class BuildException implements Exception {
   BuildException(this.message);
 
@@ -130,6 +153,41 @@ class BuildClient {
     } catch (e) {
       throw BuildException('Invalid check response: $e');
     }
+  }
+
+  /// Runs tests for [archive]. If [file] is provided, only that test file/class is run.
+  Future<BuildTestResult> runTest(Uint8List archive, {String? file}) async {
+    late http.Response response;
+    final params = <String, String>{};
+    if (file != null && file.trim().isNotEmpty) {
+      params['file'] = file.trim();
+    }
+    final uri = _url('/build/test').replace(queryParameters: params.isEmpty ? null : params);
+    try {
+      response = await _http
+          .post(uri, body: archive)
+          .timeout(const Duration(minutes: 6));
+    } catch (error) {
+      throw BuildException('Build service is unreachable: $error');
+    }
+
+    final text = _decode(response.bodyBytes);
+    Map<String, dynamic> decoded = const <String, dynamic>{};
+    try {
+      final d = jsonDecode(text);
+      if (d is Map<String, dynamic>) decoded = d;
+    } catch (_) {}
+
+    if (response.statusCode == 200) {
+      if (decoded.isNotEmpty) return BuildTestResult.fromJson(decoded);
+      return BuildTestResult(success: false, exitCode: -1, output: text, command: '');
+    }
+
+    if (decoded.isNotEmpty) return BuildTestResult.fromJson(decoded);
+    final detail = text.trim();
+    throw BuildException(
+      detail.isEmpty ? 'Test run failed (HTTP ${response.statusCode})' : detail,
+    );
   }
 
   /// Validates that a dependency exists (checked against Maven Central by backend).

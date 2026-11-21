@@ -3432,6 +3432,16 @@ class EditorController extends ChangeNotifier {
     return await client.check(archive);
   }
 
+  Future<BuildTestResult> runBackendTest({String? path, String? content}) async {
+    final project = _currentProject;
+    if (project == null) {
+      throw BuildException('No project open');
+    }
+    final archive = buildCheckArchive(project, path: path, content: content);
+    final client = buildClient ?? BuildClient();
+    return await client.runTest(archive, file: path ?? codePath);
+  }
+
   Future<List<FileCheckRecord>> getFileCheckHistory(String file) async {
     final project = _currentProject;
     final token = _token;

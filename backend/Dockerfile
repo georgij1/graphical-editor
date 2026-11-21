@@ -29,7 +29,7 @@ RUN set -eux; \
     done; \
     chmod -R a+rX /opt/javafx/lib; \
     if command -v apt-get >/dev/null 2>&1; then \
-      apt-get update && apt-get install -y --no-install-recommends bash && rm -rf /var/lib/apt/lists/*; \
+      apt-get update && apt-get install -y --no-install-recommends bash maven && rm -rf /var/lib/apt/lists/*; \
     fi
 
 COPY --from=build /app/build/libs/fxml-editor-backend-*.jar /app/app.jar

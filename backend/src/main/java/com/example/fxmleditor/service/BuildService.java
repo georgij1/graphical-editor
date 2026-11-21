@@ -8,6 +8,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.util.*;
 import java.util.Comparator;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.zip.ZipEntry;
@@ -40,6 +41,8 @@ public class BuildService {
     }
 
     public record Diagnostic(String file, int line, int column, String kind, String message) {}
+
+    public record TestResult(boolean success, int exitCode, String output, String command) {}
 
     public byte[] build(byte[] archive, boolean bundle) throws IOException, BuildException {
         Path work = Files.createTempDirectory("javafx-build-");
@@ -288,6 +291,102 @@ public class BuildService {
         } finally {
             deleteRecursively(work);
         }
+    }
+
+    public TestResult runTest(byte[] archive, String testFile) throws IOException, BuildException {
+        Path work = Files.createTempDirectory("javafx-test-");
+        try {
+            Path extracted = unzip(archive, work);
+            Path root = singleRoot(extracted);
+
+            String testSelector = toTestSelector(testFile);
+            boolean hasMaven = Files.isRegularFile(root.resolve("pom.xml"));
+            boolean hasGradle = Files.isRegularFile(root.resolve("build.gradle"))
+                    || Files.isRegularFile(root.resolve("build.gradle.kts"));
+
+            List<String> command;
+            if (hasMaven) {
+                command = new ArrayList<>(List.of("mvn", "-B", "-ntp", "-DtrimStackTrace=false", "test"));
+                if (testSelector != null) {
+                    command.add("-Dtest=" + testSelector);
+                    command.add("-DfailIfNoSpecifiedTests=false");
+                }
+            } else if (hasGradle) {
+                String gradlew = Files.isRegularFile(root.resolve("gradlew")) ? "./gradlew"
+                        : Files.isRegularFile(root.resolve("gradlew.bat")) ? "gradlew.bat" : "gradle";
+                command = new ArrayList<>(List.of(gradlew, "--console=plain", "test"));
+                if (testSelector != null) {
+                    command.add("--tests");
+                    command.add(testSelector);
+                }
+            } else {
+                throw new BuildException("No pom.xml or build.gradle found in project archive");
+            }
+
+            return runCommandResult(command, root, 300);
+        } finally {
+            deleteRecursively(work);
+        }
+    }
+
+    private String toTestSelector(String testFile) {
+        if (testFile == null) return null;
+        String s = testFile.trim().replace('\\', '/');
+        if (s.isEmpty()) return null;
+        // Strip common source prefixes
+        for (String prefix : List.of("src/test/java/", "src/main/java/", "src/test/kotlin/", "src/main/kotlin/")) {
+            if (s.startsWith(prefix)) {
+                s = s.substring(prefix.length());
+                break;
+            }
+        }
+        if (s.endsWith(".java")) s = s.substring(0, s.length() - 5);
+        else if (s.endsWith(".kt")) s = s.substring(0, s.length() - 3);
+        s = s.replace('/', '.');
+        // sanitize: allow class/package chars and wildcard
+        if (!s.matches("[A-Za-z0-9_.$*]+")) return null;
+        return s;
+    }
+
+    private TestResult runCommandResult(List<String> command, Path workDir, int timeoutSeconds)
+            throws IOException, BuildException {
+        Process process = new ProcessBuilder(command)
+                .directory(workDir.toFile())
+                .redirectErrorStream(true)
+                .start();
+        ByteArrayOutputStream buf = new ByteArrayOutputStream();
+        Thread reader = new Thread(() -> {
+            try (InputStream in = process.getInputStream()) {
+                in.transferTo(buf);
+            } catch (IOException ignored) {
+            }
+        });
+        reader.setDaemon(true);
+        reader.start();
+        int code;
+        boolean timedOut = false;
+        try {
+            boolean finished = process.waitFor(timeoutSeconds, TimeUnit.SECONDS);
+            if (!finished) {
+                timedOut = true;
+                process.destroyForcibly();
+                process.waitFor(5, TimeUnit.SECONDS);
+                code = -1;
+            } else {
+                code = process.exitValue();
+            }
+            reader.join(5000);
+        } catch (InterruptedException error) {
+            Thread.currentThread().interrupt();
+            process.destroyForcibly();
+            throw new BuildException("Test run interrupted");
+        }
+        String output = buf.toString(StandardCharsets.UTF_8);
+        if (timedOut) {
+            output = output + "\n[Timed out after " + timeoutSeconds + " seconds]";
+        }
+        String cmd = String.join(" ", command);
+        return new TestResult(code == 0, code, trim(output), cmd);
     }
 
     private String runCapture(List<String> command, Path workDir) throws IOException, BuildException {

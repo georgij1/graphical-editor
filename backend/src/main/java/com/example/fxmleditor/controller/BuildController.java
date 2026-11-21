@@ -86,6 +86,37 @@ public class BuildController {
         }
     }
 
+    @PostMapping("/test")
+    @Operation(summary = "Run tests for an exported project and return console output")
+    public ResponseEntity<?> runTest(
+            @RequestBody byte[] archive,
+            @RequestParam(required = false) String file) {
+        try {
+            var result = buildService.runTest(archive, file);
+            return ResponseEntity.ok(java.util.Map.of(
+                    "success", result.success(),
+                    "exitCode", result.exitCode(),
+                    "output", result.output(),
+                    "command", result.command()));
+        } catch (BuildException e) {
+            return ResponseEntity.badRequest()
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(java.util.Map.of(
+                            "success", false,
+                            "exitCode", -1,
+                            "output", e.getMessage(),
+                            "command", ""));
+        } catch (Exception e) {
+            return ResponseEntity.status(500)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(java.util.Map.of(
+                            "success", false,
+                            "exitCode", -1,
+                            "output", "Test run failed: " + e,
+                            "command", ""));
+        }
+    }
+
     @GetMapping("/validate-dependency")
     @Operation(summary = "Validate that a Maven/Gradle dependency exists in Maven Central")
     public ResponseEntity<?> validateDependency(
