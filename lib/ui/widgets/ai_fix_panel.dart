@@ -729,12 +729,17 @@ class _AiChatPanelState extends State<AiChatPanel> {
               color: bg,
               borderRadius: BorderRadius.circular(8),
             ),
-            child: SelectableText(
-              msg.content,
-              style: const TextStyle(fontSize: 13),
-            ),
+            child: (!isUser && msg.content.trim().isEmpty && _busy)
+                ? _ThinkingIndicator(elapsedSeconds: _elapsedSeconds)
+                : SelectableText(
+                    msg.content.isEmpty ? '...' : msg.content,
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: msg.content.isEmpty ? theme.hintColor : null,
+                    ),
+                  ),
           ),
-          if (!isUser)
+          if (!isUser && msg.content.trim().isNotEmpty)
             Padding(
               padding: const EdgeInsets.only(top: 4),
               child: Wrap(
@@ -851,6 +856,84 @@ class _AiChatPanelState extends State<AiChatPanel> {
             visualDensity: VisualDensity.compact,
             onPressed: _removeSelectedCustomModel,
           ),
+      ],
+    );
+  }
+}
+
+class _ThinkingIndicator extends StatefulWidget {
+  const _ThinkingIndicator({required this.elapsedSeconds});
+  final int elapsedSeconds;
+
+  @override
+  State<_ThinkingIndicator> createState() => _ThinkingIndicatorState();
+}
+
+class _ThinkingIndicatorState extends State<_ThinkingIndicator>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1200),
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final color = theme.colorScheme.primary;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: <Widget>[
+        SizedBox(
+          width: 36,
+          height: 16,
+          child: AnimatedBuilder(
+            animation: _controller,
+            builder: (context, _) {
+              return Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: List<Widget>.generate(3, (i) {
+                  final t = (_controller.value - i * 0.2) % 1.0;
+                  final scale = 0.45 + 0.55 * (0.5 - (t - 0.5).abs()) * 2;
+                  final opacity = 0.35 + 0.65 * (0.5 - (t - 0.5).abs()) * 2;
+                  return Opacity(
+                    opacity: opacity.clamp(0.25, 1.0),
+                    child: Transform.scale(
+                      scale: scale.clamp(0.5, 1.0),
+                      child: Container(
+                        width: 8,
+                        height: 8,
+                        decoration: BoxDecoration(
+                          color: color,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                    ),
+                  );
+                }),
+              );
+            },
+          ),
+        ),
+        const SizedBox(width: 8),
+        Text(
+          '${context.tr('Thinking...')} ${widget.elapsedSeconds}s',
+          style: TextStyle(
+            fontSize: 12,
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+        ),
       ],
     );
   }
