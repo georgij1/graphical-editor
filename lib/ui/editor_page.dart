@@ -343,7 +343,7 @@ class _EditorPageState extends State<EditorPage> {
                         if (_controller.isOpenJavaTestFile)
                           TextButton.icon(
                             onPressed: _controller.requestGenerateTestsForCurrentFile,
-                            icon: const Icon(Icons.science_outlined, size: 18),
+                            icon: const Icon(Icons.fact_check_outlined, size: 18),
                             label: Text(context.tr('Generate test')),
                           ),
                         if (_controller.canRestoreOriginalRunScript)
