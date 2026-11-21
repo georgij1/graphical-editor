@@ -503,12 +503,14 @@ public class BuildService {
             char next2 = i + 2 < n ? src.charAt(i + 2) : '\0';
 
             if (c == '\n') {
-                line++;
-                lineComment = false;
-                if (!sq3 && !dq3) {
+                if (!sq3 && !dq3 && (sq || dq)) {
+                    result.add(new Diagnostic(rel, line, 1, "error",
+                            "Unclosed string literal."));
                     sq = false;
                     dq = false;
                 }
+                line++;
+                lineComment = false;
                 escape = false;
                 i++;
                 continue;
