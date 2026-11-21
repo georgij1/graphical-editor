@@ -7,6 +7,7 @@ import '../../build/build_client.dart';
 import '../../editor/code_validator.dart';
 import '../../editor/editor_controller.dart';
 import '../../l10n/app_localizations.dart';
+import 'highlighting_text_controller.dart';
 import 'markdown_parser.dart';
 import 'source_view.dart' show CheckSnapshot, CompilationHistoryDialog;
 
@@ -23,8 +24,11 @@ class MarkdownEditor extends StatefulWidget {
 }
 
 class _MarkdownEditorState extends State<MarkdownEditor> {
-  late final TextEditingController _text =
-      TextEditingController(text: widget.controller.codeContent);
+  late final HighlightingTextEditingController _text =
+      HighlightingTextEditingController(
+    text: widget.controller.codeContent,
+    language: HighlightLanguage.markdown,
+  );
   final FocusNode _focusNode = FocusNode();
   final ScrollController _editorScrollController = ScrollController();
   final ScrollController _gutterScrollController = ScrollController();
@@ -69,6 +73,18 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
     _focusNode.addListener(_onFocusChanged);
     _editorScrollController.addListener(_onEditorScroll);
     _recordLocalCheckSnapshot(_text.text, _validation);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _syncHighlighting();
+    });
+  }
+
+  void _syncHighlighting() {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    if (_text.dark != dark || _text.language != HighlightLanguage.markdown) {
+      _text.dark = dark;
+      _text.language = HighlightLanguage.markdown;
+      _text.refresh();
+    }
   }
 
   void _onEditorScroll() {
@@ -84,6 +100,12 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
     );
     _gutterScrollController.jumpTo(target);
     _syncingScroll = false;
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _syncHighlighting();
   }
 
   @override
@@ -109,7 +131,10 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
       _text.text = widget.controller.codeContent;
       _validation = _validate(_text.text);
       _recordLocalCheckSnapshot(_text.text, _validation);
+      _syncHighlighting();
       setState(() {});
+    } else {
+      _syncHighlighting();
     }
   }
 

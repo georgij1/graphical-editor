@@ -1,6 +1,16 @@
 import 'package:flutter/material.dart';
 
-enum HighlightLanguage { plain, java, xml, css, shell, batch, gradle, gitignore }
+enum HighlightLanguage {
+  plain,
+  java,
+  xml,
+  css,
+  shell,
+  batch,
+  gradle,
+  gitignore,
+  markdown,
+}
 
 class HighlightingTextEditingController extends TextEditingController {
   HighlightingTextEditingController({
@@ -132,6 +142,17 @@ class HighlightingTextEditingController extends TextEditingController {
           r'(?<escape>\\.)',
           multiLine: true,
         );
+      case HighlightLanguage.markdown:
+        return RegExp(
+          r'(?<code>```[\s\S]*?```|~~~[\s\S]*?~~~|`[^`\n]+`)|'
+          r'(?<heading>^\s{0,3}#{1,6}[ \t].*$)|'
+          r'(?<quote>^\s{0,3}>.*$)|'
+          r'(?<list>^\s*(?:[-*+]|\d+\.)\s)|'
+          r'(?<link>!?\[[^\]\n]*\]\([^\)\n]*\)|!?\[[^\]\n]*\]\[[^\]\n]*\])|'
+          r'(?<bold>\*\*[^*\n]+\*\*|__[^_\n]+__)|'
+          r'(?<hr>^\s{0,3}(?:[-*_][ \t]*){3,}\s*$)',
+          multiLine: true,
+        );
       case HighlightLanguage.plain:
         return RegExp(r'$^');
     }
@@ -219,6 +240,24 @@ class HighlightingTextEditingController extends TextEditingController {
       weight = FontWeight.w600;
     } else if (has('escape')) {
       color = isDark ? const Color(0xFF4EC9B0) : const Color(0xFF267F99);
+      weight = FontWeight.w600;
+    } else if (has('heading')) {
+      color = isDark ? const Color(0xFF569CD6) : const Color(0xFF0000FF);
+      weight = FontWeight.w700;
+    } else if (has('code')) {
+      color = isDark ? const Color(0xFFCE9178) : const Color(0xFFA31515);
+    } else if (has('link')) {
+      color = isDark ? const Color(0xFF4EC9B0) : const Color(0xFF267F99);
+    } else if (has('bold')) {
+      color = isDark ? const Color(0xFFDCDCAA) : const Color(0xFF795E26);
+      weight = FontWeight.w700;
+    } else if (has('list')) {
+      color = isDark ? const Color(0xFFC586C0) : const Color(0xFFAF00DB);
+      weight = FontWeight.w600;
+    } else if (has('quote')) {
+      color = isDark ? const Color(0xFF6A9955) : const Color(0xFF008000);
+    } else if (has('hr')) {
+      color = isDark ? const Color(0xFF858585) : const Color(0xFF6E7681);
       weight = FontWeight.w600;
     }
     return TextStyle(color: color, fontWeight: weight);
