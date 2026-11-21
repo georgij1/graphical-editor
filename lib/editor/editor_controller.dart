@@ -348,6 +348,12 @@ class EditorController extends ChangeNotifier {
       List<String>.unmodifiable(_aiChatContextErrors);
   void Function(String fixed)? _aiChatApply;
   void Function(String fixed)? get aiChatApply => _aiChatApply;
+  String? _aiChatPendingPrompt;
+  String? takeAiChatPendingPrompt() {
+    final p = _aiChatPendingPrompt;
+    _aiChatPendingPrompt = null;
+    return p;
+  }
 
   final List<AiChatSession> _aiChats = <AiChatSession>[];
   List<AiChatSession> get aiChats => List<AiChatSession>.unmodifiable(_aiChats);
@@ -406,6 +412,19 @@ class EditorController extends ChangeNotifier {
   void applyAiFixResult(String fixed) {
     final apply = _aiChatApply;
     if (apply != null) apply(fixed);
+  }
+
+  void requestGenerateTestsForCurrentFile() {
+    final path = codePath;
+    final source = codeContent;
+    openAiChatPanel(
+      contextPath: path.isEmpty ? null : path,
+      contextSource: source.isEmpty ? null : source,
+      contextErrors: const <String>[],
+    );
+    _aiChatPendingPrompt =
+        'Сгенерируй unit-тесты для этого файла. Верни полный код тестового класса.';
+    notifyListeners();
   }
 
   AiChatSession createAiChat({bool seedFromContext = false}) {
@@ -692,6 +711,18 @@ class EditorController extends ChangeNotifier {
 
   /// True when the opened source is a Java file (validated as Java).
   bool get codeIsJavaSource => _openSource?.isJava ?? false;
+
+  /// True when the opened file looks like a Java test file.
+  bool get isOpenJavaTestFile {
+    final source = _openSource;
+    if (source == null || !source.isJava) return false;
+    final p = source.path.replaceAll('\\', '/').toLowerCase();
+    final name = p.split('/').last;
+    if (p.contains('/src/test/')) return true;
+    return name.endsWith('test.java') ||
+        name.endsWith('tests.java') ||
+        name.endsWith('it.java');
+  }
 
   /// True when the opened source is an XML file (validated as XML).
   bool get codeIsXmlSource => _openSource?.isXml ?? false;

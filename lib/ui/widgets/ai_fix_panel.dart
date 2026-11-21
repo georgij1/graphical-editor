@@ -39,11 +39,29 @@ class _AiChatPanelState extends State<AiChatPanel> {
   @override
   void initState() {
     super.initState();
+    widget.controller.addListener(_onControllerChanged);
     _loadModels();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _consumePendingPrompt());
+  }
+
+  void _onControllerChanged() {
+    if (!mounted) return;
+    _consumePendingPrompt();
+  }
+
+  void _consumePendingPrompt() {
+    final prompt = widget.controller.takeAiChatPendingPrompt();
+    if (prompt == null || !mounted) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _input.text = prompt;
+      _send();
+    });
   }
 
   @override
   void dispose() {
+    widget.controller.removeListener(_onControllerChanged);
     _timer?.cancel();
     _input.dispose();
     _scroll.dispose();

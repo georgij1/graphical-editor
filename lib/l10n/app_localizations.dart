@@ -493,6 +493,7 @@ class AppLocalizations {
     'Add': 'Добавить',
     'AI chat': 'AI чат',
     'AI chats': 'AI чаты',
+    'Generate test': 'Сгенерировать тест',
     'Restore original script': 'Восстановить оригинальный скрипт',
     'Switch to Gradle': 'Перейти на Gradle',
     'Switch to pom.xml': 'Перейти на pom.xml',
