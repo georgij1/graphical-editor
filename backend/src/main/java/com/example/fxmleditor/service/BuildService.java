@@ -672,6 +672,16 @@ public class BuildService {
                 result.add(new Diagnostic(rel, i + 1, m.start(1) + 1, "error",
                         "Unknown settings.gradle property: rootProject." + prop));
             }
+
+            String trimmed = scan.trim();
+            if (trimmed.matches("(?U)^[\\p{L}_$][\\p{L}\\p{N}_$]*$")) {
+                Set<String> allowedBare = Set.of(
+                        "true", "false", "null", "gradle", "settings", "rootProject");
+                if (!allowedBare.contains(trimmed)) {
+                    result.add(new Diagnostic(rel, i + 1, 1, "error",
+                            "Unknown property or reference in settings.gradle: " + trimmed));
+                }
+            }
         }
         return result;
     }
