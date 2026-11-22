@@ -35,6 +35,9 @@ class _AiChatPanelState extends State<AiChatPanel> {
   String? _error;
   Timer? _timer;
   int _elapsedSeconds = 0;
+  final Map<AiChatMessage, String> _translations = <AiChatMessage, String>{};
+  final Set<AiChatMessage> _showTranslation = <AiChatMessage>{};
+  final Set<AiChatMessage> _translating = <AiChatMessage>{};
 
   @override
   void initState() {
@@ -709,6 +712,67 @@ class _AiChatPanelState extends State<AiChatPanel> {
     );
   }
 
+  bool _isMostlyRussian(String text) {
+    int cyr = 0;
+    int lat = 0;
+    for (final r in text.runes) {
+      if ((r >= 0x0400 && r <= 0x04FF) || (r >= 0x0500 && r <= 0x052F)) cyr++;
+      if ((r >= 0x0041 && r <= 0x005A) || (r >= 0x0061 && r <= 0x007A)) lat++;
+    }
+    return cyr > 0 && cyr >= lat;
+  }
+
+  Future<void> _translateMessage(AiChatMessage msg) async {
+    if (_translating.contains(msg)) return;
+    if (_translations.containsKey(msg)) {
+      setState(() {
+        if (_showTranslation.contains(msg)) {
+          _showTranslation.remove(msg);
+        } else {
+          _showTranslation.add(msg);
+        }
+      });
+      return;
+    }
+    final modelId = _selectedModelId;
+    if (modelId == null) return;
+    final model = _modelName(modelId);
+    final baseUrl = _modelBaseUrl(modelId);
+    final toRussian = !_isMostlyRussian(msg.content);
+    final prompt = toRussian
+        ? 'Переведи следующий текст на русский язык. Сохрани форматирование, код, списки и имена. Верни только перевод.\n\n${msg.content}'
+        : 'Translate the following text to English. Preserve formatting, code, lists, and names. Return only the translation.\n\n${msg.content}';
+    setState(() {
+      _translating.add(msg);
+    });
+    try {
+      final translated = await widget.client.generate(
+        model: model,
+        prompt: prompt,
+        baseUrl: baseUrl,
+      );
+      if (!mounted) return;
+      setState(() {
+        _translations[msg] = translated.trim();
+        _showTranslation.add(msg);
+      });
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(e.toString()),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _translating.remove(msg);
+        });
+      }
+    }
+  }
+
   Widget _buildMessage(BuildContext context, AiChatMessage msg) {
     final theme = Theme.of(context);
     final isUser = msg.role == AiChatRole.user;
@@ -717,6 +781,8 @@ class _AiChatPanelState extends State<AiChatPanel> {
         : theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.45);
     final align = isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start;
     final blocks = !isUser ? _extractCodeBlocks(msg.content) : const <String>[];
+    final showingTranslation = _showTranslation.contains(msg);
+    final displayedContent = showingTranslation ? (_translations[msg] ?? msg.content) : msg.content;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Column(
@@ -731,7 +797,7 @@ class _AiChatPanelState extends State<AiChatPanel> {
             ),
             child: (!isUser && msg.content.trim().isEmpty && _busy)
                 ? _ThinkingIndicator(elapsedSeconds: _elapsedSeconds)
-                : _AssistantMessageContent(text: msg.content),
+                : _AssistantMessageContent(text: displayedContent),
           ),
           if (!isUser && msg.content.trim().isNotEmpty)
             Padding(
@@ -742,7 +808,7 @@ class _AiChatPanelState extends State<AiChatPanel> {
                 children: <Widget>[
                   TextButton.icon(
                     onPressed: () {
-                      Clipboard.setData(ClipboardData(text: msg.content));
+                      Clipboard.setData(ClipboardData(text: displayedContent));
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
                           content: Text(context.tr('AI result copied to clipboard.')),
@@ -753,6 +819,31 @@ class _AiChatPanelState extends State<AiChatPanel> {
                     },
                     icon: const Icon(Icons.copy, size: 14),
                     label: Text(context.tr('Copy')),
+                    style: TextButton.styleFrom(
+                      visualDensity: VisualDensity.compact,
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                    ),
+                  ),
+                  TextButton.icon(
+                    onPressed: _translating.contains(msg)
+                        ? null
+                        : () => _translateMessage(msg),
+                    icon: _translating.contains(msg)
+                        ? const SizedBox(
+                            width: 14,
+                            height: 14,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.translate, size: 14),
+                    label: Text(
+                      _translating.contains(msg)
+                          ? context.tr('Translating...')
+                          : showingTranslation
+                              ? context.tr('Show original')
+                              : _isMostlyRussian(msg.content)
+                                  ? context.tr('Translate to English')
+                                  : context.tr('Translate to Russian'),
+                    ),
                     style: TextButton.styleFrom(
                       visualDensity: VisualDensity.compact,
                       padding: const EdgeInsets.symmetric(horizontal: 8),
