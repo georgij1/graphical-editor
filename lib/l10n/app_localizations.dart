@@ -499,7 +499,7 @@ class AppLocalizations {
     'Test passed': 'Тест пройден',
     'Test failed': 'Тест не пройден',
     'Key reasons': 'Ключевые причины',
-    'Fix error with AI': '????????? ?????? ? ??????? ??',
+    'Fix error with AI': '\u0418\u0441\u043f\u0440\u0430\u0432\u0438\u0442\u044c \u043e\u0448\u0438\u0431\u043a\u0443 \u0441 \u043f\u043e\u043c\u043e\u0449\u044c\u044e \u0418\u0418',
     'Translate to Russian': 'Перевести на русский',
     'Translate to English': 'Перевести на английский',
     'Show original': 'Показать оригинал',
