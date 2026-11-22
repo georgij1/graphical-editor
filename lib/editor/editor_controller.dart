@@ -428,6 +428,38 @@ class EditorController extends ChangeNotifier {
     notifyListeners();
   }
 
+  void requestFixTestErrors({
+    required String path,
+    required String source,
+    required List<String> reasons,
+    required String output,
+  }) {
+    createAiChat();
+    openAiChatPanel(
+      contextPath: path,
+      contextSource: source,
+      contextErrors: reasons,
+    );
+    final buf = StringBuffer()
+      ..writeln('Исправь ошибки в тесте. Верни полный исправленный код файла.');
+    if (reasons.isNotEmpty) {
+      buf.writeln();
+      buf.writeln('Ключевые причины:');
+      for (final r in reasons.take(8)) {
+        buf.writeln('- $r');
+      }
+    }
+    if (output.trim().isNotEmpty) {
+      buf.writeln();
+      buf.writeln('Вывод консоли:');
+      buf.writeln('```');
+      buf.writeln(output.length > 6000 ? '${output.substring(0, 6000)}\n...[truncated]' : output);
+      buf.writeln('```');
+    }
+    _aiChatPendingPrompt = buf.toString();
+    notifyListeners();
+  }
+
   AiChatSession createAiChat({bool seedFromContext = false}) {
     final id = 'chat_${DateTime.now().microsecondsSinceEpoch}_${_aiChats.length}';
     final session = AiChatSession(id: id, title: 'New chat', messages: <AiChatMessage>[]);

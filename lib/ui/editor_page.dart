@@ -325,6 +325,27 @@ class _EditorPageState extends State<EditorPage> {
                       ),
                     ),
                   ),
+                if (!success)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: FilledButton.icon(
+                        onPressed: () {
+                          final source = _controller.codeContent;
+                          Navigator.of(ctx).pop();
+                          _controller.requestFixTestErrors(
+                            path: path,
+                            source: source,
+                            reasons: reasons,
+                            output: output,
+                          );
+                        },
+                        icon: const Icon(Icons.auto_fix_high, size: 18),
+                        label: Text(context.tr('Fix error with AI')),
+                      ),
+                    ),
+                  ),
                 ConstrainedBox(
                   constraints: const BoxConstraints(maxHeight: 420),
                   child: Container(
