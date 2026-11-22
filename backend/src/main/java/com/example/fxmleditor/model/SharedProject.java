@@ -20,6 +20,10 @@ public class SharedProject {
     public String ownerEmail = "";
     public int revision = 1;
     public String buildTool = "maven";
+    public String aiModel;
+    public List<Map<String, Object>> aiCustomModels = new ArrayList<>();
+    public List<String> aiHiddenModels = new ArrayList<>();
+    public boolean aiHiddenDefaultsSeeded = false;
     public String inviteToken;
     public String inviteRole = "editor";
     public List<ProjectMember> members = new ArrayList<>();

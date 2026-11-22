@@ -39,10 +39,12 @@ class _AiChatPanelState extends State<AiChatPanel> {
   final Map<AiChatMessage, String> _translations = <AiChatMessage, String>{};
   final Set<AiChatMessage> _showTranslation = <AiChatMessage>{};
   final Set<AiChatMessage> _translating = <AiChatMessage>{};
+  String? _lastProjectId;
 
   @override
   void initState() {
     super.initState();
+    _lastProjectId = widget.controller.currentProject?.id;
     widget.controller.addListener(_onControllerChanged);
     _loadModels();
     WidgetsBinding.instance.addPostFrameCallback((_) => _consumePendingPrompt());
@@ -51,6 +53,11 @@ class _AiChatPanelState extends State<AiChatPanel> {
   void _onControllerChanged() {
     if (!mounted) return;
     _consumePendingPrompt();
+    final pid = widget.controller.currentProject?.id;
+    if (pid != _lastProjectId) {
+      _lastProjectId = pid;
+      _loadModels();
+    }
   }
 
   void _consumePendingPrompt() {

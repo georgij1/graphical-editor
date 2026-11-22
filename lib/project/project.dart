@@ -57,10 +57,16 @@ class Project {
     this.revision = 0,
     this.shared = false,
     this.buildTool = 'maven',
+    this.aiModel,
+    List<Map<String, dynamic>>? aiCustomModels,
+    List<String>? aiHiddenModels,
+    this.aiHiddenDefaultsSeeded = false,
     List<SceneFile>? scenes,
     Map<String, String>? sourceOverrides,
     List<ProjectMember>? members,
-  })  : scenes = scenes ?? [],
+  })  : aiCustomModels = aiCustomModels ?? <Map<String, dynamic>>[],
+        aiHiddenModels = aiHiddenModels ?? <String>[],
+        scenes = scenes ?? [],
         sourceOverrides = sourceOverrides ?? <String, String>{},
         members = members ?? <ProjectMember>[];
 
@@ -86,6 +92,18 @@ class Project {
 
   /// Active build system for the project: 'maven' or 'gradle'.
   String buildTool;
+
+  /// Selected AI model id for this project.
+  String? aiModel;
+
+  /// Project-scoped custom AI models.
+  final List<Map<String, dynamic>> aiCustomModels;
+
+  /// Project-scoped hidden/ignored AI model ids.
+  final List<String> aiHiddenModels;
+
+  /// Whether default hidden AI models were seeded for this project.
+  bool aiHiddenDefaultsSeeded;
 
   /// People who take part in the project.
   final List<ProjectMember> members;
@@ -158,6 +176,10 @@ class Project {
         if (revision > 0) 'revision': revision,
         if (shared) 'shared': true,
         'buildTool': buildTool,
+        if (aiModel != null && aiModel!.trim().isNotEmpty) 'aiModel': aiModel,
+        if (aiCustomModels.isNotEmpty) 'aiCustomModels': aiCustomModels,
+        if (aiHiddenModels.isNotEmpty) 'aiHiddenModels': aiHiddenModels,
+        if (aiHiddenDefaultsSeeded) 'aiHiddenDefaultsSeeded': true,
         if (members.isNotEmpty)
           'members': [for (final m in members) m.toJson()],
         'scenes': scenes.map((s) => s.toJson()).toList(),
@@ -176,6 +198,16 @@ class Project {
       revision: (json['revision'] as num?)?.toInt() ?? 0,
       shared: json['shared'] as bool? ?? false,
       buildTool: (json['buildTool'] as String?) ?? 'maven',
+      aiModel: (json['aiModel'] as String?)?.trim(),
+      aiCustomModels: [
+        for (final m in (json['aiCustomModels'] as List? ?? []))
+          if (m is Map) Map<String, dynamic>.from(m),
+      ],
+      aiHiddenModels: [
+        for (final m in (json['aiHiddenModels'] as List? ?? []))
+          if (m.toString().trim().isNotEmpty) m.toString().trim(),
+      ],
+      aiHiddenDefaultsSeeded: json['aiHiddenDefaultsSeeded'] as bool? ?? false,
       members: [
         for (final m in (json['members'] as List? ?? []))
           ProjectMember.fromJson(m as Map<String, dynamic>),
@@ -204,6 +236,12 @@ class Project {
         revision: revision,
         shared: shared,
         buildTool: buildTool,
+        aiModel: aiModel,
+        aiCustomModels: [
+          for (final m in aiCustomModels) Map<String, dynamic>.from(m),
+        ],
+        aiHiddenModels: List<String>.from(aiHiddenModels),
+        aiHiddenDefaultsSeeded: aiHiddenDefaultsSeeded,
         members: [for (final m in members) ProjectMember(email: m.email, role: m.role)],
         scenes: [for (final s in scenes) s.copy()],
         sourceOverrides: Map<String, String>.from(sourceOverrides),

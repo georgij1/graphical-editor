@@ -419,6 +419,40 @@ public class ProjectController {
         } else if (existing != null) {
             p.sources = existing.sources;
         }
+        Object aiModel = body.get("aiModel");
+        if (aiModel != null && !String.valueOf(aiModel).trim().isEmpty()) {
+            p.aiModel = String.valueOf(aiModel).trim();
+        } else if (existing != null) {
+            p.aiModel = existing.aiModel;
+        }
+        Object aiCustomModels = body.get("aiCustomModels");
+        if (aiCustomModels instanceof List) {
+            p.aiCustomModels = new ArrayList<>();
+            for (Object m : (List<?>) aiCustomModels) {
+                if (m instanceof Map) {
+                    p.aiCustomModels.add(new java.util.HashMap<>((Map<String, Object>) m));
+                }
+            }
+        } else if (existing != null && existing.aiCustomModels != null) {
+            p.aiCustomModels = existing.aiCustomModels;
+        }
+        Object aiHiddenModels = body.get("aiHiddenModels");
+        if (aiHiddenModels instanceof List) {
+            p.aiHiddenModels = new ArrayList<>();
+            for (Object m : (List<?>) aiHiddenModels) {
+                if (m != null && !String.valueOf(m).trim().isEmpty()) {
+                    p.aiHiddenModels.add(String.valueOf(m).trim());
+                }
+            }
+        } else if (existing != null && existing.aiHiddenModels != null) {
+            p.aiHiddenModels = existing.aiHiddenModels;
+        }
+        Object aiHiddenDefaultsSeeded = body.get("aiHiddenDefaultsSeeded");
+        if (aiHiddenDefaultsSeeded instanceof Boolean) {
+            p.aiHiddenDefaultsSeeded = (Boolean) aiHiddenDefaultsSeeded;
+        } else if (existing != null) {
+            p.aiHiddenDefaultsSeeded = existing.aiHiddenDefaultsSeeded;
+        }
         if (body.get("inviteToken") != null) p.inviteToken = body.get("inviteToken").toString();
         if (body.get("inviteRole") != null) p.inviteRole = body.get("inviteRole").toString();
         return p;

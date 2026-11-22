@@ -1407,10 +1407,32 @@ class EditorController extends ChangeNotifier {
   static const String _aiModelKey = 'ai_model';
 
   /// The Ollama model the user picked for AI fixes, if any.
-  Future<String?> readAiModel() => _tokenStore.read(_aiModelKey);
+  Future<String?> readAiModel() async {
+    final p = _currentProject;
+    if (p != null) {
+      final m = p.aiModel?.trim();
+      return (m == null || m.isEmpty) ? null : m;
+    }
+    return _tokenStore.read(_aiModelKey);
+  }
 
-  Future<void> writeAiModel(String model) =>
-      _tokenStore.write(_aiModelKey, model);
+  Future<void> writeAiModel(String model) async {
+    final p = _currentProject;
+    if (p != null) {
+      p.aiModel = model.trim();
+      await _saveProjectAiSettings();
+      return;
+    }
+    await _tokenStore.write(_aiModelKey, model);
+  }
+
+  Future<void> _saveProjectAiSettings() async {
+    final p = _currentProject;
+    if (p == null) return;
+    await _persist(explicit: true);
+    _scheduleSharedPublish();
+    notifyListeners();
+  }
 
   static String aiModelSelectionId({required String name, String? baseUrl}) {
     final n = name.trim();
@@ -1432,34 +1454,60 @@ class EditorController extends ChangeNotifier {
     return (name: raw, baseUrl: null);
   }
 
+  List<AiModelConfig> _aiCustomModelsFromList(List<dynamic> decoded) {
+    final out = <AiModelConfig>[];
+    final seen = <String>{};
+    for (final item in decoded) {
+      String name = '';
+      String? baseUrl;
+      if (item is String) {
+        name = item.trim();
+      } else if (item is Map) {
+        final m = Map<String, dynamic>.from(item);
+        name = (m['name'] ?? '').toString().trim();
+        final b = (m['baseUrl'] ?? m['url'] ?? '').toString().trim();
+        if (b.isNotEmpty) baseUrl = b;
+      }
+      if (name.isEmpty) continue;
+      final id = aiModelSelectionId(name: name, baseUrl: baseUrl);
+      if (!seen.add(id)) continue;
+      out.add(AiModelConfig(name: name, baseUrl: baseUrl));
+    }
+    return out;
+  }
+
+  List<Map<String, dynamic>> _aiCustomModelsToJson(List<AiModelConfig> models) => <Map<String, dynamic>>[
+        for (final m in models)
+          <String, dynamic>{
+            'name': m.name,
+            if ((m.baseUrl ?? '').trim().isNotEmpty) 'baseUrl': m.baseUrl!.trim(),
+          },
+      ];
+
   Future<List<AiModelConfig>> readCustomAiModels() async {
+    final p = _currentProject;
+    if (p != null) return _aiCustomModelsFromList(p.aiCustomModels);
     final raw = await _tokenStore.read(_aiCustomModelsKey);
     if (raw == null || raw.isEmpty) return const <AiModelConfig>[];
     try {
       final decoded = jsonDecode(raw);
       if (decoded is! List) return const <AiModelConfig>[];
-      final out = <AiModelConfig>[];
-      final seen = <String>{};
-      for (final item in decoded) {
-        String name = '';
-        String? baseUrl;
-        if (item is String) {
-          name = item.trim();
-        } else if (item is Map) {
-          final m = Map<String, dynamic>.from(item);
-          name = (m['name'] ?? '').toString().trim();
-          final b = (m['baseUrl'] ?? m['url'] ?? '').toString().trim();
-          if (b.isNotEmpty) baseUrl = b;
-        }
-        if (name.isEmpty) continue;
-        final id = aiModelSelectionId(name: name, baseUrl: baseUrl);
-        if (!seen.add(id)) continue;
-        out.add(AiModelConfig(name: name, baseUrl: baseUrl));
-      }
-      return out;
+      return _aiCustomModelsFromList(decoded);
     } catch (_) {
       return const <AiModelConfig>[];
     }
+  }
+
+  Future<void> _writeCustomAiModels(List<AiModelConfig> models) async {
+    final p = _currentProject;
+    if (p != null) {
+      p.aiCustomModels
+        ..clear()
+        ..addAll(_aiCustomModelsToJson(models));
+      await _saveProjectAiSettings();
+      return;
+    }
+    await _tokenStore.write(_aiCustomModelsKey, jsonEncode(_aiCustomModelsToJson(models)));
   }
 
   Future<void> addCustomAiModel({required String name, String? baseUrl}) async {
@@ -1475,16 +1523,7 @@ class EditorController extends ChangeNotifier {
       AiModelConfig(name: n, baseUrl: b.isEmpty ? null : b),
       ...current,
     ];
-    await _tokenStore.write(
-      _aiCustomModelsKey,
-      jsonEncode(<Map<String, dynamic>>[
-        for (final m in next)
-          <String, dynamic>{
-            'name': m.name,
-            if ((m.baseUrl ?? '').trim().isNotEmpty) 'baseUrl': m.baseUrl!.trim(),
-          },
-      ]),
-    );
+    await _writeCustomAiModels(next);
   }
 
   Future<void> removeCustomAiModel({required String name, String? baseUrl}) async {
@@ -1494,16 +1533,7 @@ class EditorController extends ChangeNotifier {
       for (final m in current)
         if (aiModelSelectionId(name: m.name, baseUrl: m.baseUrl) != id) m,
     ];
-    await _tokenStore.write(
-      _aiCustomModelsKey,
-      jsonEncode(<Map<String, dynamic>>[
-        for (final m in next)
-          <String, dynamic>{
-            'name': m.name,
-            if ((m.baseUrl ?? '').trim().isNotEmpty) 'baseUrl': m.baseUrl!.trim(),
-          },
-      ]),
-    );
+    await _writeCustomAiModels(next);
   }
 
   Future<void> updateCustomAiModel({
@@ -1528,10 +1558,6 @@ class EditorController extends ChangeNotifier {
           replaced = true;
         }
       } else if (id == newId) {
-        // avoid duplicates; if renaming into existing, drop old and keep existing/new target once
-        if (!replaced) {
-          // drop old occurrence later? we'll skip old when seen and ensure target present
-        }
         if (!next.any((x) => aiModelSelectionId(name: x.name, baseUrl: x.baseUrl) == newId)) {
           next.add(AiModelConfig(name: nn, baseUrl: nb.isEmpty ? null : nb));
         }
@@ -1543,62 +1569,69 @@ class EditorController extends ChangeNotifier {
     if (!replaced) {
       next.insert(0, AiModelConfig(name: nn, baseUrl: nb.isEmpty ? null : nb));
     }
-    // dedupe preserving order
     final deduped = <AiModelConfig>[];
     final seen = <String>{};
     for (final m in next) {
       final id = aiModelSelectionId(name: m.name, baseUrl: m.baseUrl);
       if (seen.add(id)) deduped.add(m);
     }
-    await _tokenStore.write(
-      _aiCustomModelsKey,
-      jsonEncode(<Map<String, dynamic>>[
-        for (final m in deduped)
-          <String, dynamic>{
-            'name': m.name,
-            if ((m.baseUrl ?? '').trim().isNotEmpty) 'baseUrl': m.baseUrl!.trim(),
-          },
-      ]),
-    );
+    await _writeCustomAiModels(deduped);
+  }
+
+  List<String> _normalizeHiddenIds(List<dynamic> ids) {
+    final out = <String>[];
+    final seen = <String>{};
+    for (final item in ids) {
+      final s = item.toString().trim();
+      if (s.isEmpty || !seen.add(s)) continue;
+      out.add(s);
+    }
+    return out;
   }
 
   Future<List<String>> readHiddenAiModels() async {
+    final p = _currentProject;
+    if (p != null) return _normalizeHiddenIds(p.aiHiddenModels);
     final raw = await _tokenStore.read(_aiHiddenModelsKey);
     if (raw == null || raw.isEmpty) return const <String>[];
     try {
       final decoded = jsonDecode(raw);
       if (decoded is! List) return const <String>[];
-      final out = <String>[];
-      final seen = <String>{};
-      for (final item in decoded) {
-        final s = item.toString().trim();
-        if (s.isEmpty || !seen.add(s)) continue;
-        out.add(s);
-      }
-      return out;
+      return _normalizeHiddenIds(decoded);
     } catch (_) {
       return const <String>[];
     }
   }
 
   Future<void> writeHiddenAiModels(List<String> ids) async {
-    final out = <String>[];
-    final seen = <String>{};
-    for (final id in ids) {
-      final s = id.trim();
-      if (s.isEmpty || !seen.add(s)) continue;
-      out.add(s);
+    final out = _normalizeHiddenIds(ids);
+    final p = _currentProject;
+    if (p != null) {
+      p.aiHiddenModels
+        ..clear()
+        ..addAll(out);
+      await _saveProjectAiSettings();
+      return;
     }
     await _tokenStore.write(_aiHiddenModelsKey, jsonEncode(out));
   }
 
   Future<bool> readAiHiddenDefaultsSeeded() async {
+    final p = _currentProject;
+    if (p != null) return p.aiHiddenDefaultsSeeded;
     final raw = await _tokenStore.read(_aiHiddenDefaultsSeededKey);
     return raw == '1';
   }
 
-  Future<void> writeAiHiddenDefaultsSeeded(bool value) =>
-      _tokenStore.write(_aiHiddenDefaultsSeededKey, value ? '1' : '0');
+  Future<void> writeAiHiddenDefaultsSeeded(bool value) async {
+    final p = _currentProject;
+    if (p != null) {
+      p.aiHiddenDefaultsSeeded = value;
+      await _saveProjectAiSettings();
+      return;
+    }
+    await _tokenStore.write(_aiHiddenDefaultsSeededKey, value ? '1' : '0');
+  }
 
   /// Persists the open document into the workspace: no file is downloaded.
   ///
