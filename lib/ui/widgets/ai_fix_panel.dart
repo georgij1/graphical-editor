@@ -1203,9 +1203,26 @@ class _MarkdownText extends StatelessWidget {
 
     for (final raw in lines) {
       final line = raw;
+      final mHeading = RegExp(r'^(#{1,6})\s+(.*)$').firstMatch(line.trimLeft());
       final mBullet = RegExp(r'^(\s*)[-*]\s+(.*)$').firstMatch(line);
       final mNum = RegExp(r'^(\s*)(\d+)[.)]\s+(.*)$').firstMatch(line);
-      if (mBullet != null) {
+      if (mHeading != null) {
+        flushPara();
+        final level = mHeading.group(1)!.length;
+        final content = mHeading.group(2) ?? '';
+        if (children.isNotEmpty) children.add(const SizedBox(height: 6));
+        final fontSize = switch (level) {
+          1 => 18.0,
+          2 => 16.0,
+          3 => 14.5,
+          4 => 13.5,
+          _ => 13.0,
+        };
+        children.add(SelectableText.rich(
+          _inlineSpans(content, theme, boldAll: true),
+          style: TextStyle(fontSize: fontSize, height: 1.3, fontWeight: FontWeight.w700),
+        ));
+      } else if (mBullet != null) {
         flushPara();
         final indent = (mBullet.group(1) ?? '').length;
         final content = mBullet.group(2) ?? '';
