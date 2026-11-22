@@ -40,6 +40,7 @@ class _GitignoreEditorState extends State<GitignoreEditor> {
     _text.addListener(_onChanged);
     widget.controller.addListener(_onControllerChanged);
     _focusNode.addListener(_onFocusChanged);
+    widget.controller.aiFixHandler = _fixWithAi;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _syncHighlighting();
     });
@@ -63,6 +64,9 @@ class _GitignoreEditorState extends State<GitignoreEditor> {
   @override
   void dispose() {
     _hideSuggestions();
+    if (identical(widget.controller.aiFixHandler, _fixWithAi)) {
+      widget.controller.aiFixHandler = null;
+    }
     widget.controller.removeListener(_onControllerChanged);
     _text.removeListener(_onChanged);
     _focusNode.removeListener(_onFocusChanged);
@@ -118,6 +122,22 @@ class _GitignoreEditorState extends State<GitignoreEditor> {
         behavior: SnackBarBehavior.floating,
         duration: const Duration(seconds: 2),
       ));
+  }
+
+  Future<void> _fixWithAi() async {
+    widget.controller.openAiFixPanel(
+      path: widget.controller.codePath,
+      source: _text.text,
+      errors: _validation.issues.map((i) => i.toString()).toList(),
+      onApply: (fixed) {
+        if (!mounted) return;
+        _text.text = fixed;
+        setState(() {
+          _validation = _validate(_text.text);
+        });
+        widget.controller.applyCode(_text.text);
+      },
+    );
   }
 
   ValidationResult _validate(String source) =>

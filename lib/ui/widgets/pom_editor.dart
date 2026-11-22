@@ -35,6 +35,7 @@ class _PomEditorState extends State<PomEditor> {
     _lastEpoch = widget.controller.codeEpoch;
     _text.addListener(_onChanged);
     widget.controller.addListener(_onControllerChanged);
+    widget.controller.aiFixHandler = _fixWithAi;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _syncHighlighting();
     });
@@ -56,6 +57,9 @@ class _PomEditorState extends State<PomEditor> {
 
   @override
   void dispose() {
+    if (identical(widget.controller.aiFixHandler, _fixWithAi)) {
+      widget.controller.aiFixHandler = null;
+    }
     widget.controller.removeListener(_onControllerChanged);
     _text.removeListener(_onChanged);
     _text.dispose();
@@ -144,6 +148,24 @@ class _PomEditorState extends State<PomEditor> {
         behavior: SnackBarBehavior.floating,
         duration: const Duration(seconds: 2),
       ));
+  }
+
+  Future<void> _fixWithAi() async {
+    widget.controller.openAiFixPanel(
+      path: widget.controller.codePath,
+      source: _text.text,
+      errors: _validation.issues
+          .map((i) => i.toString())
+          .toList(),
+      onApply: (fixed) {
+        if (!mounted) return;
+        _text.text = fixed;
+        setState(() {
+          _validation = _validate(_text.text);
+        });
+        widget.controller.applyCode(_text.text);
+      },
+    );
   }
 
   static const List<String> _scopes = <String>[

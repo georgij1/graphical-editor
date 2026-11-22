@@ -72,6 +72,7 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
     widget.controller.addListener(_onControllerChanged);
     _focusNode.addListener(_onFocusChanged);
     _editorScrollController.addListener(_onEditorScroll);
+    widget.controller.aiFixHandler = _fixWithAi;
     _recordLocalCheckSnapshot(_text.text, _validation);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _syncHighlighting();
@@ -113,6 +114,9 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
     _checkRecordTimer?.cancel();
     _editorScrollController.removeListener(_onEditorScroll);
     _hideSuggestions();
+    if (identical(widget.controller.aiFixHandler, _fixWithAi)) {
+      widget.controller.aiFixHandler = null;
+    }
     widget.controller.removeListener(_onControllerChanged);
     _text.removeListener(_onChanged);
     _focusNode.removeListener(_onFocusChanged);
@@ -172,6 +176,24 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
         behavior: SnackBarBehavior.floating,
         duration: const Duration(seconds: 2),
       ));
+  }
+
+  Future<void> _fixWithAi() async {
+    widget.controller.openAiFixPanel(
+      path: widget.controller.codePath,
+      source: _text.text,
+      errors: _validation.issues.map((i) => i.toString()).toList(),
+      onApply: (fixed) {
+        if (!mounted) return;
+        _text.text = fixed;
+        final validation = _validate(_text.text);
+        setState(() {
+          _validation = validation;
+        });
+        widget.controller.applyCode(_text.text);
+        _recordLocalCheckSnapshot(_text.text, validation);
+      },
+    );
   }
 
   ValidationResult _validate(String source) =>

@@ -46,6 +46,7 @@ class _SettingsGradleEditorState extends State<SettingsGradleEditor> {
     _text.addListener(_onChanged);
     widget.controller.addListener(_onControllerChanged);
     _editorScrollController.addListener(_onEditorScroll);
+    widget.controller.aiFixHandler = _fixWithAi;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         _syncHighlighting();
@@ -88,6 +89,9 @@ class _SettingsGradleEditorState extends State<SettingsGradleEditor> {
   void dispose() {
     _remoteCheckTimer?.cancel();
     _remoteCheckSeq++;
+    if (identical(widget.controller.aiFixHandler, _fixWithAi)) {
+      widget.controller.aiFixHandler = null;
+    }
     _editorScrollController.removeListener(_onEditorScroll);
     widget.controller.removeListener(_onControllerChanged);
     _text.removeListener(_onChanged);
@@ -146,6 +150,25 @@ class _SettingsGradleEditorState extends State<SettingsGradleEditor> {
           duration: const Duration(seconds: 2),
         ),
       );
+  }
+
+  Future<void> _fixWithAi() async {
+    widget.controller.openAiFixPanel(
+      path: widget.controller.codePath,
+      source: _text.text,
+      errors: _remoteIssues
+          .map((d) => '${d.kind} line ${d.line}: ${d.message}')
+          .toList(),
+      onApply: (fixed) {
+        if (!mounted) return;
+        _text.text = fixed;
+        setState(() {
+          _remoteIssues = const <BuildDiagnostic>[];
+        });
+        widget.controller.applyCode(_text.text);
+        _scheduleRemoteCheck();
+      },
+    );
   }
 
   // --------------------------- Remote checks -----------------------------
