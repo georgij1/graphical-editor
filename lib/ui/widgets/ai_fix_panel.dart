@@ -29,6 +29,7 @@ class _AiChatPanelState extends State<AiChatPanel> {
 
   List<String> _remoteModels = const <String>[];
   List<AiModelConfig> _customModels = const <AiModelConfig>[];
+  List<String> _hiddenModelIds = const <String>[];
   String? _selectedModelId;
   bool _loadingModels = true;
   bool _busy = false;
@@ -82,9 +83,10 @@ class _AiChatPanelState extends State<AiChatPanel> {
       loadError = error.toString();
     }
     final custom = await widget.controller.readCustomAiModels();
+    final hidden = await widget.controller.readHiddenAiModels();
     final saved = await widget.controller.readAiModel();
     if (!mounted) return;
-    final allIds = _allModelIds(remote: remote, custom: custom, savedId: saved);
+    final allIds = _allModelIds(remote: remote, custom: custom, hidden: hidden, savedId: saved);
     String? selected = saved;
     if (selected == null || (allIds.isNotEmpty && !allIds.contains(selected))) {
       selected = allIds.isNotEmpty ? allIds.first : saved;
@@ -92,6 +94,7 @@ class _AiChatPanelState extends State<AiChatPanel> {
     setState(() {
       _remoteModels = remote;
       _customModels = custom;
+      _hiddenModelIds = hidden;
       _loadingModels = false;
       _error = loadError != null && allIds.isEmpty ? loadError : _error;
       _selectedModelId = selected;
@@ -107,8 +110,10 @@ class _AiChatPanelState extends State<AiChatPanel> {
   List<String> _allModelIds({
     required List<String> remote,
     required List<AiModelConfig> custom,
+    List<String> hidden = const <String>[],
     String? savedId,
   }) {
+    final hiddenSet = hidden.map((e) => e.trim()).where((e) => e.isNotEmpty).toSet();
     final out = <String>[];
     final seen = <String>{};
     void addId(String? id) {
@@ -116,6 +121,7 @@ class _AiChatPanelState extends State<AiChatPanel> {
       if (s.isEmpty || !seen.add(s)) return;
       final parsed = EditorController.parseAiModelSelection(s);
       if (parsed.name.trim().toLowerCase() == 'codellama:latest') return;
+      if (hiddenSet.contains(s)) return;
       out.add(s);
     }
     for (final m in custom) {
@@ -129,7 +135,7 @@ class _AiChatPanelState extends State<AiChatPanel> {
   }
 
   List<String> get _allModelIdsCurrent =>
-      _allModelIds(remote: _remoteModels, custom: _customModels, savedId: _selectedModelId);
+      _allModelIds(remote: _remoteModels, custom: _customModels, hidden: _hiddenModelIds, savedId: _selectedModelId);
 
   String _modelLabel(String id) {
     final parsed = EditorController.parseAiModelSelection(id);
@@ -165,7 +171,7 @@ class _AiChatPanelState extends State<AiChatPanel> {
     await widget.controller.removeCustomAiModel(name: parsed.name, baseUrl: parsed.baseUrl);
     final custom = await widget.controller.readCustomAiModels();
     if (!mounted) return;
-    final allIds = _allModelIds(remote: _remoteModels, custom: custom, savedId: null);
+    final allIds = _allModelIds(remote: _remoteModels, custom: custom, hidden: _hiddenModelIds, savedId: null);
     String? next;
     if (allIds.isNotEmpty) {
       next = allIds.first;
@@ -249,6 +255,226 @@ class _AiChatPanelState extends State<AiChatPanel> {
       _selectedModelId = newId;
     });
     await widget.controller.writeAiModel(newId);
+  }
+
+  Future<void> _showManageModelsDialog() async {
+    final hidden = Set<String>.from(_hiddenModelIds);
+    final custom = List<AiModelConfig>.from(_customModels);
+    final remote = List<String>.from(_remoteModels);
+
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setDialogState) {
+            Future<void> saveHidden() async {
+              await widget.controller.writeHiddenAiModels(hidden.toList());
+            }
+
+            Widget sectionTitle(String text) => Padding(
+                  padding: const EdgeInsets.only(top: 8, bottom: 4),
+                  child: Text(
+                    text,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: Theme.of(ctx).colorScheme.primary,
+                    ),
+                  ),
+                );
+
+            final remoteIds = <String>[
+              for (final name in remote)
+                if (name.trim().toLowerCase() != 'codellama:latest')
+                  _modelId(name: name),
+            ];
+            final customIds = <String>[
+              for (final m in custom) _modelId(name: m.name, baseUrl: m.baseUrl),
+            ];
+
+            return AlertDialog(
+              title: Text(context.tr('Manage models')),
+              content: SizedBox(
+                width: 520,
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxHeight: 420),
+                  child: SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: <Widget>[
+                        if (remoteIds.isNotEmpty) sectionTitle(context.tr('Ollama models')),
+                        for (final id in remoteIds)
+                          CheckboxListTile(
+                            dense: true,
+                            contentPadding: EdgeInsets.zero,
+                            value: !hidden.contains(id) && EditorController.parseAiModelSelection(id).name.trim().toLowerCase() != 'codellama:latest',
+                            onChanged: EditorController.parseAiModelSelection(id).name.trim().toLowerCase() == 'codellama:latest'
+                                ? null
+                                : (v) async {
+                                    setDialogState(() {
+                                      if (v == true) {
+                                        hidden.remove(id);
+                                      } else {
+                                        hidden.add(id);
+                                      }
+                                    });
+                                    await saveHidden();
+                                  },
+                            title: Text(
+                              _modelLabel(id),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        sectionTitle(context.tr('Custom models')),
+                        if (customIds.isEmpty)
+                          Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 4),
+                            child: Text(
+                              context.tr('No custom models'),
+                              style: TextStyle(fontSize: 12, color: Theme.of(ctx).colorScheme.onSurfaceVariant),
+                            ),
+                          ),
+                        for (var i = 0; i < custom.length; i++)
+                          ListTile(
+                            dense: true,
+                            contentPadding: EdgeInsets.zero,
+                            title: Text(_modelLabel(customIds[i]), overflow: TextOverflow.ellipsis),
+                            trailing: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: <Widget>[
+                                IconButton(
+                                  tooltip: context.tr('Edit model'),
+                                  icon: const Icon(Icons.edit_outlined, size: 18),
+                                  onPressed: () async {
+                                    final m = custom[i];
+                                    final nameController = TextEditingController(text: m.name);
+                                    final urlController = TextEditingController(text: m.baseUrl ?? '');
+                                    final result = await showDialog<({String name, String url})>(
+                                      context: ctx,
+                                      builder: (ctx2) => AlertDialog(
+                                        title: Text(context.tr('Edit model')),
+                                        content: Column(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: <Widget>[
+                                            TextField(
+                                              controller: nameController,
+                                              decoration: InputDecoration(labelText: context.tr('Model name')),
+                                            ),
+                                            const SizedBox(height: 8),
+                                            TextField(
+                                              controller: urlController,
+                                              decoration: InputDecoration(labelText: context.tr('Base URL (optional)')),
+                                            ),
+                                          ],
+                                        ),
+                                        actions: <Widget>[
+                                          TextButton(onPressed: () => Navigator.of(ctx2).pop(), child: Text(context.tr('Cancel'))),
+                                          FilledButton(
+                                            onPressed: () => Navigator.of(ctx2).pop((name: nameController.text.trim(), url: urlController.text.trim())),
+                                            child: Text(context.tr('Save')),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                    if (result == null || result.name.isEmpty) return;
+                                    await widget.controller.updateCustomAiModel(
+                                      oldName: m.name,
+                                      oldBaseUrl: m.baseUrl,
+                                      newName: result.name,
+                                      newBaseUrl: result.url.isEmpty ? null : result.url,
+                                    );
+                                    final updated = await widget.controller.readCustomAiModels();
+                                    setDialogState(() {
+                                      custom
+                                        ..clear()
+                                        ..addAll(updated);
+                                    });
+                                  },
+                                ),
+                                IconButton(
+                                  tooltip: context.tr('Delete model'),
+                                  icon: const Icon(Icons.delete_outline, size: 18),
+                                  onPressed: () async {
+                                    final m = custom[i];
+                                    await widget.controller.removeCustomAiModel(name: m.name, baseUrl: m.baseUrl);
+                                    final updated = await widget.controller.readCustomAiModels();
+                                    setDialogState(() {
+                                      custom
+                                        ..clear()
+                                        ..addAll(updated);
+                                    });
+                                  },
+                                ),
+                              ],
+                            ),
+                          ),
+                        const SizedBox(height: 8),
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: OutlinedButton.icon(
+                            onPressed: () async {
+                              final nameController = TextEditingController();
+                              final urlController = TextEditingController();
+                              final result = await showDialog<({String name, String url})>(
+                                context: ctx,
+                                builder: (ctx2) => AlertDialog(
+                                  title: Text(context.tr('Add model')),
+                                  content: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: <Widget>[
+                                      TextField(
+                                        controller: nameController,
+                                        decoration: InputDecoration(labelText: context.tr('Model name')),
+                                      ),
+                                      const SizedBox(height: 8),
+                                      TextField(
+                                        controller: urlController,
+                                        decoration: InputDecoration(labelText: context.tr('Base URL (optional)')),
+                                      ),
+                                    ],
+                                  ),
+                                  actions: <Widget>[
+                                    TextButton(onPressed: () => Navigator.of(ctx2).pop(), child: Text(context.tr('Cancel'))),
+                                    FilledButton(
+                                      onPressed: () => Navigator.of(ctx2).pop((name: nameController.text.trim(), url: urlController.text.trim())),
+                                      child: Text(context.tr('Add')),
+                                    ),
+                                  ],
+                                ),
+                              );
+                              if (result == null || result.name.isEmpty) return;
+                              await widget.controller.addCustomAiModel(name: result.name, baseUrl: result.url.isEmpty ? null : result.url);
+                              final updated = await widget.controller.readCustomAiModels();
+                              setDialogState(() {
+                                custom
+                                  ..clear()
+                                  ..addAll(updated);
+                              });
+                            },
+                            icon: const Icon(Icons.add, size: 18),
+                            label: Text(context.tr('Add model')),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              actions: <Widget>[
+                FilledButton(
+                  onPressed: () => Navigator.of(ctx).pop(),
+                  child: Text(context.tr('Done')),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    if (!mounted) return;
+    await _loadModels();
   }
 
   Future<void> _addCustomModel() async {
@@ -930,6 +1156,11 @@ class _AiChatPanelState extends State<AiChatPanel> {
               child: Text(_modelLabel(id), overflow: TextOverflow.ellipsis),
             ),
           const Divider(height: 8),
+          MenuItemButton(
+            onPressed: _showManageModelsDialog,
+            leadingIcon: const Icon(Icons.tune, size: 18),
+            child: Text(context.tr('Manage models')),
+          ),
           MenuItemButton(
             onPressed: _addCustomModel,
             leadingIcon: const Icon(Icons.add, size: 18),

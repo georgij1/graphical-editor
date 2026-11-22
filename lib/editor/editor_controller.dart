@@ -1351,6 +1351,7 @@ class EditorController extends ChangeNotifier {
   static const String _rightPanelWidthKey = 'right_panel_width';
   static const String _aiChatsKey = 'ai_chats_v1';
   static const String _aiCustomModelsKey = 'ai_custom_models_v1';
+  static const String _aiHiddenModelsKey = 'ai_hidden_models_v1';
 
   /// Share of the right column given to the project tree, or null while the
   /// divider has not been dragged and the pane should fit its content.
@@ -1558,6 +1559,36 @@ class EditorController extends ChangeNotifier {
           },
       ]),
     );
+  }
+
+  Future<List<String>> readHiddenAiModels() async {
+    final raw = await _tokenStore.read(_aiHiddenModelsKey);
+    if (raw == null || raw.isEmpty) return const <String>[];
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is! List) return const <String>[];
+      final out = <String>[];
+      final seen = <String>{};
+      for (final item in decoded) {
+        final s = item.toString().trim();
+        if (s.isEmpty || !seen.add(s)) continue;
+        out.add(s);
+      }
+      return out;
+    } catch (_) {
+      return const <String>[];
+    }
+  }
+
+  Future<void> writeHiddenAiModels(List<String> ids) async {
+    final out = <String>[];
+    final seen = <String>{};
+    for (final id in ids) {
+      final s = id.trim();
+      if (s.isEmpty || !seen.add(s)) continue;
+      out.add(s);
+    }
+    await _tokenStore.write(_aiHiddenModelsKey, jsonEncode(out));
   }
 
   /// Persists the open document into the workspace: no file is downloaded.
