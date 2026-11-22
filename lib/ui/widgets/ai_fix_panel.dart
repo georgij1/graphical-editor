@@ -951,10 +951,7 @@ class _AssistantMessageContent extends StatelessWidget {
           else if (seg.content.trim().isNotEmpty)
             Padding(
               padding: const EdgeInsets.only(bottom: 6),
-              child: SelectableText(
-                seg.content.trim(),
-                style: const TextStyle(fontSize: 13, height: 1.4),
-              ),
+              child: _MarkdownText(text: seg.content.trim()),
             ),
       ],
     );
@@ -1082,6 +1079,114 @@ class _CodeBlock extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+class _MarkdownText extends StatelessWidget {
+  const _MarkdownText({required this.text});
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final lines = text.replaceAll('\r\n', '\n').split('\n');
+    final children = <Widget>[];
+    final para = <String>[];
+
+    void flushPara() {
+      if (para.isEmpty) return;
+      final t = para.join('\n').trim();
+      para.clear();
+      if (t.isEmpty) return;
+      children.add(SelectableText.rich(
+        _inlineSpans(t, theme),
+        style: const TextStyle(fontSize: 13, height: 1.4),
+      ));
+    }
+
+    for (final raw in lines) {
+      final line = raw;
+      final mBullet = RegExp(r'^(\s*)[-*]\s+(.*)$').firstMatch(line);
+      final mNum = RegExp(r'^(\s*)(\d+)[.)]\s+(.*)$').firstMatch(line);
+      if (mBullet != null) {
+        flushPara();
+        final indent = (mBullet.group(1) ?? '').length;
+        final content = mBullet.group(2) ?? '';
+        children.add(_listItem(context, '•', content, indent));
+      } else if (mNum != null) {
+        flushPara();
+        final indent = (mNum.group(1) ?? '').length;
+        final num = mNum.group(2) ?? '1';
+        final content = mNum.group(3) ?? '';
+        children.add(_listItem(context, '$num.', content, indent));
+      } else if (line.trim().isEmpty) {
+        flushPara();
+        if (children.isNotEmpty) children.add(const SizedBox(height: 4));
+      } else {
+        para.add(line);
+      }
+    }
+    flushPara();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: children,
+    );
+  }
+
+  Widget _listItem(BuildContext context, String marker, String content, int indent) {
+    final theme = Theme.of(context);
+    final leftPad = (indent ~/ 2) * 14.0;
+    final isKey = content.trim().endsWith(':') && content.trim().length < 60;
+    return Padding(
+      padding: EdgeInsets.only(left: leftPad, bottom: 3),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          SizedBox(
+            width: 18,
+            child: Text(
+              marker,
+              style: TextStyle(fontSize: 13, height: 1.4, color: theme.colorScheme.primary),
+            ),
+          ),
+          Expanded(
+            child: SelectableText.rich(
+              _inlineSpans(content, theme, boldAll: isKey),
+              style: const TextStyle(fontSize: 13, height: 1.4),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  static TextSpan _inlineSpans(String text, ThemeData theme, {bool boldAll = false}) {
+    final spans = <InlineSpan>[];
+    final re = RegExp(r'`([^`]+)`');
+    var last = 0;
+    for (final m in re.allMatches(text)) {
+      if (m.start > last) {
+        spans.add(TextSpan(text: text.substring(last, m.start)));
+      }
+      spans.add(TextSpan(
+        text: m.group(1),
+        style: TextStyle(
+          fontFamily: 'monospace',
+          fontSize: 12.5,
+          backgroundColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.7),
+          color: theme.colorScheme.onSurface,
+        ),
+      ));
+      last = m.end;
+    }
+    if (last < text.length) {
+      spans.add(TextSpan(text: text.substring(last)));
+    }
+    if (spans.isEmpty) spans.add(TextSpan(text: text));
+    return TextSpan(
+      style: TextStyle(fontWeight: boldAll ? FontWeight.w600 : FontWeight.normal),
+      children: spans,
     );
   }
 }
