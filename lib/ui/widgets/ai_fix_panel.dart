@@ -456,6 +456,31 @@ class _AiChatPanelState extends State<AiChatPanel> {
                             label: Text(context.tr('Add model')),
                           ),
                         ),
+                        sectionTitle(context.tr('Ignored models')),
+                        if (hidden.isEmpty)
+                          Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 4),
+                            child: Text(
+                              context.tr('No ignored models'),
+                              style: TextStyle(fontSize: 12, color: Theme.of(ctx).colorScheme.onSurfaceVariant),
+                            ),
+                          ),
+                        for (final id in hidden.toList()..sort())
+                          ListTile(
+                            dense: true,
+                            contentPadding: EdgeInsets.zero,
+                            title: Text(_modelLabel(id), overflow: TextOverflow.ellipsis),
+                            trailing: IconButton(
+                              tooltip: context.tr('Restore'),
+                              icon: const Icon(Icons.visibility_outlined, size: 18),
+                              onPressed: () async {
+                                setDialogState(() {
+                                  hidden.remove(id);
+                                });
+                                await saveHidden();
+                              },
+                            ),
+                          ),
                       ],
                     ),
                   ),
