@@ -731,12 +731,7 @@ class _AiChatPanelState extends State<AiChatPanel> {
             ),
             child: (!isUser && msg.content.trim().isEmpty && _busy)
                 ? _ThinkingIndicator(elapsedSeconds: _elapsedSeconds)
-                : isUser
-                    ? SelectableText(
-                        msg.content,
-                        style: const TextStyle(fontSize: 13),
-                      )
-                    : _AssistantMessageContent(text: msg.content),
+                : _AssistantMessageContent(text: msg.content),
           ),
           if (!isUser && msg.content.trim().isNotEmpty)
             Padding(
