@@ -1352,6 +1352,7 @@ class EditorController extends ChangeNotifier {
   static const String _aiChatsKey = 'ai_chats_v1';
   static const String _aiCustomModelsKey = 'ai_custom_models_v1';
   static const String _aiHiddenModelsKey = 'ai_hidden_models_v1';
+  static const String _aiHiddenDefaultsSeededKey = 'ai_hidden_defaults_seeded_v1';
 
   /// Share of the right column given to the project tree, or null while the
   /// divider has not been dragged and the pane should fit its content.
@@ -1590,6 +1591,14 @@ class EditorController extends ChangeNotifier {
     }
     await _tokenStore.write(_aiHiddenModelsKey, jsonEncode(out));
   }
+
+  Future<bool> readAiHiddenDefaultsSeeded() async {
+    final raw = await _tokenStore.read(_aiHiddenDefaultsSeededKey);
+    return raw == '1';
+  }
+
+  Future<void> writeAiHiddenDefaultsSeeded(bool value) =>
+      _tokenStore.write(_aiHiddenDefaultsSeededKey, value ? '1' : '0');
 
   /// Persists the open document into the workspace: no file is downloaded.
   ///

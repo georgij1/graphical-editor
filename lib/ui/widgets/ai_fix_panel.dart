@@ -83,7 +83,15 @@ class _AiChatPanelState extends State<AiChatPanel> {
       loadError = error.toString();
     }
     final custom = await widget.controller.readCustomAiModels();
-    final hidden = await widget.controller.readHiddenAiModels();
+    var hidden = await widget.controller.readHiddenAiModels();
+    final seeded = await widget.controller.readAiHiddenDefaultsSeeded();
+    if (!seeded) {
+      const defaultHidden = <String>['codellama:latest'];
+      final merged = <String>{...hidden, ...defaultHidden}.toList();
+      hidden = merged;
+      await widget.controller.writeHiddenAiModels(hidden);
+      await widget.controller.writeAiHiddenDefaultsSeeded(true);
+    }
     final saved = await widget.controller.readAiModel();
     if (!mounted) return;
     final allIds = _allModelIds(remote: remote, custom: custom, hidden: hidden, savedId: saved);
@@ -119,8 +127,6 @@ class _AiChatPanelState extends State<AiChatPanel> {
     void addId(String? id) {
       final s = (id ?? '').trim();
       if (s.isEmpty || !seen.add(s)) return;
-      final parsed = EditorController.parseAiModelSelection(s);
-      if (parsed.name.trim().toLowerCase() == 'codellama:latest') return;
       if (hiddenSet.contains(s)) return;
       out.add(s);
     }
@@ -284,9 +290,7 @@ class _AiChatPanelState extends State<AiChatPanel> {
                 );
 
             final remoteIds = <String>[
-              for (final name in remote)
-                if (name.trim().toLowerCase() != 'codellama:latest')
-                  _modelId(name: name),
+              for (final name in remote) _modelId(name: name),
             ];
             final customIds = <String>[
               for (final m in custom) _modelId(name: m.name, baseUrl: m.baseUrl),
@@ -308,19 +312,17 @@ class _AiChatPanelState extends State<AiChatPanel> {
                           CheckboxListTile(
                             dense: true,
                             contentPadding: EdgeInsets.zero,
-                            value: !hidden.contains(id) && EditorController.parseAiModelSelection(id).name.trim().toLowerCase() != 'codellama:latest',
-                            onChanged: EditorController.parseAiModelSelection(id).name.trim().toLowerCase() == 'codellama:latest'
-                                ? null
-                                : (v) async {
-                                    setDialogState(() {
-                                      if (v == true) {
-                                        hidden.remove(id);
-                                      } else {
-                                        hidden.add(id);
-                                      }
-                                    });
-                                    await saveHidden();
-                                  },
+                            value: !hidden.contains(id),
+                            onChanged: (v) async {
+                              setDialogState(() {
+                                if (v == true) {
+                                  hidden.remove(id);
+                                } else {
+                                  hidden.add(id);
+                                }
+                              });
+                              await saveHidden();
+                            },
                             title: Text(
                               _modelLabel(id),
                               overflow: TextOverflow.ellipsis,
