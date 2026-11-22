@@ -498,6 +498,7 @@ class AppLocalizations {
     'Running test...': 'Запуск теста...',
     'Test passed': 'Тест пройден',
     'Test failed': 'Тест не пройден',
+    'Key reasons': 'Ключевые причины',
     'Copied to clipboard.': 'Скопировано в буфер обмена.',
     'Restore original script': 'Восстановить оригинальный скрипт',
     'Switch to Gradle': 'Перейти на Gradle',

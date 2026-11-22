@@ -138,6 +138,75 @@ class _EditorPageState extends State<EditorPage> {
 
   void _showCode() => _controller.editSceneSource();
 
+  List<String> _extractTestFailureReasons(String output) {
+    if (output.trim().isEmpty) return const <String>[];
+    final lines = output.replaceAll('\r\n', '\n').split('\n');
+    final reasons = <String>[];
+    final seen = <String>{};
+
+    void add(String s) {
+      final t = s.trim();
+      if (t.isEmpty) return;
+      final key = t.toLowerCase();
+      if (seen.add(key)) reasons.add(t);
+    }
+
+    for (var i = 0; i < lines.length; i++) {
+      final line = lines[i].trim();
+      if (line.isEmpty) continue;
+      final lower = line.toLowerCase();
+
+      final isCompilation = lower.contains('compilation error') ||
+          lower.contains('compilation failure');
+      final isTestsSummary = RegExp(r'tests run:\s*\d+', caseSensitive: false).hasMatch(line) &&
+          (lower.contains('failures:') || lower.contains('errors:') || lower.contains('skipped:'));
+      final isBuildFailure = lower.startsWith('[error]') && lower.contains('failed to execute goal');
+      final isCannotFind = lower.contains('cannot find symbol') ||
+          lower.contains('symbol:') ||
+          lower.contains('location:');
+      final isAssertion = lower.contains('assertionfailederror') ||
+          lower.contains('comparisonfailure') ||
+          lower.contains('expected:') ||
+          lower.contains('but was:');
+      final isException = RegExp(r'\b[A-Za-z0-9_.]+(Exception|Error)\b').hasMatch(line) &&
+          (lower.contains('[error]') || lower.contains('at ') || lower.contains('caused by'));
+
+      if (isCompilation || isTestsSummary || isBuildFailure || isAssertion) {
+        add(line.replaceFirst(RegExp(r'^\[ERROR\]\s*'), ''));
+        continue;
+      }
+      if (isCannotFind) {
+        add(line.replaceFirst(RegExp(r'^\[ERROR\]\s*'), ''));
+        // include next related symbol/location lines if present
+        for (var j = i + 1; j < lines.length && j <= i + 2; j++) {
+          final next = lines[j].trim().replaceFirst(RegExp(r'^\[ERROR\]\s*'), '');
+          final nl = next.toLowerCase();
+          if (nl.startsWith('symbol:') || nl.startsWith('location:')) {
+            add(next);
+            i = j;
+          } else {
+            break;
+          }
+        }
+        continue;
+      }
+      if (isException && reasons.length < 8) {
+        add(line.replaceFirst(RegExp(r'^\[ERROR\]\s*'), ''));
+      }
+    }
+
+    if (reasons.isEmpty) {
+      for (final line in lines) {
+        final t = line.trim();
+        if (t.toLowerCase().startsWith('[error]')) {
+          add(t.replaceFirst(RegExp(r'^\[ERROR\]\s*'), ''));
+          if (reasons.length >= 5) break;
+        }
+      }
+    }
+    return reasons.take(8).toList();
+  }
+
   Future<void> _runCurrentTest() async {
     final path = _controller.codePath;
     if (path.isEmpty) return;
@@ -177,6 +246,7 @@ class _EditorPageState extends State<EditorPage> {
     final success = result?.success ?? false;
     final command = result?.command ?? '';
     final exitCode = result?.exitCode;
+    final reasons = success ? const <String>[] : _extractTestFailureReasons(output);
 
     await showDialog<void>(
       context: context,
@@ -211,6 +281,47 @@ class _EditorPageState extends State<EditorPage> {
                         fontFamily: 'monospace',
                         fontSize: 12,
                         color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                if (reasons.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.errorContainer.withValues(alpha: 0.35),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: theme.colorScheme.error.withValues(alpha: 0.25)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: <Widget>[
+                          Text(
+                            context.tr('Key reasons'),
+                            style: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              color: theme.colorScheme.error,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          for (final reason in reasons)
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 4),
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: <Widget>[
+                                  Text('• ', style: TextStyle(color: theme.colorScheme.error)),
+                                  Expanded(
+                                    child: SelectableText(
+                                      reason,
+                                      style: const TextStyle(fontSize: 12.5, height: 1.35),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                        ],
                       ),
                     ),
                   ),
