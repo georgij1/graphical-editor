@@ -1264,7 +1264,7 @@ class _MarkdownText extends StatelessWidget {
     var last = 0;
     for (final m in re.allMatches(text)) {
       if (m.start > last) {
-        spans.add(TextSpan(text: text.substring(last, m.start)));
+        _appendFormattedText(spans, text.substring(last, m.start));
       }
       spans.add(TextSpan(
         text: m.group(1),
@@ -1278,12 +1278,34 @@ class _MarkdownText extends StatelessWidget {
       last = m.end;
     }
     if (last < text.length) {
-      spans.add(TextSpan(text: text.substring(last)));
+      _appendFormattedText(spans, text.substring(last));
     }
-    if (spans.isEmpty) spans.add(TextSpan(text: text));
+    if (spans.isEmpty) _appendFormattedText(spans, text);
     return TextSpan(
       style: TextStyle(fontWeight: boldAll ? FontWeight.w600 : FontWeight.normal),
       children: spans,
     );
+  }
+
+  static void _appendFormattedText(List<InlineSpan> spans, String text) {
+    final boldRe = RegExp(r'\*\*(.+?)\*\*|__(.+?)__');
+    var last = 0;
+    for (final m in boldRe.allMatches(text)) {
+      if (m.start > last) {
+        spans.add(TextSpan(text: text.substring(last, m.start)));
+      }
+      final boldText = m.group(1) ?? m.group(2) ?? '';
+      spans.add(TextSpan(
+        text: boldText,
+        style: const TextStyle(fontWeight: FontWeight.w700),
+      ));
+      last = m.end;
+    }
+    if (last < text.length) {
+      spans.add(TextSpan(text: text.substring(last)));
+    }
+    if (last == 0 && text.isEmpty) {
+      spans.add(const TextSpan(text: ''));
+    }
   }
 }
