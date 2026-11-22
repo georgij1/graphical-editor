@@ -114,6 +114,8 @@ class _AiChatPanelState extends State<AiChatPanel> {
     void addId(String? id) {
       final s = (id ?? '').trim();
       if (s.isEmpty || !seen.add(s)) return;
+      final parsed = EditorController.parseAiModelSelection(s);
+      if (parsed.name.trim().toLowerCase() == 'codellama:latest') return;
       out.add(s);
     }
     for (final m in custom) {
