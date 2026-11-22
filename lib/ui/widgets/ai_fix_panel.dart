@@ -783,6 +783,12 @@ class _AiChatPanelState extends State<AiChatPanel> {
     final blocks = !isUser ? _extractCodeBlocks(msg.content) : const <String>[];
     final showingTranslation = _showTranslation.contains(msg);
     final displayedContent = showingTranslation ? (_translations[msg] ?? msg.content) : msg.content;
+    final activeChat = widget.controller.activeAiChat;
+    final isStreaming = _busy &&
+        !isUser &&
+        activeChat != null &&
+        activeChat.messages.isNotEmpty &&
+        identical(activeChat.messages.last, msg);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Column(
@@ -799,7 +805,7 @@ class _AiChatPanelState extends State<AiChatPanel> {
                 ? _ThinkingIndicator(elapsedSeconds: _elapsedSeconds)
                 : _AssistantMessageContent(text: displayedContent),
           ),
-          if (!isUser && msg.content.trim().isNotEmpty)
+          if (!isUser && msg.content.trim().isNotEmpty && !isStreaming)
             Padding(
               padding: const EdgeInsets.only(top: 4),
               child: Wrap(
