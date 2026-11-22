@@ -614,6 +614,7 @@ class _CodeViewState extends State<CodeView> {
   Future<void> _fixWithAi() async {
     final controller = widget.controller;
     controller.openAiFixPanel(
+      newChat: true,
       path: controller.codePath,
       source: _text.text,
       errors: _effectiveValidation.issues.map((i) => i.toString()).toList(),

@@ -150,6 +150,7 @@ class _GradleEditorState extends State<GradleEditor> {
 
   Future<void> _fixWithAi() async {
     widget.controller.openAiFixPanel(
+      newChat: true,
       path: widget.controller.codePath,
       source: _text.text,
       errors: _remoteIssues

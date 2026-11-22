@@ -152,6 +152,7 @@ class _PomEditorState extends State<PomEditor> {
 
   Future<void> _fixWithAi() async {
     widget.controller.openAiFixPanel(
+      newChat: true,
       path: widget.controller.codePath,
       source: _text.text,
       errors: _validation.issues

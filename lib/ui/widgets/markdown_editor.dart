@@ -180,6 +180,7 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
 
   Future<void> _fixWithAi() async {
     widget.controller.openAiFixPanel(
+      newChat: true,
       path: widget.controller.codePath,
       source: _text.text,
       errors: _validation.issues.map((i) => i.toString()).toList(),

@@ -373,12 +373,14 @@ class EditorController extends ChangeNotifier {
     String? source,
     List<String>? errors,
     void Function(String fixed)? onApply,
+    bool newChat = false,
   }) {
     openAiChatPanel(
       contextPath: path,
       contextSource: source,
       contextErrors: errors,
       onApply: onApply,
+      newChat: newChat,
     );
   }
 
@@ -387,6 +389,7 @@ class EditorController extends ChangeNotifier {
     String? contextSource,
     List<String>? contextErrors,
     void Function(String fixed)? onApply,
+    bool newChat = false,
   }) {
     _aiChatContextPath = contextPath;
     _aiChatContextSource = contextSource;
@@ -394,7 +397,7 @@ class EditorController extends ChangeNotifier {
         ? const <String>[]
         : List<String>.from(contextErrors);
     _aiChatApply = onApply;
-    if (_aiChats.isEmpty) {
+    if (newChat || _aiChats.isEmpty) {
       createAiChat();
     }
     _aiChatPanelOpen = true;
