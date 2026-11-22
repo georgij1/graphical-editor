@@ -599,13 +599,7 @@ class _AiChatPanelState extends State<AiChatPanel> {
                     children: <Widget>[
                       Padding(
                         padding: const EdgeInsets.fromLTRB(8, 6, 8, 0),
-                        child: Row(
-                          children: <Widget>[
-                            Text(context.tr('Model:'), style: const TextStyle(fontSize: 12)),
-                            const SizedBox(width: 6),
-                            Expanded(child: _modelPicker()),
-                          ],
-                        ),
+                        child: _modelPicker(),
                       ),
                       if (_error != null)
                         Padding(
@@ -876,7 +870,7 @@ class _AiChatPanelState extends State<AiChatPanel> {
   Widget _modelPicker() {
     if (_loadingModels) {
       return const SizedBox(
-        height: 20,
+        height: 32,
         child: Align(
           alignment: Alignment.centerLeft,
           child: SizedBox(
@@ -888,66 +882,71 @@ class _AiChatPanelState extends State<AiChatPanel> {
       );
     }
     final all = _allModelIdsCurrent;
-    if (all.isEmpty) {
-      return Row(
-        children: <Widget>[
-          Expanded(
-            child: Text(
-              context.tr('No models found. Is Ollama running?'),
-              style: const TextStyle(fontSize: 12),
-            ),
-          ),
-          IconButton(
-            tooltip: context.tr('Add model'),
-            icon: const Icon(Icons.add, size: 18),
-            visualDensity: VisualDensity.compact,
-            onPressed: _addCustomModel,
-          ),
-        ],
-      );
-    }
-    final value = all.contains(_selectedModelId) ? _selectedModelId : all.first;
-    return Row(
-      children: <Widget>[
-        Expanded(
-          child: DropdownButton<String>(
-            value: value,
-            isExpanded: true,
-            isDense: true,
-            items: <DropdownMenuItem<String>>[
-              for (final id in all)
-                DropdownMenuItem<String>(
-                  value: id,
-                  child: Text(_modelLabel(id), overflow: TextOverflow.ellipsis),
-                ),
-            ],
-            onChanged: (v) {
-              setState(() => _selectedModelId = v);
-              if (v != null) widget.controller.writeAiModel(v);
+    final value = all.contains(_selectedModelId) ? _selectedModelId : (all.isEmpty ? null : all.first);
+    final label = value == null ? context.tr('Model') : _modelLabel(value);
+
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: MenuAnchor(
+        builder: (context, controller, child) {
+          return OutlinedButton.icon(
+            onPressed: () {
+              if (controller.isOpen) {
+                controller.close();
+              } else {
+                controller.open();
+              }
             },
+            icon: const Icon(Icons.smart_toy_outlined, size: 16),
+            label: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 220),
+              child: Text(label, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12)),
+            ),
+            style: OutlinedButton.styleFrom(
+              visualDensity: VisualDensity.compact,
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+          );
+        },
+        menuChildren: <Widget>[
+          if (all.isEmpty)
+            MenuItemButton(
+              onPressed: null,
+              child: Text(context.tr('No models found. Is Ollama running?')),
+            ),
+          for (final id in all)
+            MenuItemButton(
+              onPressed: () {
+                setState(() => _selectedModelId = id);
+                widget.controller.writeAiModel(id);
+              },
+              leadingIcon: Icon(
+                id == value ? Icons.radio_button_checked : Icons.radio_button_unchecked,
+                size: 18,
+              ),
+              child: Text(_modelLabel(id), overflow: TextOverflow.ellipsis),
+            ),
+          const Divider(height: 8),
+          MenuItemButton(
+            onPressed: _addCustomModel,
+            leadingIcon: const Icon(Icons.add, size: 18),
+            child: Text(context.tr('Add model')),
           ),
-        ),
-        IconButton(
-          tooltip: context.tr('Add model'),
-          icon: const Icon(Icons.add, size: 18),
-          visualDensity: VisualDensity.compact,
-          onPressed: _addCustomModel,
-        ),
-        if (_isCustomModelId(value))
-          IconButton(
-            tooltip: context.tr('Edit model'),
-            icon: const Icon(Icons.edit_outlined, size: 18),
-            visualDensity: VisualDensity.compact,
-            onPressed: _editSelectedCustomModel,
-          ),
-        if (_isCustomModelId(value))
-          IconButton(
-            tooltip: context.tr('Delete model'),
-            icon: const Icon(Icons.delete_outline, size: 18),
-            visualDensity: VisualDensity.compact,
-            onPressed: _removeSelectedCustomModel,
-          ),
-      ],
+          if (value != null && _isCustomModelId(value)) ...<Widget>[
+            MenuItemButton(
+              onPressed: _editSelectedCustomModel,
+              leadingIcon: const Icon(Icons.edit_outlined, size: 18),
+              child: Text(context.tr('Edit model')),
+            ),
+            MenuItemButton(
+              onPressed: _removeSelectedCustomModel,
+              leadingIcon: const Icon(Icons.delete_outline, size: 18),
+              child: Text(context.tr('Delete model')),
+            ),
+          ],
+        ],
+      ),
     );
   }
 }
