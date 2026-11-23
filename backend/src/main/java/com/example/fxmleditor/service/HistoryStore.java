@@ -1,13 +1,8 @@
 package com.example.fxmleditor.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -15,51 +10,50 @@ import java.util.concurrent.locks.ReentrantLock;
 
 @Service
 public class HistoryStore {
-    private final Path dataDir;
-    private final ObjectMapper mapper = new ObjectMapper().registerModule(new com.fasterxml.jackson.datatype.jsr310.JavaTimeModule()).disable(com.fasterxml.jackson.databind.SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
+    private static final String PREFIX = "history/";
+    private final MinioStorageService storage;
+    private final ObjectMapper mapper = new ObjectMapper()
+            .registerModule(new com.fasterxml.jackson.datatype.jsr310.JavaTimeModule())
+            .disable(com.fasterxml.jackson.databind.SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
     private final ReentrantLock lock = new ReentrantLock();
 
-    public HistoryStore(@Value("${app.data-dir}") String dataDir) {
-        this.dataDir = Paths.get(dataDir);
+    public HistoryStore(MinioStorageService storage) {
+        this.storage = storage;
     }
 
-    public void init() throws IOException {
-        Files.createDirectories(dataDir.resolve("history"));
-    }
-
-    private Path file(String projectId) {
-        return dataDir.resolve("history").resolve(projectId + ".json");
+    private String key(String projectId) {
+        return PREFIX + projectId + ".json";
     }
 
     public Map<String, Object> get(String projectId) {
         lock.lock();
         try {
-            Path f = file(projectId);
-            if (!Files.exists(f)) {
-                return new java.util.HashMap<>(Map.of(
-                        "projectId", projectId,
-                        "versions", List.of(),
-                        "builds", List.of(),
-                        "checks", List.of()));
+            byte[] data = storage.get(key(projectId));
+            if (data == null) {
+                return defaultData(projectId);
             }
             try {
-                Map<String, Object> data = mapper.readValue(f.toFile(), Map.class);
-                if (data == null) data = new java.util.HashMap<>();
-                data.putIfAbsent("projectId", projectId);
-                data.putIfAbsent("versions", List.of());
-                data.putIfAbsent("builds", List.of());
-                data.putIfAbsent("checks", List.of());
-                return data;
+                Map<String, Object> parsed = mapper.readValue(data, Map.class);
+                if (parsed == null) parsed = new java.util.HashMap<>();
+                parsed.putIfAbsent("projectId", projectId);
+                parsed.putIfAbsent("versions", List.of());
+                parsed.putIfAbsent("builds", List.of());
+                parsed.putIfAbsent("checks", List.of());
+                return parsed;
             } catch (Exception e) {
-                return new java.util.HashMap<>(Map.of(
-                        "projectId", projectId,
-                        "versions", List.of(),
-                        "builds", List.of(),
-                        "checks", List.of()));
+                return defaultData(projectId);
             }
         } finally {
             lock.unlock();
         }
+    }
+
+    private Map<String, Object> defaultData(String projectId) {
+        return new java.util.HashMap<>(Map.of(
+                "projectId", projectId,
+                "versions", List.of(),
+                "builds", List.of(),
+                "checks", List.of()));
     }
 
     public Map<String, Object> createVersion(String projectId, String summary, int revision, int scenesCount, int filesCount, List<String> sceneNames, String author) {
@@ -136,8 +130,8 @@ public class HistoryStore {
 
     private void save(String projectId, Map<String, Object> data) {
         try {
-            Files.createDirectories(dataDir.resolve("history"));
-            new ObjectMapper().registerModule(new com.fasterxml.jackson.datatype.jsr310.JavaTimeModule()).disable(com.fasterxml.jackson.databind.SerializationFeature.WRITE_DATES_AS_TIMESTAMPS).writeValue(file(projectId).toFile(), data);
+            byte[] bytes = mapper.writeValueAsBytes(data);
+            storage.put(key(projectId), bytes, "application/json");
         } catch (Exception ignored) {
         }
     }

@@ -1,4 +1,19 @@
 services:
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+    volumes:
+      - minio-data:/data
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    restart: unless-stopped
+    networks:
+      - editor-net
+
   backend:
     build: ./backend
     environment:
@@ -9,11 +24,17 @@ services:
       JAVA_MODULES: javafx.controls,javafx.fxml
       PORT: 8080
       OLLAMA_URL: ${OLLAMA_URL:-http://host.docker.internal:11434}
+      MINIO_URL: ${MINIO_URL:-http://minio:9000}
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      MINIO_BUCKET: ${MINIO_BUCKET:-graphical-editor}
     volumes:
       - backend-data:/data
       - ./downloads:/downloads:ro
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    depends_on:
+      - minio
     restart: unless-stopped
     networks:
       - editor-net
@@ -34,6 +55,7 @@ services:
 
 volumes:
   backend-data:
+  minio-data:
 
 networks:
   editor-net:

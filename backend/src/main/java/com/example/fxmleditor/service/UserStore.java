@@ -4,14 +4,10 @@ import com.example.fxmleditor.model.UserRecord;
 import com.example.fxmleditor.security.Security;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
-import java.io.File;
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -20,29 +16,29 @@ import java.util.concurrent.locks.ReentrantLock;
 
 @Service
 public class UserStore {
-    private final Path dataDir;
-    private final Path usersFile;
-    private final Path workspacesDir;
-    private final ObjectMapper mapper = new ObjectMapper().registerModule(new com.fasterxml.jackson.datatype.jsr310.JavaTimeModule()).disable(com.fasterxml.jackson.databind.SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
+    private static final String USERS_KEY = "users/users.json";
+    private static final String WORKSPACES_PREFIX = "workspaces/";
+    private final MinioStorageService storage;
+    private final ObjectMapper mapper = new ObjectMapper()
+            .registerModule(new com.fasterxml.jackson.datatype.jsr310.JavaTimeModule())
+            .disable(com.fasterxml.jackson.databind.SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
     private final ReentrantLock lock = new ReentrantLock();
 
-    public UserStore(@Value("${app.data-dir}") String dataDir) {
-        this.dataDir = Paths.get(dataDir);
-        this.usersFile = this.dataDir.resolve("users.json");
-        this.workspacesDir = this.dataDir.resolve("workspaces");
+    public UserStore(MinioStorageService storage) {
+        this.storage = storage;
     }
 
     public void init() throws IOException {
-        Files.createDirectories(dataDir);
-        Files.createDirectories(workspacesDir);
+        // MinIO bucket is initialized by MinioStorageService.
     }
 
     public List<UserRecord> loadUsers() {
         lock.lock();
         try {
-            if (!Files.exists(usersFile)) return new ArrayList<>();
+            byte[] data = storage.get(USERS_KEY);
+            if (data == null) return new ArrayList<>();
             try {
-                return mapper.readValue(usersFile.toFile(), new TypeReference<List<UserRecord>>() {});
+                return mapper.readValue(data, new TypeReference<List<UserRecord>>() {});
             } catch (Exception e) {
                 return new ArrayList<>();
             }
@@ -54,8 +50,8 @@ public class UserStore {
     public void saveUsers(List<UserRecord> users) throws IOException {
         lock.lock();
         try {
-            Files.createDirectories(dataDir);
-            mapper.writeValue(usersFile.toFile(), users);
+            byte[] bytes = mapper.writeValueAsBytes(users);
+            storage.put(USERS_KEY, bytes, "application/json");
         } finally {
             lock.unlock();
         }
@@ -171,10 +167,10 @@ public class UserStore {
     public String readWorkspace(String userId) {
         lock.lock();
         try {
-            Path file = workspacesDir.resolve(userId + ".json");
-            if (!Files.exists(file)) return null;
+            byte[] data = storage.get(WORKSPACES_PREFIX + userId + ".json");
+            if (data == null) return null;
             try {
-                return Files.readString(file);
+                return new String(data, StandardCharsets.UTF_8);
             } catch (Exception e) {
                 return null;
             }
@@ -186,8 +182,9 @@ public class UserStore {
     public void writeWorkspace(String userId, String json) throws IOException {
         lock.lock();
         try {
-            Files.createDirectories(workspacesDir);
-            Files.writeString(workspacesDir.resolve(userId + ".json"), json);
+            storage.put(WORKSPACES_PREFIX + userId + ".json",
+                    json.getBytes(StandardCharsets.UTF_8),
+                    "application/json");
         } finally {
             lock.unlock();
         }

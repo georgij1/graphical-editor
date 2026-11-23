@@ -1,44 +1,38 @@
 package com.example.fxmleditor.service;
 
-import com.example.fxmleditor.model.ProjectMember;
 import com.example.fxmleditor.model.SharedProject;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.locks.ReentrantLock;
 
 @Service
 public class ProjectStore {
-    private final Path projectsDir;
-    private final ObjectMapper mapper = new ObjectMapper().registerModule(new com.fasterxml.jackson.datatype.jsr310.JavaTimeModule()).disable(com.fasterxml.jackson.databind.SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
+    private static final String PREFIX = "projects/";
+    private final MinioStorageService storage;
+    private final ObjectMapper mapper = new ObjectMapper()
+            .registerModule(new com.fasterxml.jackson.datatype.jsr310.JavaTimeModule())
+            .disable(com.fasterxml.jackson.databind.SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
     private final ReentrantLock lock = new ReentrantLock();
 
-    public ProjectStore(@Value("${app.data-dir}") String dataDir) {
-        this.projectsDir = Paths.get(dataDir).resolve("projects");
+    public ProjectStore(MinioStorageService storage) {
+        this.storage = storage;
     }
 
-    public void init() throws IOException {
-        Files.createDirectories(projectsDir);
-    }
-
-    private Path file(String id) {
-        return projectsDir.resolve(id + ".json");
+    private String key(String id) {
+        return PREFIX + id + ".json";
     }
 
     public SharedProject find(String id) {
         lock.lock();
         try {
-            Path f = file(id);
-            if (!Files.exists(f)) return null;
+            byte[] data = storage.get(key(id));
+            if (data == null) return null;
             try {
-                return mapper.readValue(f.toFile(), SharedProject.class);
+                return mapper.readValue(data, SharedProject.class);
             } catch (Exception e) {
                 return null;
             }
@@ -51,15 +45,14 @@ public class ProjectStore {
         lock.lock();
         try {
             List<SharedProject> result = new ArrayList<>();
-            if (!Files.exists(projectsDir)) return result;
-            try (var stream = Files.list(projectsDir)) {
-                stream.filter(p -> p.toString().endsWith(".json")).forEach(p -> {
-                    try {
-                        result.add(mapper.readValue(p.toFile(), SharedProject.class));
-                    } catch (Exception ignored) {
-                    }
-                });
-            } catch (Exception ignored) {
+            for (String k : storage.list(PREFIX)) {
+                if (!k.endsWith(".json")) continue;
+                byte[] data = storage.get(k);
+                if (data == null) continue;
+                try {
+                    result.add(mapper.readValue(data, SharedProject.class));
+                } catch (Exception ignored) {
+                }
             }
             return result;
         } finally {
@@ -86,14 +79,11 @@ public class ProjectStore {
     public SharedProject save(SharedProject project) {
         lock.lock();
         try {
-            try {
-                Files.createDirectories(projectsDir);
-            } catch (Exception ignored) {
-            }
             project.revision += 1;
             project.updatedAt = java.time.Instant.now();
             try {
-                mapper.writeValue(file(project.id).toFile(), project);
+                byte[] bytes = mapper.writeValueAsBytes(project);
+                storage.put(key(project.id), bytes, "application/json");
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
@@ -106,10 +96,7 @@ public class ProjectStore {
     public void delete(String id) {
         lock.lock();
         try {
-            try {
-                Files.deleteIfExists(file(id));
-            } catch (Exception ignored) {
-            }
+            storage.delete(key(id));
         } finally {
             lock.unlock();
         }

@@ -14,7 +14,11 @@ app:
   java-modules: ${JAVA_MODULES:javafx.controls,javafx.fxml}  # модули JavaFX
   jwt-secret: ${JWT_SECRET:change-me-in-production}  # секрет JWT (обязательно заменить в проде)
   jwt-expiration-hours: 240
-  ollama-url: ${OLLAMA_URL:http://host.docker.internal:11434}             # время жизни токена (10 суток)
+  ollama-url: ${OLLAMA_URL:http://host.docker.internal:11434}
+  minio-url: ${MINIO_URL:http://localhost:9000}
+  minio-access-key: ${MINIO_ACCESS_KEY:minioadmin}
+  minio-secret-key: ${MINIO_SECRET_KEY:minioadmin}
+  minio-bucket: ${MINIO_BUCKET:graphical-editor}             # время жизни токена (10 суток)
 
 springdoc:
   api-docs:
