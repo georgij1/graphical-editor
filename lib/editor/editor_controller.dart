@@ -2555,16 +2555,20 @@ class EditorController extends ChangeNotifier {
     final result = await _api.listSharedProjects(token);
     if (!result.isOk || result.value == null) return;
     final seenShared = <String>{};
+    final shared = result.value!.where((p) => seenShared.add(p.id)).toList();
     _sharedProjects
       ..clear()
-      ..addAll(result.value!.where((p) => seenShared.add(p.id)));
+      ..addAll(shared);
+    final sharedById = <String, Project>{for (final p in shared) p.id: p};
     final seenLocal = <String>{};
-    final dedupedLocal = _projects.where((p) => seenLocal.add(p.id)).toList();
-    if (dedupedLocal.length != _projects.length) {
-      _projects
-        ..clear()
-        ..addAll(dedupedLocal);
+    final nextLocal = <Project>[];
+    for (final p in _projects) {
+      if (!seenLocal.add(p.id)) continue;
+      nextLocal.add(sharedById[p.id] ?? p);
     }
+    _projects
+      ..clear()
+      ..addAll(nextLocal);
     notifyListeners();
   }
 
