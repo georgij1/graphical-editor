@@ -2517,9 +2517,13 @@ class EditorController extends ChangeNotifier {
 
   /// Every project the picker knows: the own ones and the shared ones.
   List<Project> get allProjects {
-    final result = <Project>[..._projects];
+    final seen = <String>{};
+    final result = <Project>[];
+    for (final project in _projects) {
+      if (seen.add(project.id)) result.add(project);
+    }
     for (final project in _sharedProjects) {
-      if (!result.any((p) => p.id == project.id)) result.add(project);
+      if (seen.add(project.id)) result.add(project);
     }
     return result;
   }
@@ -2550,9 +2554,17 @@ class EditorController extends ChangeNotifier {
     if (token == null) return;
     final result = await _api.listSharedProjects(token);
     if (!result.isOk || result.value == null) return;
+    final seenShared = <String>{};
     _sharedProjects
       ..clear()
-      ..addAll(result.value!);
+      ..addAll(result.value!.where((p) => seenShared.add(p.id)));
+    final seenLocal = <String>{};
+    final dedupedLocal = _projects.where((p) => seenLocal.add(p.id)).toList();
+    if (dedupedLocal.length != _projects.length) {
+      _projects
+        ..clear()
+        ..addAll(dedupedLocal);
+    }
     notifyListeners();
   }
 
