@@ -13,7 +13,8 @@ app:
   javafx-lib: ${JAVAFX_LIB:/opt/javafx/lib}   # путь к JavaFX SDK внутри контейнера
   java-modules: ${JAVA_MODULES:javafx.controls,javafx.fxml}  # модули JavaFX
   jwt-secret: ${JWT_SECRET:change-me-in-production}  # секрет JWT (обязательно заменить в проде)
-  jwt-expiration-hours: 240             # время жизни токена (10 суток)
+  jwt-expiration-hours: 240
+  ollama-url: ${OLLAMA_URL:http://host.docker.internal:11434}             # время жизни токена (10 суток)
 
 springdoc:
   api-docs:

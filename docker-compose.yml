@@ -8,9 +8,12 @@ services:
       JAVAFX_LIB: /opt/javafx/lib
       JAVA_MODULES: javafx.controls,javafx.fxml
       PORT: 8080
+      OLLAMA_URL: ${OLLAMA_URL:-http://host.docker.internal:11434}
     volumes:
       - backend-data:/data
       - ./downloads:/downloads:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     restart: unless-stopped
     networks:
       - editor-net
