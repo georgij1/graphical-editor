@@ -13,6 +13,7 @@ import 'widgets/outline_panel.dart';
 import 'widgets/palette_panel.dart';
 import 'widgets/profile_dialog.dart';
 import 'widgets/project_panel.dart';
+import 'widgets/project_settings_dialog.dart';
 import 'widgets/settings_dialog.dart';
 import 'widgets/status_bar.dart';
 import 'widgets/validation_strip.dart';
@@ -578,6 +579,18 @@ class _EditorPageState extends State<EditorPage> {
                           _controller.hasOpenDocument) ...<Widget>[
                         const SizedBox(width: 12),
                         _SaveStatus(controller: _controller),
+                      ],
+                      if (_controller.currentProject != null) ...<Widget>[
+                        const SizedBox(width: 4),
+                        IconButton(
+                          tooltip: context.tr('Project settings'),
+                          icon: const Icon(Icons.settings_outlined, size: 20),
+                          onPressed: () => showProjectSettingsDialog(
+                            context,
+                            controller: _controller,
+                            project: _controller.currentProject!,
+                          ),
+                        ),
                       ],
                     ],
                   ),
