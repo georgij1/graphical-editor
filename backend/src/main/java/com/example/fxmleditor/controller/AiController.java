@@ -48,7 +48,7 @@ public class AiController {
         String token = bearer(auth);
         if (token == null || token.isEmpty()) return false;
         try {
-            return jwt.parse(token) != null;
+            return jwt.verify(token) != null;
         } catch (Exception e) {
             return false;
         }
