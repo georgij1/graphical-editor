@@ -3198,10 +3198,67 @@ class EditorController extends ChangeNotifier {
   /// scenes into the new package, so the exported FXML keeps matching the
   /// generated classes.
   void setProjectPackage(Project project, String package) {
-    project.package = package.trim();
-    fixSceneControllers(project);
+    final newPkg = package.trim();
+    final oldPkg = project.package.trim();
+    if (oldPkg == newPkg) return;
+    project.package = newPkg;
+    _renameProjectPackageInOverrides(project, oldPkg, newPkg);
+    fixSceneControllers(project, persist: false);
     _persist();
     notifyListeners();
+  }
+
+  void _renameProjectPackageInOverrides(Project project, String oldPkg, String newPkg) {
+    if (oldPkg.isEmpty || newPkg.isEmpty) return;
+    final oldDir = oldPkg.replaceAll('.', '/');
+    final newDir = newPkg.replaceAll('.', '/');
+    final oldPrefix = 'src/main/java/$oldDir/';
+    final newPrefix = 'src/main/java/$newDir/';
+    final oldTestPrefix = 'src/test/java/$oldDir/';
+    final newTestPrefix = 'src/test/java/$newDir/';
+
+    String rewriteContent(String content) {
+      var out = content;
+      out = out.replaceAllMapped(
+        RegExp(r'^package\s+' + RegExp.escape(oldPkg) + r'\s*;', multiLine: true),
+        (_) => 'package $newPkg;',
+      );
+      out = out.replaceAllMapped(
+        RegExp(r'^import\s+' + RegExp.escape(oldPkg) + r'(\.[A-Za-z_][A-Za-z0-9_.*]*\s*;)', multiLine: true),
+        (m) => 'import $newPkg${m.group(1)}',
+      );
+      out = out.replaceAllMapped(
+        RegExp(r'^import\s+static\s+' + RegExp.escape(oldPkg) + r'(\.[A-Za-z_][A-Za-z0-9_.*]*\s*;)', multiLine: true),
+        (m) => 'import static $newPkg${m.group(1)}',
+      );
+      return out;
+    }
+
+    final updates = <String, String>{};
+    final removals = <String>[];
+    for (final entry in project.sourceOverrides.entries) {
+      final path = entry.key;
+      var content = entry.value;
+      var newPath = path;
+      if (path.startsWith(oldPrefix)) {
+        newPath = '$newPrefix${path.substring(oldPrefix.length)}';
+      } else if (path.startsWith(oldTestPrefix)) {
+        newPath = '$newTestPrefix${path.substring(oldTestPrefix.length)}';
+      }
+      if (newPath.endsWith('.java') || newPath.endsWith('.kt')) {
+        content = rewriteContent(content);
+      } else if (newPath.endsWith('.fxml')) {
+        content = content.replaceAll('fx:controller="$oldPkg.', 'fx:controller="$newPkg.');
+      }
+      if (newPath != path || content != entry.value) {
+        removals.add(path);
+        updates[newPath] = content;
+      }
+    }
+    for (final p in removals) {
+      project.sourceOverrides.remove(p);
+    }
+    project.sourceOverrides.addAll(updates);
   }
 
   /// Rewrites the controller of every scene into the current project package:
@@ -3214,7 +3271,7 @@ class EditorController extends ChangeNotifier {
   /// FXML (e.g. `javafx.scene.text.Font` for a `<Font>` property element),
   /// which otherwise make JavaFX fail with "… is not a valid type".
   /// Returns true when something was changed.
-  bool fixSceneControllers(Project project) {
+  bool fixSceneControllers(Project project, {bool persist = true}) {
     // Bring the active scene's FXML up to date from the editor buffer first,
     // so the fix is not overwritten by the next flush.
     _flushToScene();
@@ -3268,7 +3325,7 @@ class EditorController extends ChangeNotifier {
         scene.fxml = fxml;
       }
     }
-    if (changed) {
+    if (changed && persist) {
       _persist();
       notifyListeners();
     }
