@@ -201,6 +201,7 @@ class _ProjectHomeState extends State<ProjectHome> {
                     else
                       Expanded(
                         child: _ProjectGrid(
+                        controller: controller,
                         projects: visible,
                         perPage: _layout.perPage,
                         columns: _layout.columns,
@@ -232,6 +233,7 @@ class _ProjectHomeState extends State<ProjectHome> {
 
 class _ProjectGrid extends StatelessWidget {
   const _ProjectGrid({
+    required this.controller,
     required this.projects,
     required this.perPage,
     required this.columns,
@@ -245,6 +247,7 @@ class _ProjectGrid extends StatelessWidget {
     required this.onImport,
   });
 
+  final EditorController controller;
   /// Projects shown on the current page.
   final List<Project> projects;
   final int perPage;
@@ -274,6 +277,7 @@ class _ProjectGrid extends StatelessWidget {
                 width: _PageLayout.cardWidth,
                 height: _PageLayout.cardHeight,
                 child: _ProjectCard(
+                  controller: controller,
                   project: project,
                   onOpen: () => onOpen(project),
                   onSettings: () => onSettings(project),
@@ -391,14 +395,111 @@ class _Pagination extends StatelessWidget {
 
 class _ProjectCard extends StatelessWidget {
   const _ProjectCard({
+    required this.controller,
     required this.project,
     required this.onOpen,
     required this.onSettings,
   });
 
+  final EditorController controller;
   final Project project;
   final VoidCallback onOpen;
   final VoidCallback onSettings;
+
+  String? _validatePackage(BuildContext context, String value) {
+    final package = value.trim();
+    if (package.isEmpty) return context.tr('Package cannot be empty.');
+    if (package.startsWith('.') || package.endsWith('.')) {
+      return context.tr('Package must not start or end with a dot.');
+    }
+    if (package.contains('..')) {
+      return context.tr('Package must not contain consecutive dots.');
+    }
+    if (package.contains(' ')) {
+      return context.tr('Package must not contain spaces.');
+    }
+    final segments = package.split('.');
+    final reserved = <String>{
+      'abstract', 'assert', 'boolean', 'break', 'byte', 'case', 'catch', 'char',
+      'class', 'const', 'continue', 'default', 'do', 'double', 'else', 'enum',
+      'extends', 'final', 'finally', 'float', 'for', 'goto', 'if', 'implements',
+      'import', 'instanceof', 'int', 'interface', 'long', 'native', 'new',
+      'package', 'private', 'protected', 'public', 'return', 'short', 'static',
+      'strictfp', 'super', 'switch', 'synchronized', 'this', 'throw', 'throws',
+      'transient', 'try', 'void', 'volatile', 'while', 'true', 'false', 'null',
+    };
+    for (final segment in segments) {
+      if (segment.isEmpty) return context.tr('Each package segment must not be empty.');
+      if (!RegExp(r'^[a-zA-Z_][a-zA-Z0-9_]*$').hasMatch(segment)) {
+        return context.tr('Package segment "{0}" is not a valid identifier.').replaceFirst('{0}', segment);
+      }
+      if (reserved.contains(segment)) {
+        return context.tr('Package segment "{0}" is a reserved Java keyword.').replaceFirst('{0}', segment);
+      }
+    }
+    return null;
+  }
+
+  Future<void> _editPackage(BuildContext context) async {
+    final textController = TextEditingController(text: project.package);
+    String? error;
+    final result = await showDialog<String>(
+      context: context,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setDialogState) {
+            return AlertDialog(
+              title: Text(ctx.tr('Edit package name')),
+              content: SizedBox(
+                width: 420,
+                child: TextField(
+                  controller: textController,
+                  autofocus: true,
+                  decoration: InputDecoration(
+                    labelText: ctx.tr('Java package'),
+                    errorText: error,
+                    border: const OutlineInputBorder(),
+                    isDense: true,
+                  ),
+                  onChanged: (value) {
+                    setDialogState(() {
+                      error = _validatePackage(ctx, value);
+                    });
+                  },
+                  onSubmitted: (value) {
+                    final err = _validatePackage(ctx, value);
+                    if (err == null) Navigator.of(ctx).pop(value.trim());
+                    setDialogState(() => error = err);
+                  },
+                ),
+              ),
+              actions: <Widget>[
+                TextButton(
+                  onPressed: () => Navigator.of(ctx).pop(),
+                  child: Text(ctx.tr('Cancel')),
+                ),
+                FilledButton(
+                  onPressed: () {
+                    final err = _validatePackage(ctx, textController.text);
+                    if (err != null) {
+                      setDialogState(() => error = err);
+                      return;
+                    }
+                    Navigator.of(ctx).pop(textController.text.trim());
+                  },
+                  child: Text(ctx.tr('Save')),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+    textController.dispose();
+    if (result == null) return;
+    if (result == project.package) return;
+    controller.setProjectPackage(project, result);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -452,19 +553,26 @@ return Card(
               ),
                Align(
                  alignment: Alignment.centerLeft,
-                 child: Container(
-                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                   decoration: BoxDecoration(
-                     color: theme.colorScheme.secondaryContainer.withValues(alpha: 0.5),
+                 child: Tooltip(
+                   message: context.tr('Edit package name'),
+                   child: InkWell(
                      borderRadius: BorderRadius.circular(12),
-                   ),
-                   child: Text(
-                     project.package,
-                     maxLines: 1,
-                     overflow: TextOverflow.ellipsis,
-                     style: TextStyle(
-                       fontSize: 11,
-                       color: theme.colorScheme.onSecondaryContainer,
+                     onTap: () => _editPackage(context),
+                     child: Container(
+                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                       decoration: BoxDecoration(
+                         color: theme.colorScheme.secondaryContainer.withValues(alpha: 0.5),
+                         borderRadius: BorderRadius.circular(12),
+                       ),
+                       child: Text(
+                         project.package.isEmpty ? context.tr('Set package') : project.package,
+                         maxLines: 1,
+                         overflow: TextOverflow.ellipsis,
+                         style: TextStyle(
+                           fontSize: 11,
+                           color: theme.colorScheme.onSecondaryContainer,
+                         ),
+                       ),
                      ),
                    ),
                  ),
