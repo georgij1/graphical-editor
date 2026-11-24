@@ -34,8 +34,13 @@ app:
 
 springdoc:
   api-docs:
-    path: /v3/api-docs            # OpenAPI-спецификация
+    path: /v3/api-docs
   swagger-ui:
-    path: /swagger-ui.html        # интерфейс Swagger UI
-    operations-sorter: method     # сортировка операций по HTTP-методу
-    tags-sorter: alpha            # сортировка тегов по алфавиту
+    path: /swagger-ui.html
+    operations-sorter: method
+    tags-sorter: alpha
+    urls:
+      - name: Backend
+        url: /v3/api-docs
+      - name: AI Service
+        url: /v3/api-docs/ai-service
