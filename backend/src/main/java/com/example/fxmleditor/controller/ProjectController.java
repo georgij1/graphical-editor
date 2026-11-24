@@ -6,7 +6,6 @@ import com.example.fxmleditor.security.JwtService;
 import com.example.fxmleditor.service.HistoryStore;
 import com.example.fxmleditor.service.ProjectFileStorageService;
 import com.example.fxmleditor.service.ProjectStore;
-import com.example.fxmleditor.service.UserStore;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.HttpHeaders;
@@ -22,14 +21,12 @@ import java.util.*;
 @Tag(name = "Projects")
 public class ProjectController {
     private final ProjectStore projects;
-    private final UserStore users;
     private final JwtService jwt;
     private final HistoryStore history;
     private final ProjectFileStorageService projectFiles;
 
-    public ProjectController(ProjectStore projects, UserStore users, JwtService jwt, HistoryStore history, ProjectFileStorageService projectFiles) {
+    public ProjectController(ProjectStore projects, JwtService jwt, HistoryStore history, ProjectFileStorageService projectFiles) {
         this.projects = projects;
-        this.users = users;
         this.jwt = jwt;
         this.history = history;
         this.projectFiles = projectFiles;
@@ -218,12 +215,11 @@ public class ProjectController {
         SharedProject project = projects.find(id);
         if (project == null) return ResponseEntity.status(404).body(Map.of("error", "Project not found."));
         if (!project.canRead(uid, email)) return ResponseEntity.status(403).body(Map.of("error", "You cannot open this project."));
-        var user = users.findById(uid);
         var bucket = presence.computeIfAbsent(id, k -> new java.util.concurrent.ConcurrentHashMap<>());
         Map<String, Object> entry = new java.util.HashMap<>();
         entry.put("id", uid);
         entry.put("email", email);
-        entry.put("avatar", user == null || user.avatar == null ? "" : user.avatar);
+        entry.put("avatar", "");
         entry.put("lastSeen", java.time.Instant.now().toString());
         if (body != null) {
             if (body.containsKey("cursorX")) {

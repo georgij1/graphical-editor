@@ -1,10 +1,10 @@
-package com.example.fxmleditor.service;
+package com.example.authservice.service;
 
-import com.example.fxmleditor.model.UserRecord;
-import com.example.fxmleditor.model.UserWorkspaceRecord;
-import com.example.fxmleditor.repository.UserRepository;
-import com.example.fxmleditor.repository.UserWorkspaceRepository;
-import com.example.fxmleditor.security.Security;
+import com.example.authservice.model.UserRecord;
+import com.example.authservice.model.UserWorkspaceRecord;
+import com.example.authservice.repository.UserRepository;
+import com.example.authservice.repository.UserWorkspaceRepository;
+import com.example.authservice.security.Security;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 

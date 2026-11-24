@@ -38,6 +38,20 @@ services:
     networks:
       - editor-net
 
+  auth-service:
+    build: ./auth-service
+    environment:
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
+      PORT: 8080
+      SPRING_DATASOURCE_URL: ${SPRING_DATASOURCE_URL:-jdbc:postgresql://postgres:5432/graphical_editor}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-editor}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-editor}
+    depends_on:
+      - postgres
+    restart: unless-stopped
+    networks:
+      - editor-net
+
   backend:
     build: ./backend
     environment:
@@ -77,6 +91,7 @@ services:
     depends_on:
       - backend
       - ai-service
+      - auth-service
     restart: unless-stopped
     networks:
       - editor-net

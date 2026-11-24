@@ -1,6 +1,6 @@
-package com.example.fxmleditor.repository;
+package com.example.authservice.repository;
 
-import com.example.fxmleditor.model.UserRecord;
+import com.example.authservice.model.UserRecord;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.Optional;

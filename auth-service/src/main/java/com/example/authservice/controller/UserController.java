@@ -1,8 +1,8 @@
-package com.example.fxmleditor.controller;
+package com.example.authservice.controller;
 
-import com.example.fxmleditor.model.UserRecord;
-import com.example.fxmleditor.security.JwtService;
-import com.example.fxmleditor.service.UserStore;
+import com.example.authservice.model.UserRecord;
+import com.example.authservice.security.JwtService;
+import com.example.authservice.service.UserStore;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.ResponseEntity;

@@ -1,8 +1,8 @@
-package com.example.fxmleditor.controller;
+package com.example.authservice.controller;
 
-import com.example.fxmleditor.model.UserRecord;
-import com.example.fxmleditor.security.JwtService;
-import com.example.fxmleditor.service.UserStore;
+import com.example.authservice.model.UserRecord;
+import com.example.authservice.security.JwtService;
+import com.example.authservice.service.UserStore;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.ResponseEntity;
@@ -51,7 +51,7 @@ public class AuthController {
         String password = str(body, "password");
         UserRecord user = userStore.findByEmail(email);
         if (user == null) return ResponseEntity.status(401).body(Map.of("error", "Invalid email or password."));
-        if (!com.example.fxmleditor.security.Security.verifyPassword(password, user.salt, user.hash)) {
+        if (!com.example.authservice.security.Security.verifyPassword(password, user.salt, user.hash)) {
             return ResponseEntity.status(401).body(Map.of("error", "Invalid email or password."));
         }
         String token = jwt.issue(user.id, user.email);

@@ -1,4 +1,4 @@
-package com.example.fxmleditor.model;
+package com.example.authservice.model;
 
 import jakarta.persistence.*;
 import java.time.Instant;
