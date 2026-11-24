@@ -4,11 +4,14 @@ import com.example.fxmleditor.model.ProjectMember;
 import com.example.fxmleditor.model.SharedProject;
 import com.example.fxmleditor.security.JwtService;
 import com.example.fxmleditor.service.HistoryStore;
+import com.example.fxmleditor.service.ProjectFileStorageService;
 import com.example.fxmleditor.service.ProjectStore;
 import com.example.fxmleditor.service.UserStore;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -22,12 +25,14 @@ public class ProjectController {
     private final UserStore users;
     private final JwtService jwt;
     private final HistoryStore history;
+    private final ProjectFileStorageService projectFiles;
 
-    public ProjectController(ProjectStore projects, UserStore users, JwtService jwt, HistoryStore history) {
+    public ProjectController(ProjectStore projects, UserStore users, JwtService jwt, HistoryStore history, ProjectFileStorageService projectFiles) {
         this.projects = projects;
         this.users = users;
         this.jwt = jwt;
         this.history = history;
+        this.projectFiles = projectFiles;
     }
 
     private String bearer(String auth) {
@@ -467,6 +472,36 @@ public class ProjectController {
         if (body.get("inviteToken") != null) p.inviteToken = body.get("inviteToken").toString();
         if (body.get("inviteRole") != null) p.inviteRole = body.get("inviteRole").toString();
         return p;
+    }
+
+    @GetMapping("/projects/{id}/download")
+    @Operation(summary = "Download project files as a zip")
+    public ResponseEntity<?> downloadProject(@RequestHeader("Authorization") String auth, @PathVariable String id) {
+        var claims = auth(auth);
+        if (claims == null) return ResponseEntity.status(401).body(Map.of("error", "Not authenticated."));
+        SharedProject p = projects.find(id);
+        if (p == null) return ResponseEntity.status(404).body(Map.of("error", "Project not found."));
+        String uid = jwt.userId(claims);
+        String email = jwt.email(claims);
+        if (!p.canRead(uid, email)) return ResponseEntity.status(403).body(Map.of("error", "You cannot open this project."));
+        byte[] zip = projectFiles.downloadZip(id);
+        if (zip == null || zip.length == 0) {
+            try {
+                projectFiles.syncProject(p);
+                zip = projectFiles.downloadZip(id);
+            } catch (Exception ignored) {
+            }
+        }
+        if (zip == null || zip.length == 0) {
+            return ResponseEntity.status(404).body(Map.of("error", "No project files found."));
+        }
+        String name = p.name == null || p.name.isBlank() ? "project" : p.name.trim();
+        String safe = name.replaceAll("[^a-zA-Z0-9._-]", "_");
+        if (safe.isBlank()) safe = "project";
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + safe + ".zip\"")
+                .contentType(MediaType.parseMediaType("application/zip"))
+                .body(zip);
     }
 
     private String str(Map<String, Object> body, String key) {

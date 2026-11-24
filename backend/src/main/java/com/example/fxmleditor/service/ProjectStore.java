@@ -14,12 +14,14 @@ import java.util.List;
 @Service
 public class ProjectStore {
     private final ProjectRepository repo;
+    private final ProjectFileStorageService files;
     private final ObjectMapper mapper = new ObjectMapper()
             .registerModule(new com.fasterxml.jackson.datatype.jsr310.JavaTimeModule())
             .disable(com.fasterxml.jackson.databind.SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
 
-    public ProjectStore(ProjectRepository repo) {
+    public ProjectStore(ProjectRepository repo, ProjectFileStorageService files) {
         this.repo = repo;
+        this.files = files;
     }
 
     @Transactional(readOnly = true)
@@ -76,6 +78,11 @@ public class ProjectStore {
             rec.data = json;
             rec.updatedAt = project.updatedAt;
             repo.save(rec);
+            try {
+                files.syncProject(project);
+            } catch (Exception e) {
+                System.err.println("[ProjectStore] Failed to sync project files to MinIO: " + project.id + " - " + e.getMessage());
+            }
             return project;
         } catch (Exception e) {
             throw new RuntimeException(e);
@@ -84,6 +91,13 @@ public class ProjectStore {
 
     @Transactional
     public void delete(String id) {
-        if (id != null) repo.deleteById(id);
+        if (id != null) {
+            repo.deleteById(id);
+            try {
+                files.deleteProject(id);
+            } catch (Exception e) {
+                System.err.println("[ProjectStore] Failed to delete project files from MinIO: " + id + " - " + e.getMessage());
+            }
+        }
     }
 }

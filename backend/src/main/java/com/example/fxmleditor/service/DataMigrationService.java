@@ -27,17 +27,19 @@ public class DataMigrationService {
     private final ProjectHistoryRepository history;
     private final ProjectRepository projects;
     private final UserWorkspaceRepository workspaces;
+    private final ProjectFileStorageService projectFiles;
     private final Path dataDir;
     private final ObjectMapper mapper = new ObjectMapper()
             .registerModule(new com.fasterxml.jackson.datatype.jsr310.JavaTimeModule())
             .disable(com.fasterxml.jackson.databind.SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
 
-    public DataMigrationService(MinioStorageService storage, UserRepository users, ProjectHistoryRepository history, ProjectRepository projects, UserWorkspaceRepository workspaces, @Value("${app.data-dir:/data}") String dataDir) {
+    public DataMigrationService(MinioStorageService storage, UserRepository users, ProjectHistoryRepository history, ProjectRepository projects, UserWorkspaceRepository workspaces, ProjectFileStorageService projectFiles, @Value("${app.data-dir:/data}") String dataDir) {
         this.storage = storage;
         this.users = users;
         this.history = history;
         this.projects = projects;
         this.workspaces = workspaces;
+        this.projectFiles = projectFiles;
         this.dataDir = Paths.get(dataDir);
     }
 
@@ -47,6 +49,21 @@ public class DataMigrationService {
         migrateHistoryToPostgres();
         migrateProjectsToPostgres();
         migrateWorkspacesToPostgres();
+        syncProjectsToMinioFiles();
+    }
+
+    private void syncProjectsToMinioFiles() {
+        try {
+            for (ProjectRecord r : projects.findAll()) {
+                if (r == null || r.data == null) continue;
+                try {
+                    SharedProject p = mapper.readValue(r.data, SharedProject.class);
+                    projectFiles.syncProject(p);
+                } catch (Exception ignored) {
+                }
+            }
+        } catch (Exception ignored) {
+        }
     }
 
     private void migrateWorkspacesToPostgres() {
