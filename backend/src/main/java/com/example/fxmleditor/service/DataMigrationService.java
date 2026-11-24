@@ -43,9 +43,6 @@ public class DataMigrationService {
         migrateUsersToPostgres();
         migrateHistoryToPostgres();
         migrateProjectsToPostgres();
-        migrateFile(dataDir.resolve("users.json"), "users/users.json");
-        migrateDir(dataDir.resolve("projects"), "projects/");
-        migrateDir(dataDir.resolve("history"), "history/");
         migrateDir(dataDir.resolve("workspaces"), "workspaces/");
     }
 
@@ -109,15 +106,6 @@ public class DataMigrationService {
                 } catch (Exception ignored) {
                 }
             }
-        } catch (Exception ignored) {
-        }
-    }
-
-    private void migrateFile(Path file, String key) {
-        try {
-            if (!Files.exists(file) || storage.get(key) != null) return;
-            byte[] bytes = Files.readAllBytes(file);
-            storage.put(key, bytes, "application/json");
         } catch (Exception ignored) {
         }
     }
