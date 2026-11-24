@@ -1,13 +1,14 @@
 package com.example.fxmleditor.service;
 
 import com.example.fxmleditor.model.UserRecord;
+import com.example.fxmleditor.model.UserWorkspaceRecord;
 import com.example.fxmleditor.repository.UserRepository;
+import com.example.fxmleditor.repository.UserWorkspaceRepository;
 import com.example.fxmleditor.security.Security;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -15,17 +16,16 @@ import java.util.UUID;
 
 @Service
 public class UserStore {
-    private static final String WORKSPACES_PREFIX = "workspaces/";
     private final UserRepository users;
-    private final MinioStorageService storage;
+    private final UserWorkspaceRepository workspaces;
 
-    public UserStore(UserRepository users, MinioStorageService storage) {
+    public UserStore(UserRepository users, UserWorkspaceRepository workspaces) {
         this.users = users;
-        this.storage = storage;
+        this.workspaces = workspaces;
     }
 
     public void init() throws IOException {
-        // JPA schema is managed by Hibernate; workspaces are stored in MinIO.
+        // JPA schema is managed by Hibernate.
     }
 
     @Transactional(readOnly = true)
@@ -115,20 +115,17 @@ public class UserStore {
         return users.save(target);
     }
 
+    @Transactional(readOnly = true)
     public String readWorkspace(String userId) {
-        byte[] data = storage.get(WORKSPACES_PREFIX + userId + ".json");
-        if (data == null) return null;
-        try {
-            return new String(data, StandardCharsets.UTF_8);
-        } catch (Exception e) {
-            return null;
-        }
+        return workspaces.findById(userId).map(r -> r.data).orElse(null);
     }
 
+    @Transactional
     public void writeWorkspace(String userId, String json) throws IOException {
-        storage.put(WORKSPACES_PREFIX + userId + ".json",
-                json.getBytes(StandardCharsets.UTF_8),
-                "application/json");
+        UserWorkspaceRecord rec = workspaces.findById(userId).orElse(new UserWorkspaceRecord(userId, json, Instant.now()));
+        rec.data = json;
+        rec.updatedAt = Instant.now();
+        workspaces.save(rec);
     }
 
     public static class EmailTakenException extends Exception {}

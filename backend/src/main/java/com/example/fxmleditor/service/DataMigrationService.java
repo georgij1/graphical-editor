@@ -4,9 +4,11 @@ import com.example.fxmleditor.model.ProjectHistoryRecord;
 import com.example.fxmleditor.model.ProjectRecord;
 import com.example.fxmleditor.model.SharedProject;
 import com.example.fxmleditor.model.UserRecord;
+import com.example.fxmleditor.model.UserWorkspaceRecord;
 import com.example.fxmleditor.repository.ProjectHistoryRepository;
 import com.example.fxmleditor.repository.ProjectRepository;
 import com.example.fxmleditor.repository.UserRepository;
+import com.example.fxmleditor.repository.UserWorkspaceRepository;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.PostConstruct;
@@ -17,7 +19,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
-import java.util.stream.Stream;
 
 @Service
 public class DataMigrationService {
@@ -25,16 +26,18 @@ public class DataMigrationService {
     private final UserRepository users;
     private final ProjectHistoryRepository history;
     private final ProjectRepository projects;
+    private final UserWorkspaceRepository workspaces;
     private final Path dataDir;
     private final ObjectMapper mapper = new ObjectMapper()
             .registerModule(new com.fasterxml.jackson.datatype.jsr310.JavaTimeModule())
             .disable(com.fasterxml.jackson.databind.SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
 
-    public DataMigrationService(MinioStorageService storage, UserRepository users, ProjectHistoryRepository history, ProjectRepository projects, @Value("${app.data-dir:/data}") String dataDir) {
+    public DataMigrationService(MinioStorageService storage, UserRepository users, ProjectHistoryRepository history, ProjectRepository projects, UserWorkspaceRepository workspaces, @Value("${app.data-dir:/data}") String dataDir) {
         this.storage = storage;
         this.users = users;
         this.history = history;
         this.projects = projects;
+        this.workspaces = workspaces;
         this.dataDir = Paths.get(dataDir);
     }
 
@@ -43,7 +46,25 @@ public class DataMigrationService {
         migrateUsersToPostgres();
         migrateHistoryToPostgres();
         migrateProjectsToPostgres();
-        migrateDir(dataDir.resolve("workspaces"), "workspaces/");
+        migrateWorkspacesToPostgres();
+    }
+
+    private void migrateWorkspacesToPostgres() {
+        try {
+            for (String key : storage.list("workspaces/")) {
+                if (!key.endsWith(".json")) continue;
+                String userId = key.substring("workspaces/".length(), key.length() - ".json".length());
+                if (userId.isBlank() || workspaces.existsById(userId)) continue;
+                try {
+                    byte[] data = storage.get(key);
+                    if (data == null) continue;
+                    String json = new String(data, java.nio.charset.StandardCharsets.UTF_8);
+                    workspaces.save(new UserWorkspaceRecord(userId, json, java.time.Instant.now()));
+                } catch (Exception ignored) {
+                }
+            }
+        } catch (Exception ignored) {
+        }
     }
 
     private void migrateProjectsToPostgres() {
@@ -110,22 +131,4 @@ public class DataMigrationService {
         }
     }
 
-    private void migrateDir(Path dir, String prefix) {
-        try {
-            if (!Files.exists(dir) || !Files.isDirectory(dir)) return;
-            try (Stream<Path> stream = Files.list(dir)) {
-                stream.filter(Files::isRegularFile).forEach(p -> {
-                    String name = p.getFileName().toString();
-                    String key = prefix + name;
-                    try {
-                        if (storage.get(key) != null) return;
-                        byte[] bytes = Files.readAllBytes(p);
-                        storage.put(key, bytes, "application/json");
-                    } catch (Exception ignored) {
-                    }
-                });
-            }
-        } catch (Exception ignored) {
-        }
-    }
 }
