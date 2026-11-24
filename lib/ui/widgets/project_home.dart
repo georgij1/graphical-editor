@@ -101,12 +101,19 @@ class _ProjectHomeState extends State<ProjectHome> {
   Future<void> _create(BuildContext context) async {
     final result = await showNewProjectDialog(context);
     if (result == null) return;
-    controller.createProject(
+    final ok = controller.createProject(
       name: result['name'] ?? '',
       package: result['package'] ?? '',
       mainClass: result['mainClass'] ?? '',
       description: result['description'] ?? '',
     );
+    if (!ok && context.mounted) {
+      _message(
+        context,
+        controller.collaborationNotice ??
+            context.tr('A project with this name already exists.'),
+      );
+    }
   }
 
   Future<void> _import(BuildContext context) async {

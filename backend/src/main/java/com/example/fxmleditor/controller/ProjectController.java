@@ -77,6 +77,17 @@ public class ProjectController {
             return ResponseEntity.status(403).body(Map.of("error", "You cannot change this project."));
         }
         SharedProject project = fromJson(body, id, existing, uid, email);
+        String ownerId = project.ownerId == null ? uid : project.ownerId;
+        String newName = project.name == null ? "" : project.name.trim();
+        if (!newName.isEmpty()) {
+            for (SharedProject p : projects.listAll()) {
+                if (p == null || p.id == null || p.id.equals(id)) continue;
+                if (ownerId != null && ownerId.equals(p.ownerId)
+                        && p.name != null && p.name.trim().equalsIgnoreCase(newName)) {
+                    return ResponseEntity.status(409).body(Map.of("error", "A project with this name already exists."));
+                }
+            }
+        }
         SharedProject saved = projects.save(project);
         return ResponseEntity.ok(saved);
     }

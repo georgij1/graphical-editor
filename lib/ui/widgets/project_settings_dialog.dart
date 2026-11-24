@@ -132,16 +132,28 @@ class _ProjectSettingsDialogState extends State<ProjectSettingsDialog> {
     _packageError = null;
 
     if (!renamed && !described && !repackaged && !reclassed) return;
-    if (renamed) controller.renameProject(widget.project, name);
-    if (described) controller.setProjectDescription(widget.project, description);
-    if (repackaged) controller.setProjectPackage(widget.project, package);
-    if (reclassed)
-      controller.setProjectMainClass(widget.project, _mainClassController.text);
     final changed = <String>[];
-    if (renamed) changed.add(context.tr('name'));
-    if (described) changed.add(context.tr('description'));
-    if (repackaged) changed.add(context.tr('package'));
-    if (reclassed) changed.add(context.tr('main class'));
+    if (renamed) {
+      final ok = controller.renameProject(widget.project, name);
+      if (!ok) {
+        _say(controller.collaborationNotice ?? context.tr('A project with this name already exists.'), error: true);
+        return;
+      }
+      changed.add(context.tr('name'));
+    }
+    if (described) {
+      controller.setProjectDescription(widget.project, description);
+      changed.add(context.tr('description'));
+    }
+    if (repackaged) {
+      controller.setProjectPackage(widget.project, package);
+      changed.add(context.tr('package'));
+    }
+    if (reclassed) {
+      controller.setProjectMainClass(widget.project, _mainClassController.text);
+      changed.add(context.tr('main class'));
+    }
+    if (changed.isEmpty) return;
     _say(
       '${context.tr('Project updated')} (${changed.join(', ')}).',
     );

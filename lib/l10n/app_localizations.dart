@@ -421,6 +421,8 @@ class AppLocalizations {
     'Actions': 'Действия',
     'Project renamed.': 'Проект переименован.',
     'Project duplicated.': 'Проект продублирован.',
+    'A project with this name already exists.':
+        '\u041f\u0440\u043e\u0435\u043a\u0442 \u0441 \u0442\u0430\u043a\u0438\u043c \u0438\u043c\u0435\u043d\u0435\u043c \u0443\u0436\u0435 \u0441\u0443\u0449\u0435\u0441\u0442\u0432\u0443\u0435\u0442.',
     'Project name is empty.': 'Название проекта не может быть пустым.',
     'Description': 'Описание',
     'Description saved.': 'Описание сохранено.',

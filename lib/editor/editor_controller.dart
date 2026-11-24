@@ -2356,13 +2356,36 @@ class EditorController extends ChangeNotifier {
     return doc;
   }
 
-  void createProject({
+  bool _projectNameTaken(String name, {String? ownerId, String? excludeProjectId}) {
+    final n = name.trim().toLowerCase();
+    if (n.isEmpty) return false;
+    final oid = (ownerId ?? _userId ?? '').trim();
+    bool sameOwner(Project p) {
+      final poid = (p.ownerId ?? '').trim();
+      if (oid.isNotEmpty && poid.isNotEmpty) return poid == oid;
+      if (oid.isNotEmpty && poid.isEmpty) return false;
+      return true;
+    }
+    for (final p in allProjects) {
+      if (excludeProjectId != null && p.id == excludeProjectId) continue;
+      if (!sameOwner(p)) continue;
+      if (p.name.trim().toLowerCase() == n) return true;
+    }
+    return false;
+  }
+
+  bool createProject({
     String? name,
     String package = 'com.example',
     String? mainClass,
     String description = '',
   }) {
     final safeName = (name ?? '').trim().isEmpty ? 'Untitled' : name!.trim();
+    if (_projectNameTaken(safeName, ownerId: _userId)) {
+      collaborationNotice = 'A project with this name already exists.';
+      notifyListeners();
+      return false;
+    }
     final safeMain = (mainClass ?? '').trim().isEmpty
         ? 'MainApp'
         : mainClass!.trim();
@@ -2415,6 +2438,7 @@ class EditorController extends ChangeNotifier {
     _endEditChain();
     _persist();
     notifyListeners();
+    return true;
   }
 
   void openProject(Project project) {
@@ -3193,12 +3217,18 @@ class EditorController extends ChangeNotifier {
     notifyListeners();
   }
 
-  void renameProject(Project project, String newName) {
+  bool renameProject(Project project, String newName) {
     final safe = newName.trim();
-    if (safe.isEmpty) return;
+    if (safe.isEmpty) return false;
+    if (_projectNameTaken(safe, ownerId: project.ownerId, excludeProjectId: project.id)) {
+      collaborationNotice = 'A project with this name already exists.';
+      notifyListeners();
+      return false;
+    }
     project.name = safe;
     _persist();
     notifyListeners();
+    return true;
   }
 
   /// Stores the free-form project description shown in the settings window and
@@ -3538,16 +3568,26 @@ class EditorController extends ChangeNotifier {
     return true;
   }
 
-  void duplicateProject(Project project) {
+  bool duplicateProject(Project project) {
+    final base = '${project.name} copy';
+    var name = base;
+    var i = 2;
+    while (_projectNameTaken(name, ownerId: project.ownerId)) {
+      name = '$base $i';
+      i++;
+    }
     final copy = project.copy()
       ..id = _newId()
-      ..name = '${project.name} copy';
-    if (_projects.any((p) => p.name == copy.name)) {
-      copy.name = '${project.name} copy $_idCounter';
+      ..name = name;
+    final idx = _projects.indexOf(project);
+    if (idx >= 0) {
+      _projects.insert(idx + 1, copy);
+    } else {
+      _projects.add(copy);
     }
-    _projects.insert(_projects.indexOf(project) + 1, copy);
     _persist();
     notifyListeners();
+    return true;
   }
 
   Future<void> deleteProject(Project project) async {
@@ -3839,14 +3879,16 @@ class EditorController extends ChangeNotifier {
       final json = jsonDecode(picked.content) as Map<String, dynamic>;
       final project = Project.fromJson(json);
       if (project.name.isEmpty || project.scenes.isEmpty) return false;
+      project.id = _newId();
+      project.ownerId = _userId;
+      project.ownerEmail = _userEmail;
       var name = project.name;
       var i = 2;
-      while (_projects.any((p) => p.name == name)) {
+      while (_projectNameTaken(name, ownerId: project.ownerId, excludeProjectId: project.id)) {
         name = '${project.name} $i';
         i++;
       }
       project.name = name;
-      project.id = _newId();
       _projects.add(project);
       _persist();
       notifyListeners();
