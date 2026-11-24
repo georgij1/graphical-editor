@@ -1,8 +1,11 @@
 package com.example.fxmleditor.service;
 
 import com.example.fxmleditor.model.ProjectHistoryRecord;
+import com.example.fxmleditor.model.ProjectRecord;
+import com.example.fxmleditor.model.SharedProject;
 import com.example.fxmleditor.model.UserRecord;
 import com.example.fxmleditor.repository.ProjectHistoryRepository;
+import com.example.fxmleditor.repository.ProjectRepository;
 import com.example.fxmleditor.repository.UserRepository;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -21,15 +24,17 @@ public class DataMigrationService {
     private final MinioStorageService storage;
     private final UserRepository users;
     private final ProjectHistoryRepository history;
+    private final ProjectRepository projects;
     private final Path dataDir;
     private final ObjectMapper mapper = new ObjectMapper()
             .registerModule(new com.fasterxml.jackson.datatype.jsr310.JavaTimeModule())
             .disable(com.fasterxml.jackson.databind.SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
 
-    public DataMigrationService(MinioStorageService storage, UserRepository users, ProjectHistoryRepository history, @Value("${app.data-dir:/data}") String dataDir) {
+    public DataMigrationService(MinioStorageService storage, UserRepository users, ProjectHistoryRepository history, ProjectRepository projects, @Value("${app.data-dir:/data}") String dataDir) {
         this.storage = storage;
         this.users = users;
         this.history = history;
+        this.projects = projects;
         this.dataDir = Paths.get(dataDir);
     }
 
@@ -37,10 +42,33 @@ public class DataMigrationService {
     public void migrate() {
         migrateUsersToPostgres();
         migrateHistoryToPostgres();
+        migrateProjectsToPostgres();
         migrateFile(dataDir.resolve("users.json"), "users/users.json");
         migrateDir(dataDir.resolve("projects"), "projects/");
         migrateDir(dataDir.resolve("history"), "history/");
         migrateDir(dataDir.resolve("workspaces"), "workspaces/");
+    }
+
+    private void migrateProjectsToPostgres() {
+        try {
+            for (String key : storage.list("projects/")) {
+                if (!key.endsWith(".json")) continue;
+                String projectId = key.substring("projects/".length(), key.length() - ".json".length());
+                if (projectId.isBlank() || projects.existsById(projectId)) continue;
+                try {
+                    byte[] data = storage.get(key);
+                    if (data == null) continue;
+                    String json = new String(data, java.nio.charset.StandardCharsets.UTF_8);
+                    SharedProject p = mapper.readValue(json, SharedProject.class);
+                    String name = p == null ? null : p.name;
+                    String ownerId = p == null ? null : p.ownerId;
+                    java.time.Instant updatedAt = p == null ? null : p.updatedAt;
+                    projects.save(new ProjectRecord(projectId, ownerId, name, json, updatedAt));
+                } catch (Exception ignored) {
+                }
+            }
+        } catch (Exception ignored) {
+        }
     }
 
     private void migrateHistoryToPostgres() {
