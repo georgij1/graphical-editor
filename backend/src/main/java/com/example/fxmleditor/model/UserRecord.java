@@ -1,17 +1,31 @@
 package com.example.fxmleditor.model;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
-import com.fasterxml.jackson.annotation.JsonProperty;
+import jakarta.persistence.*;
 
 import java.time.Instant;
 
 @JsonInclude(JsonInclude.Include.NON_NULL)
+@Entity
+@Table(name = "app_users")
 public class UserRecord {
+    @Id
+    @Column(nullable = false, updatable = false)
     public String id;
+
+    @Column(nullable = false, unique = true)
     public String email;
+
+    @Column(nullable = false)
     public String salt;
+
+    @Column(nullable = false)
     public String hash;
+
+    @Column(name = "created_at")
     public Instant createdAt;
+
+    @Column(columnDefinition = "TEXT")
     public String avatar;
 
     public UserRecord() {}

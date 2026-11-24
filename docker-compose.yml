@@ -1,4 +1,18 @@
 services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-graphical_editor}
+      POSTGRES_USER: ${POSTGRES_USER:-editor}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-editor}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    restart: unless-stopped
+    networks:
+      - editor-net
+
   minio:
     image: minio/minio:latest
     command: server /data --console-address ":9001"
@@ -28,6 +42,9 @@ services:
       MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
       MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
       MINIO_BUCKET: ${MINIO_BUCKET:-graphical-editor}
+      SPRING_DATASOURCE_URL: ${SPRING_DATASOURCE_URL:-jdbc:postgresql://postgres:5432/graphical_editor}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-editor}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-editor}
     volumes:
       - backend-data:/data
       - ./downloads:/downloads:ro
@@ -35,6 +52,7 @@ services:
       - "host.docker.internal:host-gateway"
     depends_on:
       - minio
+      - postgres
     restart: unless-stopped
     networks:
       - editor-net
@@ -56,6 +74,7 @@ services:
 volumes:
   backend-data:
   minio-data:
+  postgres-data:
 
 networks:
   editor-net:

@@ -1,5 +1,9 @@
 package com.example.fxmleditor.service;
 
+import com.example.fxmleditor.model.UserRecord;
+import com.example.fxmleditor.repository.UserRepository;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -7,24 +11,55 @@ import org.springframework.stereotype.Service;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.List;
 import java.util.stream.Stream;
 
 @Service
 public class DataMigrationService {
     private final MinioStorageService storage;
+    private final UserRepository users;
     private final Path dataDir;
+    private final ObjectMapper mapper = new ObjectMapper()
+            .registerModule(new com.fasterxml.jackson.datatype.jsr310.JavaTimeModule())
+            .disable(com.fasterxml.jackson.databind.SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
 
-    public DataMigrationService(MinioStorageService storage, @Value("${app.data-dir:/data}") String dataDir) {
+    public DataMigrationService(MinioStorageService storage, UserRepository users, @Value("${app.data-dir:/data}") String dataDir) {
         this.storage = storage;
+        this.users = users;
         this.dataDir = Paths.get(dataDir);
     }
 
     @PostConstruct
     public void migrate() {
+        migrateUsersToPostgres();
         migrateFile(dataDir.resolve("users.json"), "users/users.json");
         migrateDir(dataDir.resolve("projects"), "projects/");
         migrateDir(dataDir.resolve("history"), "history/");
         migrateDir(dataDir.resolve("workspaces"), "workspaces/");
+    }
+
+    private void migrateUsersToPostgres() {
+        try {
+            if (users.count() > 0) return;
+            byte[] data = storage.get("users/users.json");
+            if (data == null) {
+                Path disk = dataDir.resolve("users.json");
+                if (Files.exists(disk)) data = Files.readAllBytes(disk);
+            }
+            if (data == null) return;
+            List<UserRecord> list = mapper.readValue(data, new TypeReference<List<UserRecord>>() {});
+            if (list == null || list.isEmpty()) return;
+            for (UserRecord u : list) {
+                if (u == null || u.id == null) continue;
+                try {
+                    if (!users.existsById(u.id)) {
+                        users.save(u);
+                    }
+                } catch (Exception ignored) {
+                }
+            }
+        } catch (Exception ignored) {
+        }
     }
 
     private void migrateFile(Path file, String key) {

@@ -5,6 +5,19 @@ spring:
   jackson:
     serialization:
       write-dates-as-timestamps: false
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/graphical_editor}
+    username: ${SPRING_DATASOURCE_USERNAME:editor}
+    password: ${SPRING_DATASOURCE_PASSWORD:editor}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: update
+    open-in-view: false
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
 
 # Директория для хранения JSON-данных
 app:
