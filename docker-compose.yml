@@ -26,6 +26,18 @@ services:
     networks:
       - editor-net
 
+  ai-service:
+    build: ./ai-service
+    environment:
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
+      PORT: 8080
+      OLLAMA_URL: ${OLLAMA_URL:-http://host.docker.internal:11434}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+    networks:
+      - editor-net
+
   backend:
     build: ./backend
     environment:
@@ -35,7 +47,6 @@ services:
       JAVAFX_LIB: /opt/javafx/lib
       JAVA_MODULES: javafx.controls,javafx.fxml
       PORT: 8080
-      OLLAMA_URL: ${OLLAMA_URL:-http://host.docker.internal:11434}
       MINIO_URL: ${MINIO_URL:-http://minio:9000}
       MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
       MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
@@ -65,6 +76,7 @@ services:
       - "host.docker.internal:host-gateway"
     depends_on:
       - backend
+      - ai-service
     restart: unless-stopped
     networks:
       - editor-net

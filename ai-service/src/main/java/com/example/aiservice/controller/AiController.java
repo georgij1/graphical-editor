@@ -1,6 +1,6 @@
-package com.example.fxmleditor.controller;
+package com.example.aiservice.controller;
 
-import com.example.fxmleditor.security.JwtService;
+import com.example.aiservice.security.JwtService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Value;
@@ -18,7 +18,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
-import java.util.*;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/ai")
@@ -54,7 +54,7 @@ public class AiController {
         }
     }
 
-    @GetMapping("/models")
+    @GetMapping({"/models", "/tags"})
     @Operation(summary = "List AI models available in Ollama")
     public ResponseEntity<?> listModels(@RequestHeader(value = "Authorization", required = false) String auth) {
         if (!isAuthenticated(auth)) return unauthorized();
@@ -123,7 +123,6 @@ public class AiController {
                         os.flush();
                     }
                 } catch (IOException ignored) {
-                    // client disconnected or stream closed
                 }
             };
             return ResponseEntity.ok()

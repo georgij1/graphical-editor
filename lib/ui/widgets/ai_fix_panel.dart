@@ -83,7 +83,7 @@ class _AiChatPanelState extends State<AiChatPanel> {
     List<String> remote = const <String>[];
     String? loadError;
     try {
-      remote = await widget.client.listModels();
+      remote = await widget.client.listModels(authToken: widget.controller.authToken);
     } on AiException catch (error) {
       loadError = error.message;
     } catch (error) {
@@ -656,6 +656,7 @@ class _AiChatPanelState extends State<AiChatPanel> {
         model: model,
         prompt: prompt,
         baseUrl: baseUrl,
+        authToken: widget.controller.authToken,
         system:
             'You are a helpful coding assistant inside a graphical editor. '
             'Answer clearly. When providing corrected or example code, include it in fenced code blocks.',

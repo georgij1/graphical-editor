@@ -125,6 +125,7 @@ class EditorController extends ChangeNotifier {
   bool get authBusy => _authBusy;
   String? get authError => _authError;
   String? get userEmail => _userEmail;
+  String? get authToken => _token;
   bool get signedIn => _authStatus == AuthStatus.signedIn;
   bool get editorVisible => _authStatus == AuthStatus.signedIn;
 
