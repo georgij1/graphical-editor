@@ -1,7 +1,7 @@
-package com.example.fxmleditor.controller;
+package com.example.storageservice.controller;
 
-import com.example.fxmleditor.security.JwtService;
-import com.example.fxmleditor.service.MinioStorageService;
+import com.example.storageservice.security.JwtService;
+import com.example.storageservice.service.MinioStorageService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.HttpHeaders;

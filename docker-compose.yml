@@ -65,6 +65,21 @@ services:
     networks:
       - editor-net
 
+  storage-service:
+    build: ./storage-service
+    environment:
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
+      PORT: 8080
+      MINIO_URL: ${MINIO_URL:-http://minio:9000}
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      MINIO_BUCKET: ${MINIO_BUCKET:-graphical-editor}
+    depends_on:
+      - minio
+    restart: unless-stopped
+    networks:
+      - editor-net
+
   backend:
     build: ./backend
     environment:
@@ -106,6 +121,7 @@ services:
       - ai-service
       - auth-service
       - analyzer-service
+      - storage-service
     restart: unless-stopped
     networks:
       - editor-net

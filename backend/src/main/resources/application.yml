@@ -48,3 +48,5 @@ springdoc:
         url: /v3/api-docs/auth-service
       - name: Analyzer Service
         url: /v3/api-docs/analyzer-service
+      - name: Storage Service
+        url: /v3/api-docs/storage-service
