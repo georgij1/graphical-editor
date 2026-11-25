@@ -17,6 +17,7 @@ springdoc:
     path: /swagger-ui.html
     operations-sorter: method
     tags-sorter: alpha
+    urls-primary-name: Auth Service
     urls:
       - name: Auth Service
         url: /v3/api-docs/auth-service
