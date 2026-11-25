@@ -58,6 +58,9 @@ services:
       PORT: 8080
       JAVAFX_LIB: /opt/javafx/lib
       JAVA_MODULES: javafx.controls,javafx.fxml
+      DOWNLOADS_DIR: /downloads
+    volumes:
+      - ./downloads:/downloads:ro
     restart: unless-stopped
     networks:
       - editor-net

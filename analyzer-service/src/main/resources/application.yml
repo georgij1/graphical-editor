@@ -10,6 +10,7 @@ spring:
 app:
   javafx-lib: ${JAVAFX_LIB:/opt/javafx/lib}
   java-modules: ${JAVA_MODULES:javafx.controls,javafx.fxml}
+  downloads-dir: ${DOWNLOADS_DIR:/downloads}
 
 springdoc:
   api-docs:
