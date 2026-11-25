@@ -18,12 +18,12 @@ springdoc:
     operations-sorter: method
     tags-sorter: alpha
     urls:
+      - name: Auth Service
+        url: /v3/api-docs/auth-service
       - name: Backend
         url: /v3/api-docs
       - name: AI Service
         url: /v3/api-docs/ai-service
-      - name: Auth Service
-        url: /v3/api-docs/auth-service
       - name: Analyzer Service
         url: /v3/api-docs/analyzer-service
       - name: Storage Service
