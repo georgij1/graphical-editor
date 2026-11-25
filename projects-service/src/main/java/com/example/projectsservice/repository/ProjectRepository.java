@@ -1,6 +1,6 @@
-package com.example.fxmleditor.repository;
+package com.example.projectsservice.repository;
 
-import com.example.fxmleditor.model.ProjectRecord;
+import com.example.projectsservice.model.ProjectRecord;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface ProjectRepository extends JpaRepository<ProjectRecord, String> {

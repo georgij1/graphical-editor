@@ -1,10 +1,10 @@
-package com.example.fxmleditor.service;
+package com.example.projectsservice.service;
 
-import com.example.fxmleditor.model.ProjectHistoryRecord;
-import com.example.fxmleditor.model.ProjectRecord;
-import com.example.fxmleditor.model.SharedProject;
-import com.example.fxmleditor.repository.ProjectHistoryRepository;
-import com.example.fxmleditor.repository.ProjectRepository;
+import com.example.projectsservice.model.ProjectHistoryRecord;
+import com.example.projectsservice.model.ProjectRecord;
+import com.example.projectsservice.model.SharedProject;
+import com.example.projectsservice.repository.ProjectHistoryRepository;
+import com.example.projectsservice.repository.ProjectRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Value;

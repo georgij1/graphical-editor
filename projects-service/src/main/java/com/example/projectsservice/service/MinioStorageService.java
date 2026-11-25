@@ -1,4 +1,4 @@
-package com.example.fxmleditor.service;
+package com.example.projectsservice.service;
 
 import io.minio.*;
 import io.minio.messages.Item;

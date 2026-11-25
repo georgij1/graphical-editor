@@ -5,32 +5,10 @@ spring:
   jackson:
     serialization:
       write-dates-as-timestamps: false
-  datasource:
-    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/graphical_editor}
-    username: ${SPRING_DATASOURCE_USERNAME:editor}
-    password: ${SPRING_DATASOURCE_PASSWORD:editor}
-    driver-class-name: org.postgresql.Driver
-  jpa:
-    hibernate:
-      ddl-auto: update
-    open-in-view: false
-    properties:
-      hibernate:
-        jdbc:
-          time_zone: UTC
 
-# Директория для хранения JSON-данных
 app:
-  data-dir: ${DATA_DIR:/data}           # директория для хранения JSON-данных
-  downloads-dir: ${DOWNLOADS_DIR:/downloads}  # директория со скачиваемыми клиентами
-  javafx-lib: ${JAVAFX_LIB:/opt/javafx/lib}   # путь к JavaFX SDK внутри контейнера
-  java-modules: ${JAVA_MODULES:javafx.controls,javafx.fxml}  # модули JavaFX
-  jwt-secret: ${JWT_SECRET:change-me-in-production}  # секрет JWT (обязательно заменить в проде)
+  jwt-secret: ${JWT_SECRET:change-me-in-production}
   jwt-expiration-hours: 240
-  minio-url: ${MINIO_URL:http://localhost:9000}
-  minio-access-key: ${MINIO_ACCESS_KEY:minioadmin}
-  minio-secret-key: ${MINIO_SECRET_KEY:minioadmin}
-  minio-bucket: ${MINIO_BUCKET:graphical-editor}             # время жизни токена (10 суток)
 
 springdoc:
   api-docs:
@@ -50,3 +28,5 @@ springdoc:
         url: /v3/api-docs/analyzer-service
       - name: Storage Service
         url: /v3/api-docs/storage-service
+      - name: Projects Service
+        url: /v3/api-docs/projects-service

@@ -1,4 +1,4 @@
-package com.example.fxmleditor.model;
+package com.example.projectsservice.model;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 

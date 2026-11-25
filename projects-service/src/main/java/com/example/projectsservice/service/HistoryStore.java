@@ -1,7 +1,7 @@
-package com.example.fxmleditor.service;
+package com.example.projectsservice.service;
 
-import com.example.fxmleditor.model.ProjectHistoryRecord;
-import com.example.fxmleditor.repository.ProjectHistoryRepository;
+import com.example.projectsservice.model.ProjectHistoryRecord;
+import com.example.projectsservice.repository.ProjectHistoryRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;

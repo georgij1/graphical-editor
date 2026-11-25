@@ -1,11 +1,11 @@
-package com.example.fxmleditor.controller;
+package com.example.projectsservice.controller;
 
-import com.example.fxmleditor.model.ProjectMember;
-import com.example.fxmleditor.model.SharedProject;
-import com.example.fxmleditor.security.JwtService;
-import com.example.fxmleditor.service.HistoryStore;
-import com.example.fxmleditor.service.ProjectFileStorageService;
-import com.example.fxmleditor.service.ProjectStore;
+import com.example.projectsservice.model.ProjectMember;
+import com.example.projectsservice.model.SharedProject;
+import com.example.projectsservice.security.JwtService;
+import com.example.projectsservice.service.HistoryStore;
+import com.example.projectsservice.service.ProjectFileStorageService;
+import com.example.projectsservice.service.ProjectStore;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.HttpHeaders;

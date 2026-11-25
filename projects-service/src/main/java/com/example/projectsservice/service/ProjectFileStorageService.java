@@ -1,6 +1,6 @@
-package com.example.fxmleditor.service;
+package com.example.projectsservice.service;
 
-import com.example.fxmleditor.model.SharedProject;
+import com.example.projectsservice.model.SharedProject;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Service;
 
