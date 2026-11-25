@@ -1,0 +1,20 @@
+server:
+  port: ${PORT:8080}
+
+spring:
+  servlet:
+    multipart:
+      max-file-size: 64MB
+      max-request-size: 64MB
+
+app:
+  javafx-lib: ${JAVAFX_LIB:/opt/javafx/lib}
+  java-modules: ${JAVA_MODULES:javafx.controls,javafx.fxml}
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    operations-sorter: method
+    tags-sorter: alpha

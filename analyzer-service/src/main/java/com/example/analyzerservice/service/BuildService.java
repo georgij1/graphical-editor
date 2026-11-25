@@ -1,4 +1,4 @@
-package com.example.fxmleditor.service;
+package com.example.analyzerservice.service;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;

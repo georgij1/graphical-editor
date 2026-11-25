@@ -1,7 +1,7 @@
-package com.example.fxmleditor.controller;
+package com.example.analyzerservice.controller;
 
-import com.example.fxmleditor.service.BuildService;
-import com.example.fxmleditor.service.BuildService.BuildException;
+import com.example.analyzerservice.service.BuildService;
+import com.example.analyzerservice.service.BuildService.BuildException;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.*;

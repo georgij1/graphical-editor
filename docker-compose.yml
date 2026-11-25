@@ -52,6 +52,16 @@ services:
     networks:
       - editor-net
 
+  analyzer-service:
+    build: ./analyzer-service
+    environment:
+      PORT: 8080
+      JAVAFX_LIB: /opt/javafx/lib
+      JAVA_MODULES: javafx.controls,javafx.fxml
+    restart: unless-stopped
+    networks:
+      - editor-net
+
   backend:
     build: ./backend
     environment:
@@ -92,6 +102,7 @@ services:
       - backend
       - ai-service
       - auth-service
+      - analyzer-service
     restart: unless-stopped
     networks:
       - editor-net
