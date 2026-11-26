@@ -49,7 +49,7 @@ services:
       MINIO_URL: ${MINIO_URL:-http://minio:9000}
       MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
       MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
-      MINIO_BUCKET: ${MINIO_BUCKET:graphical-editor}
+      MINIO_BUCKET: ${MINIO_BUCKET:-graphical-editor}
     depends_on:
       - postgres
       - minio
