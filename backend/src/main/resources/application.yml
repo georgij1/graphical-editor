@@ -17,15 +17,15 @@ springdoc:
     path: /swagger-ui.html
     operations-sorter: method
     tags-sorter: alpha
-    urls-primary-name: Auth Service
+    urls-primary-name: 1. Auth Service
     urls:
-      - name: Auth Service
+      - name: 1. Auth Service
         url: /v3/api-docs/auth-service
-      - name: AI Service
-        url: /v3/api-docs/ai-service
-      - name: Analyzer Service
-        url: /v3/api-docs/analyzer-service
-      - name: Storage Service
-        url: /v3/api-docs/storage-service
-      - name: Projects Service
+      - name: 2. Projects Service
         url: /v3/api-docs/projects-service
+      - name: 3. AI Service
+        url: /v3/api-docs/ai-service
+      - name: 4. Analyzer Service
+        url: /v3/api-docs/analyzer-service
+      - name: 5. Storage Service
+        url: /v3/api-docs/storage-service
