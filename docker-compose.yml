@@ -46,8 +46,13 @@ services:
       SPRING_DATASOURCE_URL: ${SPRING_DATASOURCE_URL:-jdbc:postgresql://postgres:5432/graphical_editor}
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-editor}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-editor}
+      MINIO_URL: ${MINIO_URL:-http://minio:9000}
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      MINIO_BUCKET: ${MINIO_BUCKET:graphical-editor}
     depends_on:
       - postgres
+      - minio
     restart: unless-stopped
     networks:
       - editor-net

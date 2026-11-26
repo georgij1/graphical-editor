@@ -7,6 +7,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -64,7 +65,7 @@ public class UserController {
         if (claims == null) return unauthorized();
         UserRecord user = userStore.findById(jwt.userId(claims));
         if (user == null) return unauthorized();
-        return ResponseEntity.ok(Map.of("email", user.email, "id", user.id, "avatar", user.avatar == null ? "" : user.avatar));
+        return ResponseEntity.ok(Map.of("email", user.email, "id", user.id, "avatar", userStore.avatarUrl(user.id)));
     }
 
     @PatchMapping("/me")
@@ -76,7 +77,7 @@ public class UserController {
         try {
             UserRecord user = userStore.updateEmail(jwt.userId(claims), email);
             String newToken = jwt.issue(user.id, user.email);
-            return ResponseEntity.ok(Map.of("email", user.email, "token", newToken, "id", user.id));
+            return ResponseEntity.ok(Map.of("email", user.email, "token", newToken, "id", user.id, "avatar", userStore.avatarUrl(user.id)));
         } catch (UserStore.EmailTakenException e) {
             return ResponseEntity.badRequest().body(Map.of("error", "This email is already registered."));
         } catch (Exception e) {
@@ -111,7 +112,7 @@ public class UserController {
         String avatar = body == null ? null : body.avatar();
         try {
             UserRecord user = userStore.updateAvatar(jwt.userId(claims), avatar);
-            return ResponseEntity.ok(Map.of("avatar", user.avatar == null ? "" : user.avatar));
+            return ResponseEntity.ok(Map.of("avatar", userStore.avatarUrl(user.id)));
         } catch (UserStore.AvatarTooLargeException e) {
             return ResponseEntity.badRequest().body(Map.of("error", "Avatar too large."));
         } catch (Exception e) {
@@ -119,8 +120,18 @@ public class UserController {
         }
     }
 
+    @GetMapping("/users/{id}/avatar")
+    @Operation(summary = "Get user avatar", security = {})
+    public ResponseEntity<?> getAvatar(@PathVariable String id) {
+        var avatar = userStore.getAvatar(id);
+        if (avatar == null) return ResponseEntity.notFound().build();
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType(avatar.contentType()))
+                .body(avatar.bytes());
+    }
+
     @PostMapping("/users")
-    @Operation(summary = "List accounts", security = {})
+    @Operation(summary = "List accounts", security = {}) 
     public ResponseEntity<?> listAccounts(@RequestBody TokenRequest body) {
         var claims = claims(token(body));
         if (claims == null) return unauthorized();

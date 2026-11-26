@@ -27,7 +27,31 @@ class UserAvatar extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final size = radius * 2;
-    final bytes = _decode(dataUrl);
+    final url = _asUrl(dataUrl);
+    final bytes = url == null ? _decode(dataUrl) : null;
+
+    Widget child;
+    if (url != null) {
+      child = Image.network(
+        url,
+        width: size,
+        height: size,
+        fit: BoxFit.cover,
+        gaplessPlayback: true,
+        errorBuilder: (context, _, _) => _fallback(theme),
+      );
+    } else if (bytes != null) {
+      child = Image.memory(
+        bytes,
+        width: size,
+        height: size,
+        fit: BoxFit.cover,
+        gaplessPlayback: true,
+        errorBuilder: (context, _, _) => _fallback(theme),
+      );
+    } else {
+      child = _fallback(theme);
+    }
 
     return Tooltip(
       message: email ?? '',
@@ -37,34 +61,28 @@ class UserAvatar extends StatelessWidget {
         clipBehavior: Clip.antiAlias,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          color: bytes == null
+          color: (url == null && bytes == null)
               ? theme.colorScheme.primaryContainer
               : Colors.transparent,
           border: Border.all(color: theme.colorScheme.outlineVariant),
         ),
-        child: bytes == null
-            ? Center(
-                child: Text(
-                  _initial(),
-                  style: TextStyle(
-                    fontSize: radius * 0.9,
-                    fontWeight: FontWeight.w600,
-                    color: theme.colorScheme.onPrimaryContainer,
-                  ),
-                ),
-              )
-            : Image.memory(
-                bytes,
-                width: size,
-                height: size,
-                fit: BoxFit.cover,
-                gaplessPlayback: true,
-                errorBuilder: (context, _, _) => Icon(
-                  Icons.person_outline,
-                  size: radius,
-                  color: theme.colorScheme.onPrimaryContainer,
-                ),
-              ),
+        child: child,
+      ),
+    );
+  }
+
+  Widget _fallback(ThemeData theme) {
+    return ColoredBox(
+      color: theme.colorScheme.primaryContainer,
+      child: Center(
+        child: Text(
+          _initial(),
+          style: TextStyle(
+            fontSize: radius * 0.9,
+            fontWeight: FontWeight.w600,
+            color: theme.colorScheme.onPrimaryContainer,
+          ),
+        ),
       ),
     );
   }
@@ -73,6 +91,15 @@ class UserAvatar extends StatelessWidget {
     final value = (email ?? '').trim();
     if (value.isEmpty) return '?';
     return value[0].toUpperCase();
+  }
+
+  static String? _asUrl(String? value) {
+    if (value == null) return null;
+    final v = value.trim();
+    if (v.startsWith('http://') || v.startsWith('https://') || v.startsWith('/')) {
+      return v;
+    }
+    return null;
   }
 
   static Uint8List? _decode(String? dataUrl) {
