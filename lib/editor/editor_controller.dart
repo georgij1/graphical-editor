@@ -1793,6 +1793,29 @@ class EditorController extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<bool> deleteAccount() async {
+    final token = _token;
+    if (token == null) return false;
+    final result = await _api.deleteAccount(token);
+    if (!result.isOk) {
+      _setProfileMessage(result.message ?? 'Could not delete the account.', error: true);
+      notifyListeners();
+      return false;
+    }
+    _token = null;
+    _userEmail = null;
+    _userId = null;
+    _avatar = null;
+    await _tokenStore.delete('auth_token');
+    await _tokenStore.delete('auth_email');
+    await _tokenStore.delete('auth_user_id');
+    await _tokenStore.delete('auth_avatar');
+    _authStatus = AuthStatus.signedOut;
+    await loadWorkspace(replace: true);
+    notifyListeners();
+    return true;
+  }
+
   Future<void> _handleAuthResult(ApiResult<AuthUser> result) async {
     _authBusy = false;
     if (result.isOk) {

@@ -174,6 +174,9 @@ abstract class ApiClient {
 
   /// Uploads (or clears, when [avatar] is null) the profile picture.
   Future<ApiResult<String?>> updateAvatar(String token, String? avatar);
+
+  /// Permanently deletes the current user account.
+  Future<ApiResult<void>> deleteAccount(String token);
 }
 
 class HttpApiClient implements ApiClient {
@@ -698,6 +701,29 @@ class HttpApiClient implements ApiClient {
       return ApiResult.ok(data.value?['avatar'] as String?);
     } on Exception {
       return ApiResult<String?>.failure(ApiStatus.offline, null);
+    }
+  }
+
+  @override
+  Future<ApiResult<void>> deleteAccount(String token) async {
+    try {
+      final response = await _client
+          .post(
+            _uri('/me/delete'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode(<String, dynamic>{'token': token}),
+          )
+          .timeout(_timeout);
+      if (response.statusCode == 401) {
+        return ApiResult<void>.failure(ApiStatus.unauthorized, null);
+      }
+      if (response.statusCode >= 400) {
+        final data = _decode(response);
+        return ApiResult<void>.failure(data.status, data.message);
+      }
+      return ApiResult<void>.ok(null);
+    } on Exception {
+      return ApiResult<void>.failure(ApiStatus.offline, null);
     }
   }
 

@@ -120,6 +120,19 @@ public class UserController {
         }
     }
 
+    @PostMapping("/me/delete")
+    @Operation(summary = "Delete current user account", security = {})
+    public ResponseEntity<?> deleteAccount(@RequestBody TokenRequest body) {
+        var claims = claims(token(body));
+        if (claims == null) return unauthorized();
+        try {
+            userStore.deleteUser(jwt.userId(claims));
+            return ResponseEntity.ok(Map.of("ok", true));
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(Map.of("error", e.getMessage()));
+        }
+    }
+
     @GetMapping("/users/{id}/avatar")
     @Operation(summary = "Get user avatar", security = {})
     public ResponseEntity<?> getAvatar(@PathVariable String id) {

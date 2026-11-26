@@ -107,6 +107,42 @@ class _ProfileDialogState extends State<ProfileDialog> {
     return 'image/jpeg';
   }
 
+  Future<void> _deleteAccount() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(context.tr('Delete account')),
+        content: Text(context.tr(
+            'Are you sure you want to delete your account? This action cannot be undone.')),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(context.tr('Cancel')),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(ctx).colorScheme.error,
+              foregroundColor: Theme.of(ctx).colorScheme.onError,
+            ),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text(context.tr('Delete')),
+          ),
+        ],
+      ),
+    );
+    if (confirm != true || !mounted) return;
+    setState(() {
+      _busy = true;
+      _passwordError = null;
+    });
+    final ok = await controller.deleteAccount();
+    if (!mounted) return;
+    setState(() => _busy = false);
+    if (ok) {
+      Navigator.of(context).pop();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -246,6 +282,23 @@ const SizedBox(height: 8),
                   maxLines: 2,
                 ),
               ],
+              const SizedBox(height: 24),
+              const Divider(),
+              const SizedBox(height: 8),
+              Text(
+                context.tr('Danger zone'),
+                style: theme.textTheme.titleSmall?.copyWith(color: theme.colorScheme.error),
+              ),
+              const SizedBox(height: 8),
+              OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: theme.colorScheme.error,
+                  side: BorderSide(color: theme.colorScheme.error),
+                ),
+                onPressed: _busy ? null : _deleteAccount,
+                icon: const Icon(Icons.delete_forever_outlined, size: 18),
+                label: Text(context.tr('Delete account')),
+              ),
             ],
           ),
         ),

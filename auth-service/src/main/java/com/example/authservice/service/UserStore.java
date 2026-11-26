@@ -182,6 +182,14 @@ public class UserStore {
         return "/api/users/" + userId + "/avatar";
     }
 
+    @Transactional
+    public void deleteUser(String userId) {
+        UserRecord target = users.findById(userId).orElseThrow(() -> new IllegalStateException("Unknown user " + userId));
+        deleteAvatarObject(target);
+        workspaces.deleteById(userId);
+        users.deleteById(userId);
+    }
+
     private void deleteAvatarObject(UserRecord user) {
         if (user == null || user.avatar == null) return;
         if (user.avatar.startsWith("minio:")) {
