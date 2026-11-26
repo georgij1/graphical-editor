@@ -8,6 +8,7 @@ import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -41,7 +42,7 @@ public class AuthController {
             @Schema(example = "Enter a valid email address.") String error) {}
 
     @PostMapping("/auth/register")
-    @Operation(summary = "Register a new account")
+    @Operation(summary = "Register a new account", security = {})
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Registered",
                     content = @Content(schema = @Schema(implementation = AuthResponse.class))),
@@ -71,7 +72,7 @@ public class AuthController {
     }
 
     @PostMapping("/auth/login")
-    @Operation(summary = "Log in")
+    @Operation(summary = "Log in", security = {})
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Authenticated",
                     content = @Content(schema = @Schema(implementation = AuthResponse.class))),
