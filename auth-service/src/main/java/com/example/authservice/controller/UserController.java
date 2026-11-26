@@ -4,6 +4,8 @@ import com.example.authservice.model.UserRecord;
 import com.example.authservice.security.JwtService;
 import com.example.authservice.service.UserStore;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -22,24 +24,55 @@ public class UserController {
         this.jwt = jwt;
     }
 
-    @GetMapping("/me")
-    @Operation(summary = "Current profile")
-    public ResponseEntity<?> me(@RequestHeader("Authorization") String auth) {
-        String token = bearer(auth);
-        var claims = jwt.verify(token);
-        if (claims == null) return ResponseEntity.status(401).body(Map.of("error", "Not authenticated."));
+    public record TokenRequest(
+            @Schema(description = "JWT token", example = "eyJhbGciOi...") String token) {}
+
+    public record UpdateEmailRequest(
+            @Schema(description = "JWT token", example = "eyJhbGciOi...") String token,
+            @Schema(description = "New email", example = "user@example.com") String email) {}
+
+    public record ChangePasswordRequest(
+            @Schema(description = "JWT token", example = "eyJhbGciOi...") String token,
+            @Schema(description = "Current password") String currentPassword,
+            @Schema(description = "New password") String newPassword) {}
+
+    public record UpdateAvatarRequest(
+            @Schema(description = "JWT token", example = "eyJhbGciOi...") String token,
+            @Schema(description = "Avatar data URL or null") String avatar) {}
+
+    public record WorkspaceWriteRequest(
+            @Schema(description = "JWT token", example = "eyJhbGciOi...") String token,
+            @Schema(description = "Workspace JSON payload") Object workspace) {}
+
+    private ResponseEntity<?> unauthorized() {
+        return ResponseEntity.status(401).body(Map.of("error", "Not authenticated."));
+    }
+
+    private String token(TokenRequest req) {
+        return req == null || req.token() == null ? "" : req.token().trim();
+    }
+
+    private io.jsonwebtoken.Claims claims(String token) {
+        if (token == null || token.isBlank()) return null;
+        return jwt.verify(token);
+    }
+
+    @PostMapping("/me")
+    @Operation(summary = "Current profile", security = {})
+    public ResponseEntity<?> me(@RequestBody TokenRequest body) {
+        var claims = claims(token(body));
+        if (claims == null) return unauthorized();
         UserRecord user = userStore.findById(jwt.userId(claims));
-        if (user == null) return ResponseEntity.status(401).body(Map.of("error", "Not authenticated."));
+        if (user == null) return unauthorized();
         return ResponseEntity.ok(Map.of("email", user.email, "id", user.id, "avatar", user.avatar == null ? "" : user.avatar));
     }
 
     @PatchMapping("/me")
-    @Operation(summary = "Update email")
-    public ResponseEntity<?> updateEmail(@RequestHeader("Authorization") String auth, @RequestBody Map<String, Object> body) {
-        String token = bearer(auth);
-        var claims = jwt.verify(token);
-        if (claims == null) return ResponseEntity.status(401).body(Map.of("error", "Not authenticated."));
-        String email = str(body, "email");
+    @Operation(summary = "Update email", security = {})
+    public ResponseEntity<?> updateEmail(@RequestBody UpdateEmailRequest body) {
+        var claims = claims(body == null ? "" : body.token());
+        if (claims == null) return unauthorized();
+        String email = body == null || body.email() == null ? "" : body.email().trim();
         try {
             UserRecord user = userStore.updateEmail(jwt.userId(claims), email);
             String newToken = jwt.issue(user.id, user.email);
@@ -52,13 +85,14 @@ public class UserController {
     }
 
     @PostMapping("/me/password")
-    @Operation(summary = "Change password")
-    public ResponseEntity<?> changePassword(@RequestHeader("Authorization") String auth, @RequestBody Map<String, Object> body) {
-        String token = bearer(auth);
-        var claims = jwt.verify(token);
-        if (claims == null) return ResponseEntity.status(401).body(Map.of("error", "Not authenticated."));
+    @Operation(summary = "Change password", security = {})
+    public ResponseEntity<?> changePassword(@RequestBody ChangePasswordRequest body) {
+        var claims = claims(body == null ? "" : body.token());
+        if (claims == null) return unauthorized();
         try {
-            userStore.updatePassword(jwt.userId(claims), str(body, "currentPassword"), str(body, "newPassword"));
+            String current = body == null || body.currentPassword() == null ? "" : body.currentPassword();
+            String next = body == null || body.newPassword() == null ? "" : body.newPassword();
+            userStore.updatePassword(jwt.userId(claims), current, next);
             return ResponseEntity.ok(Map.of("ok", true));
         } catch (UserStore.WrongPasswordException e) {
             return ResponseEntity.badRequest().body(Map.of("error", "Current password is incorrect."));
@@ -70,12 +104,11 @@ public class UserController {
     }
 
     @PutMapping("/me/avatar")
-    @Operation(summary = "Update avatar")
-    public ResponseEntity<?> updateAvatar(@RequestHeader("Authorization") String auth, @RequestBody Map<String, Object> body) {
-        String token = bearer(auth);
-        var claims = jwt.verify(token);
-        if (claims == null) return ResponseEntity.status(401).body(Map.of("error", "Not authenticated."));
-        String avatar = body.get("avatar") == null ? null : body.get("avatar").toString();
+    @Operation(summary = "Update avatar", security = {})
+    public ResponseEntity<?> updateAvatar(@RequestBody UpdateAvatarRequest body) {
+        var claims = claims(body == null ? "" : body.token());
+        if (claims == null) return unauthorized();
+        String avatar = body == null ? null : body.avatar();
         try {
             UserRecord user = userStore.updateAvatar(jwt.userId(claims), avatar);
             return ResponseEntity.ok(Map.of("avatar", user.avatar == null ? "" : user.avatar));
@@ -86,22 +119,20 @@ public class UserController {
         }
     }
 
-    @GetMapping("/users")
-    @Operation(summary = "List accounts")
-    public ResponseEntity<?> listAccounts(@RequestHeader("Authorization") String auth) {
-        String token = bearer(auth);
-        var claims = jwt.verify(token);
-        if (claims == null) return ResponseEntity.status(401).body(Map.of("error", "Not authenticated."));
+    @PostMapping("/users")
+    @Operation(summary = "List accounts", security = {})
+    public ResponseEntity<?> listAccounts(@RequestBody TokenRequest body) {
+        var claims = claims(token(body));
+        if (claims == null) return unauthorized();
         var accounts = userStore.listAccounts();
         return ResponseEntity.ok(Map.of("accounts", accounts.stream().map(u -> Map.of("id", u.id, "email", u.email)).toList()));
     }
 
-    @GetMapping("/workspace")
-    @Operation(summary = "Read workspace")
-    public ResponseEntity<?> getWorkspace(@RequestHeader("Authorization") String auth) {
-        String token = bearer(auth);
-        var claims = jwt.verify(token);
-        if (claims == null) return ResponseEntity.status(401).body(Map.of("error", "Not authenticated."));
+    @PostMapping("/workspace/read")
+    @Operation(summary = "Read workspace", security = {})
+    public ResponseEntity<?> getWorkspace(@RequestBody TokenRequest body) {
+        var claims = claims(token(body));
+        if (claims == null) return unauthorized();
         String raw = userStore.readWorkspace(jwt.userId(claims));
         if (raw == null || raw.trim().isEmpty()) {
             return ResponseEntity.ok(Map.of("projects", java.util.List.of()));
@@ -110,26 +141,24 @@ public class UserController {
     }
 
     @PutMapping("/workspace")
-    @Operation(summary = "Write workspace")
-    public ResponseEntity<?> putWorkspace(@RequestHeader("Authorization") String auth, @RequestBody String body) {
-        String token = bearer(auth);
-        var claims = jwt.verify(token);
-        if (claims == null) return ResponseEntity.status(401).body(Map.of("error", "Not authenticated."));
+    @Operation(summary = "Write workspace", security = {})
+    public ResponseEntity<?> putWorkspace(@RequestBody WorkspaceWriteRequest body) {
+        var claims = claims(body == null ? "" : body.token());
+        if (claims == null) return unauthorized();
         try {
-            userStore.writeWorkspace(jwt.userId(claims), body);
+            Object ws = body == null ? null : body.workspace();
+            String json;
+            if (ws == null) {
+                json = "{}";
+            } else if (ws instanceof String s) {
+                json = s;
+            } else {
+                json = new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(ws);
+            }
+            userStore.writeWorkspace(jwt.userId(claims), json);
             return ResponseEntity.ok(Map.of("ok", true));
         } catch (Exception e) {
             return ResponseEntity.status(500).body(Map.of("error", e.getMessage()));
         }
-    }
-
-    private String str(Map<String, Object> body, String key) {
-        Object v = body.get(key);
-        return v == null ? "" : v.toString();
-    }
-
-    private String bearer(String auth) {
-        if (auth == null || !auth.toLowerCase().startsWith("bearer ")) return null;
-        return auth.substring(7).trim();
     }
 }

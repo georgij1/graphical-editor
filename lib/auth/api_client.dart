@@ -271,9 +271,10 @@ class HttpApiClient implements ApiClient {
   Future<ApiResult<Profile?>> getProfile(String token) async {
     try {
       final response = await _client
-          .get(
+          .post(
             _uri('/me'),
-            headers: {'Authorization': 'Bearer $token'},
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode(<String, dynamic>{'token': token}),
           )
           .timeout(_timeout);
       if (response.statusCode == 401) {
@@ -299,11 +300,8 @@ class HttpApiClient implements ApiClient {
       final response = await _client
           .patch(
             _uri('/me'),
-            headers: {
-              'Authorization': 'Bearer $token',
-              'Content-Type': 'application/json',
-            },
-            body: jsonEncode(<String, dynamic>{'email': email}),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode(<String, dynamic>{'token': token, 'email': email}),
           )
           .timeout(_timeout);
       final result = _decode(response);
@@ -328,11 +326,9 @@ class HttpApiClient implements ApiClient {
       final response = await _client
           .post(
             _uri('/me/password'),
-            headers: {
-              'Authorization': 'Bearer $token',
-              'Content-Type': 'application/json',
-            },
+            headers: {'Content-Type': 'application/json'},
             body: jsonEncode(<String, dynamic>{
+              'token': token,
               'currentPassword': currentPassword,
               'newPassword': newPassword,
             }),
@@ -403,18 +399,32 @@ class HttpApiClient implements ApiClient {
 
   @override
   Future<ApiResult<List<Account>>> listAccounts(String token) async {
-    final result = await _projectRequest('GET', '/users', token);
-    if (!result.isOk || result.value == null) {
-      return ApiResult<List<Account>>.failure(result.status, result.message);
+    try {
+      final response = await _client
+          .post(
+            _uri('/users'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode(<String, dynamic>{'token': token}),
+          )
+          .timeout(_timeout);
+      if (response.statusCode == 401) {
+        return ApiResult<List<Account>>.failure(ApiStatus.unauthorized, null);
+      }
+      final data = _decode(response);
+      if (!data.isOk || data.value == null) {
+        return ApiResult<List<Account>>.failure(data.status, data.message);
+      }
+      final list = data.value!['accounts'] as List? ?? <dynamic>[];
+      return ApiResult<List<Account>>.ok([
+        for (final item in list)
+          Account(
+            id: (item as Map<String, dynamic>)['id'] as String? ?? '',
+            email: item['email'] as String? ?? '',
+          ),
+      ]);
+    } on Exception {
+      return ApiResult<List<Account>>.failure(ApiStatus.offline, null);
     }
-    final list = result.value!['accounts'] as List? ?? <dynamic>[];
-    return ApiResult<List<Account>>.ok([
-      for (final item in list)
-        Account(
-          id: (item as Map<String, dynamic>)['id'] as String? ?? '',
-          email: item['email'] as String? ?? '',
-        ),
-    ]);
   }
 
   @override
@@ -676,11 +686,8 @@ class HttpApiClient implements ApiClient {
       final response = await _client
           .put(
             _uri('/me/avatar'),
-            headers: {
-              'Authorization': 'Bearer $token',
-              'Content-Type': 'application/json',
-            },
-            body: jsonEncode(<String, dynamic>{'avatar': avatar}),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode(<String, dynamic>{'token': token, 'avatar': avatar}),
           )
           .timeout(const Duration(seconds: 30));
       if (response.statusCode == 401) {
@@ -698,9 +705,10 @@ class HttpApiClient implements ApiClient {
   Future<ApiResult<String?>> getWorkspace(String token) async {
     try {
       final response = await _client
-          .get(
-            _uri('/workspace'),
-            headers: {'Authorization': 'Bearer $token'},
+          .post(
+            _uri('/workspace/read'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode(<String, dynamic>{'token': token}),
           )
           .timeout(_timeout);
       if (response.statusCode == 401) {
@@ -718,20 +726,26 @@ class HttpApiClient implements ApiClient {
   @override
   Future<ApiResult<void>> putWorkspace(String token, String workspaceJson) async {
     try {
+      dynamic workspace;
+      try {
+        workspace = jsonDecode(workspaceJson);
+      } catch (_) {
+        workspace = workspaceJson;
+      }
       final response = await _client
           .put(
             _uri('/workspace'),
-            headers: {
-              'Authorization': 'Bearer $token',
-              'Content-Type': 'application/json',
-            },
-            body: workspaceJson,
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode(<String, dynamic>{
+              'token': token,
+              'workspace': workspace,
+            }),
           )
           .timeout(_timeout);
       if (response.statusCode == 401) {
         return ApiResult<void>.failure(ApiStatus.unauthorized, null);
       }
-      if (response.statusCode != 204) {
+      if (response.statusCode != 200 && response.statusCode != 204) {
         return ApiResult<void>.failure(ApiStatus.invalid, null);
       }
       return ApiResult.ok(null);
