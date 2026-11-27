@@ -84,6 +84,9 @@ public class AuthController {
         String password = body == null || body.password() == null ? "" : body.password();
         UserRecord user = userStore.findByEmail(email);
         if (user == null) return ResponseEntity.status(401).body(new ErrorResponse("Invalid email or password."));
+        if (user.hash == null || user.salt == null) {
+            return ResponseEntity.status(401).body(new ErrorResponse("This account uses social login. Sign in with your provider."));
+        }
         if (!com.example.authservice.security.Security.verifyPassword(password, user.salt, user.hash)) {
             return ResponseEntity.status(401).body(new ErrorResponse("Invalid email or password."));
         }

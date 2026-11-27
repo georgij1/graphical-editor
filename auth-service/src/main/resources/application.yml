@@ -26,6 +26,24 @@ app:
   minio-access-key: ${MINIO_ACCESS_KEY:minioadmin}
   minio-secret-key: ${MINIO_SECRET_KEY:minioadmin}
   minio-bucket: ${MINIO_BUCKET:graphical-editor}
+  oauth:
+    frontend-base-url: ${OAUTH_FRONTEND_BASE_URL:http://localhost:8080}
+    google:
+      client-id: ${OAUTH_GOOGLE_CLIENT_ID:}
+      client-secret: ${OAUTH_GOOGLE_CLIENT_SECRET:}
+      redirect-uri: ${OAUTH_GOOGLE_REDIRECT_URI:}
+    yandex:
+      client-id: ${OAUTH_YANDEX_CLIENT_ID:}
+      client-secret: ${OAUTH_YANDEX_CLIENT_SECRET:}
+      redirect-uri: ${OAUTH_YANDEX_REDIRECT_URI:}
+    vk:
+      client-id: ${OAUTH_VK_CLIENT_ID:}
+      client-secret: ${OAUTH_VK_CLIENT_SECRET:}
+      redirect-uri: ${OAUTH_VK_REDIRECT_URI:}
+    tbank:
+      client-id: ${OAUTH_TBANK_CLIENT_ID:}
+      client-secret: ${OAUTH_TBANK_CLIENT_SECRET:}
+      redirect-uri: ${OAUTH_TBANK_REDIRECT_URI:}
 
 springdoc:
   api-docs:

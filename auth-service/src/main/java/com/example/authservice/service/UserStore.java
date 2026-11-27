@@ -1,7 +1,9 @@
 package com.example.authservice.service;
 
+import com.example.authservice.model.UserExternalIdentity;
 import com.example.authservice.model.UserRecord;
 import com.example.authservice.model.UserWorkspaceRecord;
+import com.example.authservice.repository.UserExternalIdentityRepository;
 import com.example.authservice.repository.UserRepository;
 import com.example.authservice.repository.UserWorkspaceRepository;
 import com.example.authservice.security.Security;
@@ -20,11 +22,14 @@ public class UserStore {
     private static final String AVATAR_PREFIX = "avatars/";
     private final UserRepository users;
     private final UserWorkspaceRepository workspaces;
+    private final UserExternalIdentityRepository externalIdentities;
     private final MinioStorageService storage;
 
-    public UserStore(UserRepository users, UserWorkspaceRepository workspaces, MinioStorageService storage) {
+    public UserStore(UserRepository users, UserWorkspaceRepository workspaces,
+                     UserExternalIdentityRepository externalIdentities, MinioStorageService storage) {
         this.users = users;
         this.workspaces = workspaces;
+        this.externalIdentities = externalIdentities;
         this.storage = storage;
     }
 
@@ -81,6 +86,76 @@ public class UserStore {
         }
     }
 
+    @Transactional(readOnly = true)
+    public UserRecord findByExternalIdentity(String provider, String providerUserId) {
+        if (provider == null || providerUserId == null) return null;
+        return externalIdentities.findByProviderAndProviderUserId(provider, providerUserId)
+                .map(identity -> users.findById(identity.userId).orElse(null))
+                .orElse(null);
+    }
+
+    @Transactional
+    public UserRecord findOrCreateOAuthUser(String provider, String providerUserId, String email) throws Exception {
+        if (provider == null || provider.isBlank() || providerUserId == null || providerUserId.isBlank()) {
+            throw new IllegalArgumentException("Invalid OAuth identity.");
+        }
+        String normalizedProvider = provider.trim().toLowerCase();
+        String normalizedProviderUserId = providerUserId.trim();
+        String normalizedEmail = email == null ? null : email.trim().toLowerCase();
+        if (normalizedEmail != null && normalizedEmail.isBlank()) normalizedEmail = null;
+
+        var existingIdentity = externalIdentities.findByProviderAndProviderUserId(normalizedProvider, normalizedProviderUserId);
+        if (existingIdentity.isPresent()) {
+            UserRecord user = users.findById(existingIdentity.get().userId).orElse(null);
+            if (user != null) return user;
+            // dangling identity - remove and continue
+            externalIdentities.delete(existingIdentity.get());
+        }
+
+        UserRecord user = null;
+        if (normalizedEmail != null) {
+            user = users.findByEmailIgnoreCase(normalizedEmail).orElse(null);
+        }
+        if (user == null) {
+            String generatedEmail = normalizedEmail != null ? normalizedEmail
+                    : (normalizedProvider + "_" + normalizedProviderUserId + "@oauth.local");
+            // ensure generated email is unique
+            String base = generatedEmail;
+            int i = 1;
+            while (users.existsByEmailIgnoreCase(generatedEmail)) {
+                int at = base.indexOf('@');
+                generatedEmail = base.substring(0, at) + "+" + i + base.substring(at);
+                i++;
+            }
+            user = new UserRecord(
+                    String.valueOf(System.currentTimeMillis()) + "_" + UUID.randomUUID().toString().substring(0, 8),
+                    generatedEmail,
+                    null,
+                    null,
+                    Instant.now());
+            user = users.save(user);
+        }
+
+        UserExternalIdentity identity = new UserExternalIdentity(
+                UUID.randomUUID().toString(),
+                user.id,
+                normalizedProvider,
+                normalizedProviderUserId,
+                normalizedEmail,
+                Instant.now());
+        try {
+            externalIdentities.save(identity);
+        } catch (org.springframework.dao.DataIntegrityViolationException e) {
+            // race: identity created concurrently
+            var concurrent = externalIdentities.findByProviderAndProviderUserId(normalizedProvider, normalizedProviderUserId);
+            if (concurrent.isPresent()) {
+                return users.findById(concurrent.get().userId).orElse(user);
+            }
+            throw e;
+        }
+        return user;
+    }
+
     @Transactional
     public UserRecord updateEmail(String userId, String email) throws Exception {
         String normalized = email.trim().toLowerCase();
@@ -100,6 +175,9 @@ public class UserStore {
     @Transactional
     public UserRecord updatePassword(String userId, String currentPassword, String newPassword) throws Exception {
         UserRecord target = users.findById(userId).orElseThrow(() -> new IllegalStateException("Unknown user " + userId));
+        if (target.hash == null || target.salt == null) {
+            throw new IllegalArgumentException("This account uses social login and has no password set.");
+        }
         if (!Security.verifyPassword(currentPassword, target.salt, target.hash)) {
             throw new WrongPasswordException();
         }
@@ -186,6 +264,7 @@ public class UserStore {
     public void deleteUser(String userId) {
         UserRecord target = users.findById(userId).orElseThrow(() -> new IllegalStateException("Unknown user " + userId));
         deleteAvatarObject(target);
+        externalIdentities.deleteByUserId(userId);
         workspaces.deleteById(userId);
         users.deleteById(userId);
     }

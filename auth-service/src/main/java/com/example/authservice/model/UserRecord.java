@@ -16,10 +16,10 @@ public class UserRecord {
     @Column(nullable = false, unique = true)
     public String email;
 
-    @Column(nullable = false)
+    @Column
     public String salt;
 
-    @Column(nullable = false)
+    @Column
     public String hash;
 
     @Column(name = "created_at")

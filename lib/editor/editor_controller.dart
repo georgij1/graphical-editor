@@ -5,7 +5,9 @@ import 'dart:ui' show Locale, Size;
 import 'package:flutter/foundation.dart';
 
 import '../auth/api_client.dart';
+import '../auth/oauth_callback.dart';
 import '../build/build_client.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../fxml/fxml_parser.dart';
 import '../fxml/fxml_serializer.dart';
 import '../io/file_service.dart';
@@ -101,6 +103,7 @@ class EditorController extends ChangeNotifier {
   String? _userEmail;
   String? _userId;
   String? _avatar;
+  List<OAuthProviderInfo> _oauthProviders = const <OAuthProviderInfo>[];
 
   List<Project> get projects => List.unmodifiable(_projects);
   Project? get currentProject => _currentProject;
@@ -128,6 +131,7 @@ class EditorController extends ChangeNotifier {
   String? get authToken => _token;
   bool get signedIn => _authStatus == AuthStatus.signedIn;
   bool get editorVisible => _authStatus == AuthStatus.signedIn;
+  List<OAuthProviderInfo> get oauthProviders => List.unmodifiable(_oauthProviders);
 
   final List<FxmlDocument> _undoStack = <FxmlDocument>[];
   final List<FxmlDocument> _redoStack = <FxmlDocument>[];
@@ -1706,11 +1710,40 @@ class EditorController extends ChangeNotifier {
   Future<void> initAuth() async {
     if (_authDecided) return;
     _authDecided = true;
+
+    final oauth = readOAuthCallback();
+    if (oauth.hasError) {
+      clearOAuthCallbackFromUrl();
+      _authStatus = AuthStatus.signedOut;
+      _authError = oauth.error;
+      unawaited(loadOAuthProviders());
+      notifyListeners();
+      return;
+    }
+    if (oauth.hasCode) {
+      _authStatus = AuthStatus.loading;
+      _authBusy = true;
+      notifyListeners();
+      final result = await _api.exchangeOAuthCode(oauth.code!);
+      clearOAuthCallbackFromUrl();
+      if (result.isOk) {
+        await _handleAuthResult(result);
+        return;
+      }
+      _authBusy = false;
+      _authStatus = AuthStatus.signedOut;
+      _authError = result.message ?? 'OAuth sign-in failed.';
+      unawaited(loadOAuthProviders());
+      notifyListeners();
+      return;
+    }
+
     final token = await _tokenStore.read('auth_token');
     final email = await _tokenStore.read('auth_email');
     final userId = await _tokenStore.read('auth_user_id');
     if (token == null || token.isEmpty) {
       _authStatus = AuthStatus.signedOut;
+      unawaited(loadOAuthProviders());
       notifyListeners();
       return;
     }
@@ -1736,6 +1769,7 @@ class EditorController extends ChangeNotifier {
       await _tokenStore.delete('auth_avatar');
       _authStatus = AuthStatus.signedOut;
       await loadWorkspace();
+      unawaited(loadOAuthProviders());
     } else {
       if (fetch.isOk) {
         final hasLocal = _projects.isNotEmpty || _looseDocument != null;
@@ -1769,10 +1803,46 @@ class EditorController extends ChangeNotifier {
     await _handleAuthResult(await _api.register(email.trim(), password));
   }
 
+  Future<void> loadOAuthProviders() async {
+    final result = await _api.listOAuthProviders();
+    if (!result.isOk || result.value == null) return;
+    _oauthProviders = result.value!;
+    notifyListeners();
+  }
+
+  Future<void> signInWithOAuth(String provider) async {
+    _authBusy = true;
+    _authError = null;
+    notifyListeners();
+    final redirect = Uri.base.toString();
+    final result = await _api.getOAuthStartUrl(provider, redirect: redirect);
+    if (!result.isOk || result.value == null) {
+      _authBusy = false;
+      _authError = result.message ?? 'Could not start OAuth sign-in.';
+      notifyListeners();
+      return;
+    }
+    final uri = Uri.tryParse(result.value!);
+    if (uri == null) {
+      _authBusy = false;
+      _authError = 'Invalid OAuth URL.';
+      notifyListeners();
+      return;
+    }
+    final ok = await launchUrl(uri, webOnlyWindowName: '_self');
+    if (!ok) {
+      _authBusy = false;
+      _authError = 'Could not open OAuth provider.';
+      notifyListeners();
+    }
+    // On success browser navigates away; keep busy state.
+  }
+
   /// Returns to the login screen (e.g. from the account menu) while keeping
   /// the local projects intact for migration on the next sign-in.
   void requestLogin() {
     _authStatus = AuthStatus.signedOut;
+    unawaited(loadOAuthProviders());
     notifyListeners();
   }
 
@@ -1790,6 +1860,7 @@ class EditorController extends ChangeNotifier {
     await _tokenStore.delete('auth_avatar');
     _authStatus = AuthStatus.signedOut;
     await loadWorkspace(replace: true);
+    unawaited(loadOAuthProviders());
     notifyListeners();
   }
 
@@ -1812,6 +1883,7 @@ class EditorController extends ChangeNotifier {
     await _tokenStore.delete('auth_avatar');
     _authStatus = AuthStatus.signedOut;
     await loadWorkspace(replace: true);
+    unawaited(loadOAuthProviders());
     notifyListeners();
     return true;
   }

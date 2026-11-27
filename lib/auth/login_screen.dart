@@ -21,6 +21,14 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _obscure = true;
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) widget.controller.loadOAuthProviders();
+    });
+  }
+
+  @override
   void dispose() {
     _email.dispose();
     _password.dispose();
@@ -57,6 +65,21 @@ class _LoginScreenState extends State<LoginScreen> {
     } else {
       await widget.controller.signIn(email, password);
     }
+  }
+
+  Widget _providerIcon(String id) {
+    final letter = switch (id) {
+      'google' => 'G',
+      'yandex' => 'Я',
+      'vk' => 'VK',
+      'tbank' => 'T',
+      _ => id.isNotEmpty ? id[0].toUpperCase() : '?',
+    };
+    return CircleAvatar(
+      radius: 10,
+      backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+      child: Text(letter, style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w700)),
+    );
   }
 
   @override
@@ -182,7 +205,49 @@ class _LoginScreenState extends State<LoginScreen> {
                                   ? context.tr('Create account')
                                   : context.tr('Sign in')),
                         ),
-                        const SizedBox(height: 12),
+                        Builder(builder: (context) {
+                          final providers = widget.controller.oauthProviders
+                              .where((p) => p.enabled)
+                              .toList();
+                          if (providers.isEmpty) {
+                            return const SizedBox(height: 12);
+                          }
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: <Widget>[
+                              const SizedBox(height: 16),
+                              Row(
+                                children: <Widget>[
+                                  const Expanded(child: Divider()),
+                                  Padding(
+                                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                                    child: Text(
+                                      context.tr('or continue with'),
+                                      style: Theme.of(context).textTheme.bodySmall,
+                                    ),
+                                  ),
+                                  const Expanded(child: Divider()),
+                                ],
+                              ),
+                              const SizedBox(height: 12),
+                              Wrap(
+                                spacing: 8,
+                                runSpacing: 8,
+                                alignment: WrapAlignment.center,
+                                children: providers.map((p) {
+                                  return OutlinedButton.icon(
+                                    onPressed: busy
+                                        ? null
+                                        : () => widget.controller.signInWithOAuth(p.id),
+                                    icon: _providerIcon(p.id),
+                                    label: Text(p.name),
+                                  );
+                                }).toList(),
+                              ),
+                              const SizedBox(height: 12),
+                            ],
+                          );
+                        }),
                       ],
                     ),
                   ),

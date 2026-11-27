@@ -78,6 +78,14 @@ class ProjectInvite {
   final String ownerEmail;
 }
 
+class OAuthProviderInfo {
+  const OAuthProviderInfo({required this.id, required this.name, required this.enabled});
+
+  final String id;
+  final String name;
+  final bool enabled;
+}
+
 /// Client for the FXML editor auth + storage backend.
 abstract class ApiClient {
   Future<ApiResult<AuthUser>> register(String email, String password);
@@ -177,6 +185,15 @@ abstract class ApiClient {
 
   /// Permanently deletes the current user account.
   Future<ApiResult<void>> deleteAccount(String token);
+
+  /// OAuth providers configured on the server.
+  Future<ApiResult<List<OAuthProviderInfo>>> listOAuthProviders();
+
+  /// Returns provider authorization URL for browser redirect.
+  Future<ApiResult<String>> getOAuthStartUrl(String provider, {String? redirect});
+
+  /// Exchanges one-time OAuth callback code for an authenticated session.
+  Future<ApiResult<AuthUser>> exchangeOAuthCode(String code);
 }
 
 class HttpApiClient implements ApiClient {
@@ -725,6 +742,72 @@ class HttpApiClient implements ApiClient {
     } on Exception {
       return ApiResult<void>.failure(ApiStatus.offline, null);
     }
+  }
+
+  @override
+  Future<ApiResult<List<OAuthProviderInfo>>> listOAuthProviders() async {
+    try {
+      final response = await _client
+          .get(_uri('/auth/oauth/providers'))
+          .timeout(_timeout);
+      final decoded = _decode(response);
+      if (!decoded.isOk || decoded.value == null) {
+        return ApiResult<List<OAuthProviderInfo>>.failure(decoded.status, decoded.message);
+      }
+      final raw = decoded.value!['providers'];
+      final out = <OAuthProviderInfo>[];
+      if (raw is Map) {
+        for (final entry in raw.entries) {
+          final id = entry.key.toString();
+          final v = entry.value;
+          if (v is Map) {
+            out.add(OAuthProviderInfo(
+              id: id,
+              name: (v['name'] as String?) ?? id,
+              enabled: v['enabled'] == true,
+            ));
+          }
+        }
+      }
+      return ApiResult.ok(out);
+    } on Exception {
+      return ApiResult<List<OAuthProviderInfo>>.failure(ApiStatus.offline, 'Cannot reach the server.');
+    }
+  }
+
+  @override
+  Future<ApiResult<String>> getOAuthStartUrl(String provider, {String? redirect}) async {
+    try {
+      var path = '/auth/oauth/$provider/start';
+      if (redirect != null && redirect.isNotEmpty) {
+        path += '?redirect=${Uri.encodeQueryComponent(redirect)}';
+      }
+      final response = await _client.get(_uri(path)).timeout(_timeout);
+      final decoded = _decode(response);
+      if (!decoded.isOk || decoded.value == null) {
+        return ApiResult<String>.failure(decoded.status, decoded.message);
+      }
+      final url = decoded.value!['url'] as String?;
+      if (url == null || url.isEmpty) {
+        return ApiResult<String>.failure(ApiStatus.invalid, 'Missing OAuth URL.');
+      }
+      return ApiResult.ok(url);
+    } on Exception {
+      return ApiResult<String>.failure(ApiStatus.offline, 'Cannot reach the server.');
+    }
+  }
+
+  @override
+  Future<ApiResult<AuthUser>> exchangeOAuthCode(String code) async {
+    final result = await _post('/auth/oauth/exchange', {'code': code});
+    if (!result.isOk || result.value == null) {
+      return ApiResult<AuthUser>.failure(result.status, result.message);
+    }
+    return ApiResult.ok(AuthUser(
+      email: result.value!['email'] as String,
+      token: result.value!['token'] as String,
+      id: result.value!['id'] as String?,
+    ));
   }
 
   @override
