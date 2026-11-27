@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 import '../editor/editor_controller.dart';
 import '../l10n/app_localizations.dart';
@@ -68,17 +69,24 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Widget _providerIcon(String id) {
-    final letter = switch (id) {
-      'google' => 'G',
-      'yandex' => 'Я',
-      'vk' => 'VK',
-      'tbank' => 'T',
-      _ => id.isNotEmpty ? id[0].toUpperCase() : '?',
+    final asset = switch (id) {
+      'google' => 'assets/oauth/google.svg',
+      'yandex' => 'assets/oauth/yandex.svg',
+      'vk' => 'assets/oauth/vk.svg',
+      'tbank' => 'assets/oauth/tbank.svg',
+      _ => null,
     };
-    return CircleAvatar(
-      radius: 10,
-      backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
-      child: Text(letter, style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w700)),
+    if (asset == null) {
+      return CircleAvatar(
+        radius: 10,
+        backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+        child: Text(id.isNotEmpty ? id[0].toUpperCase() : '?',
+            style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w700)),
+      );
+    }
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(4),
+      child: SvgPicture.asset(asset, width: 20, height: 20),
     );
   }
 
