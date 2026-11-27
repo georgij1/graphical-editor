@@ -206,9 +206,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                   : context.tr('Sign in')),
                         ),
                         Builder(builder: (context) {
-                          final providers = widget.controller.oauthProviders
-                              .where((p) => p.enabled)
-                              .toList();
+                          final providers = widget.controller.oauthProviders.toList();
                           if (providers.isEmpty) {
                             return const SizedBox(height: 12);
                           }
@@ -235,12 +233,18 @@ class _LoginScreenState extends State<LoginScreen> {
                                 runSpacing: 8,
                                 alignment: WrapAlignment.center,
                                 children: providers.map((p) {
-                                  return OutlinedButton.icon(
-                                    onPressed: busy
-                                        ? null
-                                        : () => widget.controller.signInWithOAuth(p.id),
+                                  final enabled = p.enabled && !busy;
+                                  final btn = OutlinedButton.icon(
+                                    onPressed: enabled
+                                        ? () => widget.controller.signInWithOAuth(p.id)
+                                        : null,
                                     icon: _providerIcon(p.id),
                                     label: Text(p.name),
+                                  );
+                                  if (p.enabled) return btn;
+                                  return Tooltip(
+                                    message: context.tr('Not configured on server'),
+                                    child: btn,
                                   );
                                 }).toList(),
                               ),
