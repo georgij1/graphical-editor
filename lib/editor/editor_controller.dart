@@ -2637,13 +2637,23 @@ class EditorController extends ChangeNotifier {
 
   /// Every project the picker knows: the own ones and the shared ones.
   List<Project> get allProjects {
-    final seen = <String>{};
+    final seenIds = <String>{};
+    final seenOwnerNames = <String>{};
     final result = <Project>[];
+    void add(Project project) {
+      if (!seenIds.add(project.id)) return;
+      final ownerId = project.ownerId ?? '';
+      final ownerNameKey = ownerId.isEmpty
+          ? null
+          : '$ownerId::${project.name.trim().toLowerCase()}';
+      if (ownerNameKey != null && !seenOwnerNames.add(ownerNameKey)) return;
+      result.add(project);
+    }
     for (final project in _projects) {
-      if (seen.add(project.id)) result.add(project);
+      add(project);
     }
     for (final project in _sharedProjects) {
-      if (seen.add(project.id)) result.add(project);
+      add(project);
     }
     return result;
   }
@@ -2680,11 +2690,30 @@ class EditorController extends ChangeNotifier {
       ..clear()
       ..addAll(shared);
     final sharedById = <String, Project>{for (final p in shared) p.id: p};
+    final sharedByOwnerName = <String, Project>{
+      for (final p in shared)
+        if ((p.ownerId ?? '').isNotEmpty)
+          '${p.ownerId}::${p.name.trim().toLowerCase()}': p,
+    };
     final seenLocal = <String>{};
     final nextLocal = <Project>[];
     for (final p in _projects) {
       if (!seenLocal.add(p.id)) continue;
-      nextLocal.add(sharedById[p.id] ?? p);
+      final byId = sharedById[p.id];
+      if (byId != null) {
+        nextLocal.add(byId);
+        continue;
+      }
+      final ownerKey = (p.ownerId ?? '').isNotEmpty
+          ? '${p.ownerId}::${p.name.trim().toLowerCase()}'
+          : null;
+      final byOwnerName = ownerKey == null ? null : sharedByOwnerName[ownerKey];
+      if (byOwnerName != null) {
+        // Local ghost duplicate with different id; prefer server project.
+        if (seenLocal.add(byOwnerName.id)) nextLocal.add(byOwnerName);
+        continue;
+      }
+      nextLocal.add(p);
     }
     _projects
       ..clear()
