@@ -239,7 +239,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                         ? () => widget.controller.signInWithOAuth(p.id)
                                         : null,
                                     icon: _providerIcon(p.id),
-                                    label: Text(p.name),
+                                    label: Text(context.tr(p.name)),
                                   );
                                   if (p.enabled) return btn;
                                   return Tooltip(

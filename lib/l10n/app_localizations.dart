@@ -119,6 +119,10 @@ class AppLocalizations {
     'Passwords do not match.': 'Пароли не совпадают.',
     'or continue with': 'или продолжить через',
     'Not configured on server': 'Не настроено на сервере',
+    'Google': 'Google',
+    'Yandex': 'Яндекс',
+    'VK': 'ВК',
+    'T-Bank': 'Т-Банк',
 
     // --------------------------------------------------------------- account
     'Account': 'Аккаунт',
