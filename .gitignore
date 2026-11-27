@@ -57,3 +57,8 @@ backend-dart/
 downloads/
 backend/build/
 backend/.gradle/
+
+# Local environment secrets
+.env
+.env.local
+.env.*.local
