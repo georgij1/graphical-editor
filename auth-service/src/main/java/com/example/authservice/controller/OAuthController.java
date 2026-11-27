@@ -29,7 +29,12 @@ public class OAuthController {
         this.frontendBaseUrl = frontendBaseUrl;
     }
 
-    public record ExchangeRequest(@Schema(example = "abc123") String code) {}
+    public record ExchangeRequest(
+            @Schema(example = "abc123", description = "One-time OAuth exchange code") String code,
+            @Schema(example = "google", description = "OAuth provider id (optional)") String provider) {}
+    public record StartRequest(
+            @Schema(example = "google", description = "OAuth provider id: google, yandex, vk, tbank") String provider,
+            @Schema(example = "http://localhost:8080/", description = "Frontend redirect URL after OAuth completes") String redirect) {}
     public record OAuthErrorResponse(@Schema(example = "Invalid OAuth state.") String error) {}
 
     @GetMapping("/providers")
@@ -38,16 +43,17 @@ public class OAuthController {
         return ResponseEntity.ok(Map.of("providers", oauth.listProviders()));
     }
 
-    @GetMapping("/{provider}/start")
+    @PostMapping("/start")
     @Operation(summary = "Start OAuth login", security = {})
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Authorization URL"),
             @ApiResponse(responseCode = "400", description = "Provider not configured",
                     content = @Content(schema = @Schema(implementation = OAuthErrorResponse.class)))
     })
-    public ResponseEntity<?> start(@PathVariable String provider,
-                                   @RequestParam(required = false) String redirect) {
+    public ResponseEntity<?> start(@RequestBody StartRequest body) {
         try {
+            String provider = body == null ? null : body.provider();
+            String redirect = body == null ? null : body.redirect();
             String url = oauth.createAuthorizationUrl(provider, redirect);
             return ResponseEntity.ok(Map.of("url", url));
         } catch (IllegalArgumentException e) {

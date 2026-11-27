@@ -777,24 +777,18 @@ class HttpApiClient implements ApiClient {
 
   @override
   Future<ApiResult<String>> getOAuthStartUrl(String provider, {String? redirect}) async {
-    try {
-      var path = '/auth/oauth/$provider/start';
-      if (redirect != null && redirect.isNotEmpty) {
-        path += '?redirect=${Uri.encodeQueryComponent(redirect)}';
-      }
-      final response = await _client.get(_uri(path)).timeout(_timeout);
-      final decoded = _decode(response);
-      if (!decoded.isOk || decoded.value == null) {
-        return ApiResult<String>.failure(decoded.status, decoded.message);
-      }
-      final url = decoded.value!['url'] as String?;
-      if (url == null || url.isEmpty) {
-        return ApiResult<String>.failure(ApiStatus.invalid, 'Missing OAuth URL.');
-      }
-      return ApiResult.ok(url);
-    } on Exception {
-      return ApiResult<String>.failure(ApiStatus.offline, 'Cannot reach the server.');
+    final result = await _post('/auth/oauth/start', {
+      'provider': provider,
+      if (redirect != null && redirect.isNotEmpty) 'redirect': redirect,
+    });
+    if (!result.isOk || result.value == null) {
+      return ApiResult<String>.failure(result.status, result.message);
     }
+    final url = result.value!['url'] as String?;
+    if (url == null || url.isEmpty) {
+      return ApiResult<String>.failure(ApiStatus.invalid, 'Missing OAuth URL.');
+    }
+    return ApiResult.ok(url);
   }
 
   @override
