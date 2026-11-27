@@ -1,6 +1,7 @@
 package com.example.authservice.controller;
 
 import com.example.authservice.service.oauth.OAuthService;
+import io.swagger.v3.oas.annotations.Hidden;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -35,6 +36,13 @@ public class OAuthController {
     public record StartRequest(
             @Schema(example = "google", description = "OAuth provider id: google, yandex, vk, tbank") String provider,
             @Schema(example = "http://localhost:8080/", description = "Frontend redirect URL after OAuth completes") String redirect) {}
+    public record CallbackRequest(
+            @Schema(example = "google", description = "OAuth provider id") String provider,
+            @Schema(example = "auth-code", description = "Authorization code from provider") String code,
+            @Schema(example = "state-token", description = "OAuth state") String state,
+            @Schema(example = "device-id", description = "VK device_id (optional)") String deviceId,
+            @Schema(description = "Provider error (optional)") String error,
+            @Schema(description = "Provider error description (optional)") String errorDescription) {}
     public record OAuthErrorResponse(@Schema(example = "Invalid OAuth state.") String error) {}
 
     @GetMapping("/providers")
@@ -63,26 +71,37 @@ public class OAuthController {
         }
     }
 
+    @Hidden
     @GetMapping("/{provider}/callback")
+    public ResponseEntity<Void> callbackGet(@PathVariable String provider,
+                                            @RequestParam(required = false) String code,
+                                            @RequestParam(required = false) String state,
+                                            @RequestParam(required = false, name = "device_id") String deviceId,
+                                            @RequestParam(required = false) String error,
+                                            @RequestParam(required = false, name = "error_description") String errorDescription) {
+        return handleCallback(provider, code, state, deviceId, error, errorDescription);
+    }
+
+    @PostMapping("/callback")
     @Operation(summary = "OAuth callback", security = {})
-    public ResponseEntity<Void> callback(@PathVariable String provider,
-                                         @RequestParam(required = false) String code,
-                                         @RequestParam(required = false) String state,
-                                         @RequestParam(required = false, name = "device_id") String deviceId,
-                                         @RequestParam(required = false) String error,
-                                         @RequestParam(required = false, name = "error_description") String errorDescription) {
+    public ResponseEntity<Void> callback(@RequestBody CallbackRequest body) {
+        if (body == null) return handleCallback(null, null, null, null, "invalid_request", "Missing body");
+        return handleCallback(body.provider(), body.code(), body.state(), body.deviceId(), body.error(), body.errorDescription());
+    }
+
+    private ResponseEntity<Void> handleCallback(String provider, String code, String state, String deviceId, String error, String errorDescription) {
         String base = frontendBaseUrl == null || frontendBaseUrl.isBlank() ? "http://localhost:8080" : frontendBaseUrl.trim();
         while (base.endsWith("/")) base = base.substring(0, base.length() - 1);
         if (error != null && !error.isBlank()) {
             String msg = errorDescription != null && !errorDescription.isBlank() ? errorDescription : error;
-            return redirect(base + "/?oauth_error=" + enc(msg) + "&oauth_provider=" + enc(provider));
+            return redirect(base + "/?oauth_error=" + enc(msg) + "&oauth_provider=" + enc(provider == null ? "" : provider));
         }
         try {
             String redirectTo = oauth.handleCallback(provider, code, state, deviceId);
             return redirect(redirectTo);
         } catch (Exception e) {
             String msg = e.getMessage() == null ? "OAuth sign-in failed." : e.getMessage();
-            return redirect(base + "/?oauth_error=" + enc(msg) + "&oauth_provider=" + enc(provider));
+            return redirect(base + "/?oauth_error=" + enc(msg) + "&oauth_provider=" + enc(provider == null ? "" : provider));
         }
     }
 
