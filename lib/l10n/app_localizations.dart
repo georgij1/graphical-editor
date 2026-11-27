@@ -117,6 +117,8 @@ class AppLocalizations {
     'Password must be at least 6 characters.':
         'Пароль должен содержать не менее 6 символов.',
     'Passwords do not match.': 'Пароли не совпадают.',
+    'or continue with': 'или продолжить через',
+    'Not configured on server': 'Не настроено на сервере',
 
     // --------------------------------------------------------------- account
     'Account': 'Аккаунт',
