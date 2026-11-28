@@ -66,11 +66,14 @@ class ProjectHome extends StatefulWidget {
   State<ProjectHome> createState() => _ProjectHomeState();
 }
 
+enum _ProjectFilter { all, owned, shared }
+
 class _ProjectHomeState extends State<ProjectHome> {
   /// Updated on every layout pass; drives the slicing and the page counter.
   _PageLayout _layout = const _PageLayout(columns: 1, perPage: 1);
   int _page = 0;
   String _search = '';
+  _ProjectFilter _filter = _ProjectFilter.all;
   final TextEditingController _searchController = TextEditingController();
 
   @override
@@ -81,10 +84,29 @@ class _ProjectHomeState extends State<ProjectHome> {
 
   EditorController get controller => widget.controller;
 
+  bool _isOwnedByMe(Project p) {
+    final uid = controller.userId;
+    if (uid != null && uid.isNotEmpty && p.ownerId == uid) return true;
+    final email = controller.userEmail;
+    return email != null &&
+        email.isNotEmpty &&
+        p.ownerEmail?.toLowerCase() == email.toLowerCase();
+  }
+
   /// The projects of the account: the ones it owns and the ones it takes
   /// part in. Projects without an owner are not shown.
   List<Project> get _visibleProjects {
-    final all = controller.myProjects;
+    var all = controller.myProjects;
+    switch (_filter) {
+      case _ProjectFilter.owned:
+        all = all.where(_isOwnedByMe).toList();
+        break;
+      case _ProjectFilter.shared:
+        all = all.where((p) => !_isOwnedByMe(p)).toList();
+        break;
+      case _ProjectFilter.all:
+        break;
+    }
     final q = _search.trim().toLowerCase();
     if (q.isEmpty) return all;
     return all.where((p) {
@@ -215,31 +237,72 @@ class _ProjectHomeState extends State<ProjectHome> {
                           ),
                           if (controller.myProjects.isNotEmpty) ...<Widget>[
                             const SizedBox(height: 12),
-                            SizedBox(
-                              width: 360,
-                              child: TextField(
-                                controller: _searchController,
-                                decoration: InputDecoration(
-                                  isDense: true,
-                                  prefixIcon: const Icon(Icons.search, size: 20),
-                                  hintText: context.tr('Search projects'),
-                                  border: const OutlineInputBorder(),
-                                  suffixIcon: _search.isNotEmpty
-                                      ? IconButton(
-                                          icon: const Icon(Icons.clear, size: 18),
-                                          onPressed: () => setState(() {
-                                            _searchController.clear();
-                                            _search = '';
-                                            _page = 0;
-                                          }),
-                                        )
-                                      : null,
+                            Wrap(
+                              spacing: 12,
+                              runSpacing: 8,
+                              alignment: WrapAlignment.center,
+                              crossAxisAlignment: WrapCrossAlignment.center,
+                              children: <Widget>[
+                                SizedBox(
+                                  width: 320,
+                                  child: TextField(
+                                    controller: _searchController,
+                                    decoration: InputDecoration(
+                                      isDense: true,
+                                      prefixIcon: const Icon(Icons.search, size: 20),
+                                      hintText: context.tr('Search projects'),
+                                      border: const OutlineInputBorder(),
+                                      suffixIcon: _search.isNotEmpty
+                                          ? IconButton(
+                                              icon: const Icon(Icons.clear, size: 18),
+                                              onPressed: () => setState(() {
+                                                _searchController.clear();
+                                                _search = '';
+                                                _page = 0;
+                                              }),
+                                            )
+                                          : null,
+                                    ),
+                                    onChanged: (v) => setState(() {
+                                      _search = v;
+                                      _page = 0;
+                                    }),
+                                  ),
                                 ),
-                                onChanged: (v) => setState(() {
-                                  _search = v;
-                                  _page = 0;
-                                }),
-                              ),
+                                SizedBox(
+                                  width: 220,
+                                  child: DropdownButtonFormField<_ProjectFilter>(
+                                    value: _filter,
+                                    isDense: true,
+                                    decoration: InputDecoration(
+                                      isDense: true,
+                                      prefixIcon: const Icon(Icons.filter_list, size: 20),
+                                      border: const OutlineInputBorder(),
+                                    ),
+                                    items: <DropdownMenuItem<_ProjectFilter>>[
+                                      DropdownMenuItem(
+                                        value: _ProjectFilter.all,
+                                        child: Text(context.tr('All projects')),
+                                      ),
+                                      DropdownMenuItem(
+                                        value: _ProjectFilter.owned,
+                                        child: Text(context.tr('Owned by me')),
+                                      ),
+                                      DropdownMenuItem(
+                                        value: _ProjectFilter.shared,
+                                        child: Text(context.tr('Shared with me')),
+                                      ),
+                                    ],
+                                    onChanged: (v) {
+                                      if (v == null) return;
+                                      setState(() {
+                                        _filter = v;
+                                        _page = 0;
+                                      });
+                                    },
+                                  ),
+                                ),
+                              ],
                             ),
                           ],
                         ],
