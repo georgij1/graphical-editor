@@ -656,16 +656,6 @@ return Card(
                           fontSize: 14, fontWeight: FontWeight.w600),
                     ),
                   ),
-                  // A project that several people work on.
-                  if (project.collaborative)
-                    Padding(
-                      padding: const EdgeInsets.only(right: 2),
-                      child: Tooltip(
-                        message: context.tr('Shared mode'),
-                        child: Icon(Icons.group_outlined,
-                            size: 15, color: theme.colorScheme.primary),
-                      ),
-                    ),
                   // Settings open in a modal window, not a popup list.
                   SizedBox(
                     width: 28,
