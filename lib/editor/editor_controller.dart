@@ -3382,6 +3382,15 @@ class EditorController extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Sets the icon key shown on the project card.
+  void setProjectIcon(Project project, String? icon) {
+    final value = icon?.trim() ?? '';
+    project.icon = value.isEmpty ? null : value;
+    _persist();
+    notifyListeners();
+    unawaited(_pushWorkingCopyIfSignedIn());
+  }
+
   /// Changes the Java package used for the generated sources.
   /// Changes the Java package of the project and moves the controllers of all
   /// scenes into the new package, so the exported FXML keeps matching the

@@ -11,6 +11,28 @@ import '../../project/project.dart';
 import 'project_dialogs.dart';
 import 'project_settings_dialog.dart';
 
+const Map<String, IconData> kProjectIcons = <String, IconData>{
+  'folder': Icons.folder_copy_outlined,
+  'dashboard': Icons.dashboard_outlined,
+  'code': Icons.code,
+  'terminal': Icons.terminal,
+  'web': Icons.language,
+  'phone_android': Icons.phone_android,
+  'shopping_cart': Icons.shopping_cart_outlined,
+  'analytics': Icons.analytics_outlined,
+  'school': Icons.school_outlined,
+  'sports_esports': Icons.sports_esports_outlined,
+  'palette': Icons.palette_outlined,
+  'chat': Icons.chat_bubble_outline,
+  'rocket': Icons.rocket_launch_outlined,
+  'build': Icons.build_outlined,
+  'science': Icons.science_outlined,
+  'auto_awesome': Icons.auto_awesome_outlined,
+};
+
+IconData projectIconData(String? key) =>
+    kProjectIcons[key] ?? Icons.folder_copy_outlined;
+
 /// How many project cards fit on one page of the picker.
 ///
 /// The page is laid out from the space the picker actually got, so the grid
@@ -509,6 +531,63 @@ class _ProjectCard extends StatelessWidget {
     controller.setProjectPackage(project, result);
   }
 
+  Future<void> _pickIcon(BuildContext context) async {
+    final selected = await showDialog<String>(
+      context: context,
+      builder: (ctx) {
+        final theme = Theme.of(ctx);
+        return AlertDialog(
+          title: Text(context.tr('Choose icon')),
+          content: SizedBox(
+            width: 320,
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: <Widget>[
+                for (final entry in kProjectIcons.entries)
+                  InkWell(
+                    borderRadius: BorderRadius.circular(8),
+                    onTap: () => Navigator.of(ctx).pop(entry.key),
+                    child: Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: project.icon == entry.key
+                            ? theme.colorScheme.primaryContainer
+                            : null,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: project.icon == entry.key
+                              ? theme.colorScheme.primary
+                              : theme.colorScheme.outlineVariant,
+                        ),
+                      ),
+                      child: Icon(
+                        entry.value,
+                        size: 22,
+                        color: project.icon == entry.key
+                            ? theme.colorScheme.primary
+                            : theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: Text(context.tr('Cancel')),
+            ),
+          ],
+        );
+      },
+    );
+    if (selected != null) {
+      controller.setProjectIcon(project, selected);
+    }
+  }
+
   Future<void> _showTransferDialog(BuildContext context) async {
     final controller = this.controller;
     final project = this.project;
@@ -644,8 +723,21 @@ return Card(
             children: <Widget>[
               Row(
                 children: <Widget>[
-                  Icon(Icons.folder_copy_outlined,
-                      size: 18, color: theme.colorScheme.primary),
+                  Tooltip(
+                    message: context.tr('Change icon'),
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: () => _pickIcon(context),
+                      child: Padding(
+                        padding: const EdgeInsets.all(2),
+                        child: Icon(
+                          projectIconData(project.icon),
+                          size: 18,
+                          color: theme.colorScheme.primary,
+                        ),
+                      ),
+                    ),
+                  ),
                   const SizedBox(width: 6),
                   Expanded(
                     child: Text(

@@ -57,6 +57,7 @@ class Project {
     this.revision = 0,
     this.shared = false,
     this.buildTool = 'maven',
+    this.icon,
     this.aiModel,
     List<Map<String, dynamic>>? aiCustomModels,
     List<String>? aiHiddenModels,
@@ -92,6 +93,9 @@ class Project {
 
   /// Active build system for the project: 'maven' or 'gradle'.
   String buildTool;
+
+  /// Icon key for the project card. Null/empty means default folder icon.
+  String? icon;
 
   /// Selected AI model id for this project.
   String? aiModel;
@@ -176,6 +180,7 @@ class Project {
         if (revision > 0) 'revision': revision,
         if (shared) 'shared': true,
         'buildTool': buildTool,
+        if (icon != null && icon!.trim().isNotEmpty) 'icon': icon,
         if (aiModel != null && aiModel!.trim().isNotEmpty) 'aiModel': aiModel,
         if (aiCustomModels.isNotEmpty) 'aiCustomModels': aiCustomModels,
         if (aiHiddenModels.isNotEmpty) 'aiHiddenModels': aiHiddenModels,
@@ -198,6 +203,7 @@ class Project {
       revision: (json['revision'] as num?)?.toInt() ?? 0,
       shared: json['shared'] as bool? ?? false,
       buildTool: (json['buildTool'] as String?) ?? 'maven',
+      icon: (json['icon'] as String?)?.trim(),
       aiModel: (json['aiModel'] as String?)?.trim(),
       aiCustomModels: [
         for (final m in (json['aiCustomModels'] as List? ?? []))
@@ -236,6 +242,7 @@ class Project {
         revision: revision,
         shared: shared,
         buildTool: buildTool,
+        icon: icon,
         aiModel: aiModel,
         aiCustomModels: [
           for (final m in aiCustomModels) Map<String, dynamic>.from(m),

@@ -489,6 +489,8 @@ class AppLocalizations {
     'Publication': 'Публикация',
     'Not published': 'Не опубликован',
     'Publish again': 'Опубликовать снова',
+    'Change icon': 'Изменить иконку',
+    'Choose icon': 'Выберите иконку',
     'Published': 'Опубликован',
     'Project published.': 'Проект опубликован.',
     'Could not publish the project.': 'Не удалось опубликовать проект.',
