@@ -582,12 +582,7 @@ class _ProjectSettingsDialogState extends State<ProjectSettingsDialog> {
                             label: context.tr('Export'),
                             onPressed: _busy ? null : _export,
                           ),
-                          if (controller.userEmail == project.ownerEmail)
-                            _ActionButton(
-                              icon: Icons.person_outline,
-                              label: context.tr('Transfer ownership'),
-                              onPressed: _busy ? null : () => _showTransferDialog(),
-                            ),
+
                           TextButton.icon(
                             onPressed: _busy ? null : _delete,
                             icon: const Icon(Icons.delete_outline, size: 18),
