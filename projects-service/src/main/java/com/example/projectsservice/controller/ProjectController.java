@@ -356,36 +356,6 @@ public class ProjectController {
         return p;
     }
 
-    @GetMapping("/projects/{id}/download")
-    @Operation(summary = "Download project files as a zip")
-    public ResponseEntity<?> downloadProject(@RequestHeader("Authorization") String auth, @PathVariable String id) {
-        var claims = auth(auth);
-        if (claims == null) return ResponseEntity.status(401).body(Map.of("error", "Not authenticated."));
-        SharedProject p = projects.find(id);
-        if (p == null) return ResponseEntity.status(404).body(Map.of("error", "Project not found."));
-        String uid = jwt.userId(claims);
-        String email = jwt.email(claims);
-        if (!p.canRead(uid, email)) return ResponseEntity.status(403).body(Map.of("error", "You cannot open this project."));
-        byte[] zip = projectFiles.downloadZip(id);
-        if (zip == null || zip.length == 0) {
-            try {
-                projectFiles.syncProject(p);
-                zip = projectFiles.downloadZip(id);
-            } catch (Exception ignored) {
-            }
-        }
-        if (zip == null || zip.length == 0) {
-            return ResponseEntity.status(404).body(Map.of("error", "No project files found."));
-        }
-        String name = p.name == null || p.name.isBlank() ? "project" : p.name.trim();
-        String safe = name.replaceAll("[^a-zA-Z0-9._-]", "_");
-        if (safe.isBlank()) safe = "project";
-        return ResponseEntity.ok()
-                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + safe + ".zip\"")
-                .contentType(MediaType.parseMediaType("application/zip"))
-                .body(zip);
-    }
-
     private String str(Map<String, Object> body, String key) {
         Object v = body.get(key);
         return v == null ? "" : v.toString();
