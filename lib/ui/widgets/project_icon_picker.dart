@@ -206,15 +206,32 @@ Future<String?> showIconPickerDialog(
                   ),
                 ),
                 const SizedBox(height: 8),
-                OutlinedButton.icon(
-                  onPressed: () async {
-                    final dataUrl = await showIconStudioDialog(ctx);
-                    if (dataUrl != null && ctx.mounted) {
-                      Navigator.of(ctx).pop(dataUrl);
-                    }
-                  },
-                  icon: const Icon(Icons.brush_outlined, size: 18),
-                  label: Text(context.tr('Create icon')),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: <Widget>[
+                    if (currentIcon != null && currentIcon.trim().isNotEmpty)
+                      OutlinedButton.icon(
+                        onPressed: () async {
+                          final dataUrl = await showIconStudioDialog(ctx, initialIcon: currentIcon);
+                          if (dataUrl != null && ctx.mounted) {
+                            Navigator.of(ctx).pop(dataUrl);
+                          }
+                        },
+                        icon: const Icon(Icons.edit_outlined, size: 18),
+                        label: Text(context.tr('Edit current icon')),
+                      ),
+                    OutlinedButton.icon(
+                      onPressed: () async {
+                        final dataUrl = await showIconStudioDialog(ctx);
+                        if (dataUrl != null && ctx.mounted) {
+                          Navigator.of(ctx).pop(dataUrl);
+                        }
+                      },
+                      icon: const Icon(Icons.brush_outlined, size: 18),
+                      label: Text(context.tr('Create icon')),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -242,10 +259,10 @@ Future<void> showProjectIconPickerDialog(
   }
 }
 
-Future<String?> showIconStudioDialog(BuildContext context) {
+Future<String?> showIconStudioDialog(BuildContext context, {String? initialIcon}) {
   return showDialog<String>(
     context: context,
-    builder: (_) => const _IconStudioDialog(),
+    builder: (_) => _IconStudioDialog(initialIcon: initialIcon),
   );
 }
 
@@ -291,7 +308,8 @@ class _IconStrokePainter extends CustomPainter {
 }
 
 class _IconStudioDialog extends StatefulWidget {
-  const _IconStudioDialog();
+  const _IconStudioDialog({this.initialIcon});
+  final String? initialIcon;
 
   @override
   State<_IconStudioDialog> createState() => _IconStudioDialogState();
@@ -309,6 +327,22 @@ class _IconStudioDialogState extends State<_IconStudioDialog> {
   Color _brushColor = Colors.white;
   double _brushSize = 4;
   final List<_IconStroke> _strokes = <_IconStroke>[];
+  Uint8List? _baseImage;
+
+  @override
+  void initState() {
+    super.initState();
+    final initial = widget.initialIcon;
+    if (initial != null && kProjectIcons.containsKey(initial)) {
+      _iconKey = initial;
+    } else {
+      final bytes = decodeCustomProjectIcon(initial);
+      if (bytes != null) {
+        _baseImage = bytes;
+        _iconKey = 'none';
+      }
+    }
+  }
 
   static const List<Color> _palette = <Color>[
     Color(0xFF4F46E5), Color(0xFF2563EB), Color(0xFF0891B2), Color(0xFF059669),
@@ -406,13 +440,18 @@ class _IconStudioDialogState extends State<_IconStudioDialog> {
                                 ),
                                 child: Stack(
                                   children: <Widget>[
-                                    Center(
-                                      child: Icon(
-                                        kProjectIcons[_iconKey] ?? Icons.folder_copy_outlined,
-                                        size: _iconSize,
-                                        color: _fgColor,
+                                    if (_baseImage != null)
+                                      Positioned.fill(
+                                        child: Image.memory(_baseImage!, fit: BoxFit.cover),
                                       ),
-                                    ),
+                                    if (_iconKey != 'none')
+                                      Center(
+                                        child: Icon(
+                                          kProjectIcons[_iconKey] ?? Icons.folder_copy_outlined,
+                                          size: _iconSize,
+                                          color: _fgColor,
+                                        ),
+                                      ),
                                     Positioned.fill(
                                       child: IgnorePointer(
                                         ignoring: !_drawMode,
@@ -494,6 +533,29 @@ class _IconStudioDialogState extends State<_IconStudioDialog> {
                               spacing: 6,
                               runSpacing: 6,
                               children: <Widget>[
+                                Tooltip(
+                                  message: context.tr('None'),
+                                  child: InkWell(
+                                    borderRadius: BorderRadius.circular(8),
+                                    onTap: () => setState(() => _iconKey = 'none'),
+                                    child: Container(
+                                      width: 36,
+                                      height: 36,
+                                      decoration: BoxDecoration(
+                                        color: _iconKey == 'none'
+                                            ? theme.colorScheme.primaryContainer
+                                            : null,
+                                        borderRadius: BorderRadius.circular(8),
+                                        border: Border.all(
+                                          color: _iconKey == 'none'
+                                              ? theme.colorScheme.primary
+                                              : theme.colorScheme.outlineVariant,
+                                        ),
+                                      ),
+                                      child: const Icon(Icons.do_not_disturb_alt, size: 20),
+                                    ),
+                                  ),
+                                ),
                                 for (final entry in kProjectIcons.entries)
                                   InkWell(
                                     borderRadius: BorderRadius.circular(8),
