@@ -421,6 +421,10 @@ class AppLocalizations {
     'Remove participant': 'Убрать участника',
     'Publish for the participants': 'Опубликовать для участников',
     'The participant has been added.': 'Участник добавлен.',
+    'Could not add the participant.': 'Не удалось добавить участника.',
+    'The rights have been changed.': 'Права изменены.',
+    'Could not change the rights.': 'Не удалось изменить права.',
+    'Could not remove the participant.': 'Не удалось удалить участника.',
     'The participant has been removed.': 'Участник удалён.',
     'The project has been published for the participants.':
         'Проект опубликован для участников.',
@@ -524,6 +528,7 @@ class AppLocalizations {
     'Published': 'Опубликован',
     'Project published.': 'Проект опубликован.',
     'Could not publish the project.': 'Не удалось опубликовать проект.',
+    'Could not create the link.': 'Не удалось создать ссылку.',
     'Transfer project': 'Передать проект',
     'No other users available.': 'Нет доступных пользователей.',
     'Ownership transferred.': 'Права владельца переданы.',

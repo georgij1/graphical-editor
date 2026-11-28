@@ -158,7 +158,7 @@ class _ProjectSettingsDialogState extends State<ProjectSettingsDialog> {
   void _saveDetails() {
     final name = _name.text.trim();
     if (name.isEmpty) {
-      _say('Project name is empty.', error: true);
+      _say(context.tr('Project name is empty.'), error: true);
       return;
     }
 
@@ -295,7 +295,7 @@ class _ProjectSettingsDialogState extends State<ProjectSettingsDialog> {
         final ok = await controller.exportProject(widget.project, options);
         if (!mounted) return;
         _say(
-          ok ? 'Project exported.' : 'Export failed.',
+          ok ? context.tr('Project exported.') : context.tr('Export failed.'),
           error: !ok,
         );
       });
@@ -317,8 +317,8 @@ class _ProjectSettingsDialogState extends State<ProjectSettingsDialog> {
       final ok = await controller.publishSharedProject(widget.project);
       _say(
         ok
-            ? 'The project has been published for the participants.'
-            : controller.collaborationNotice ?? 'Could not publish the project.',
+            ? context.tr('The project has been published for the participants.')
+            : controller.collaborationNotice ?? context.tr('Could not publish the project.'),
         error: !ok,
       );
     });
@@ -712,7 +712,7 @@ class _ProjectSettingsDialogState extends State<ProjectSettingsDialog> {
                                       if (link == null) {
                                         _say(
                                             controller.collaborationNotice ??
-                                                'Could not create the link.',
+                                                context.tr('Could not create the link.'),
                                             error: true);
                                         return;
                                       }
@@ -936,17 +936,18 @@ class _ProjectSettingsDialogState extends State<ProjectSettingsDialog> {
   Future<void> _inviteParticipant(String email) async {
     final address = email.trim();
     if (address.isEmpty) {
-      _say('Enter the email of the participant.', error: true);
+      _say(context.tr('Enter the email of the participant.'), error: true);
       return;
     }
     await _run(() async {
       final ok = await controller.inviteCollaborator(address, _inviteRole, widget.project);
+      if (!mounted) return;
       if (!ok) {
-        _say(controller.collaborationNotice ?? 'Could not add the participant.',
+        _say(controller.collaborationNotice ?? context.tr('Could not add the participant.'),
             error: true);
         return;
       }
-      _say('The participant has been added.');
+      _say(context.tr('The participant has been added.'));
     });
   }
 
@@ -954,13 +955,14 @@ class _ProjectSettingsDialogState extends State<ProjectSettingsDialog> {
   Future<void> _changeRole(ProjectMember member, String role) async {
     await _run(() async {
       final ok = await controller.changeCollaboratorRole(member.email, role, widget.project);
+      if (!mounted) return;
       if (!ok) {
         _say(controller.collaborationNotice ??
-            'Could not change the rights.',
+            context.tr('Could not change the rights.'),
             error: true);
         return;
       }
-      _say('The rights have been changed.');
+      _say(context.tr('The rights have been changed.'));
     });
   }
 
@@ -968,13 +970,14 @@ class _ProjectSettingsDialogState extends State<ProjectSettingsDialog> {
   Future<void> _removeParticipant(String email) async {
     await _run(() async {
       final ok = await controller.removeCollaborator(email, widget.project);
+      if (!mounted) return;
       if (!ok) {
         _say(controller.collaborationNotice ??
-            'Could not remove the participant.',
+            context.tr('Could not remove the participant.'),
             error: true);
         return;
       }
-      _say('The participant has been removed.');
+      _say(context.tr('The participant has been removed.'));
     });
   }
 }
