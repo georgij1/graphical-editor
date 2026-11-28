@@ -2649,17 +2649,31 @@ class EditorController extends ChangeNotifier {
       return s;
     }
 
+    void mergeIcon(Project target, Project source) {
+      if ((target.icon == null || target.icon!.trim().isEmpty) &&
+          (source.icon != null && source.icon!.trim().isNotEmpty)) {
+        target.icon = source.icon;
+      }
+    }
+
     void add(Project project) {
       final nameKey = project.name.trim().toLowerCase();
-      if (!seenIds.add(project.id)) return;
+      if (!seenIds.add(project.id)) {
+        final existing = result.where((p) => p.id == project.id).firstOrNull;
+        if (existing != null) mergeIcon(existing, project);
+        return;
+      }
       final existingIdx = nameIndex[nameKey];
       if (existingIdx != null) {
         final existing = result[existingIdx];
         // Same-name duplicate: prefer the richer/server-backed project.
         if (score(project) > score(existing)) {
+          mergeIcon(project, existing);
           seenIds.remove(existing.id);
           result[existingIdx] = project;
           seenIds.add(project.id);
+        } else {
+          mergeIcon(existing, project);
         }
         return;
       }
