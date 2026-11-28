@@ -3723,11 +3723,6 @@ class EditorController extends ChangeNotifier {
       return false;
     }
 
-    final isParticipant = project.members.any(
-      (m) => m.email.toLowerCase() == newOwner.toLowerCase(),
-    );
-    if (!isParticipant) return false;
-
     final token = _token;
     final newOwnerAccount = _accounts.cast<Account?>().firstWhere(
       (a) => a!.email.toLowerCase() == newOwner.toLowerCase(),
