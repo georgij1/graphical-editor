@@ -692,13 +692,18 @@ return Card(
                           project.ownerEmail?.toLowerCase()
                       ? context.tr('Transfer project')
                       : (project.ownerEmail ?? ''),
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(12),
-                    onTap: controller.userEmail?.toLowerCase() ==
+                  child: MouseRegion(
+                    cursor: controller.userEmail?.toLowerCase() ==
                             project.ownerEmail?.toLowerCase()
-                        ? () => _showTransferDialog(context)
-                        : null,
-                    child: Container(
+                        ? SystemMouseCursors.click
+                        : SystemMouseCursors.basic,
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: controller.userEmail?.toLowerCase() ==
+                              project.ownerEmail?.toLowerCase()
+                          ? () => _showTransferDialog(context)
+                          : null,
+                      child: Container(
                       padding: const EdgeInsets.fromLTRB(2, 0, 8, 0),
                       decoration: BoxDecoration(
                         color: theme.colorScheme.primaryContainer
@@ -739,6 +744,7 @@ return Card(
                     ),
                   ),
                 ),
+              ),
               ),
             ],
           ),
