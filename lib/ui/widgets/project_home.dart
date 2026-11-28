@@ -687,12 +687,14 @@ return Card(
                       child: SizedBox(
                         width: 28,
                         height: 28,
-                        child: Icon(
-                          project.shared ? Icons.cloud_done : Icons.cloud_upload_outlined,
-                          size: 16,
-                          color: project.shared
-                              ? theme.colorScheme.primary
-                              : theme.colorScheme.onSurfaceVariant,
+                        child: Center(
+                          child: Icon(
+                            project.shared ? Icons.cloud_done : Icons.cloud_upload_outlined,
+                            size: 18,
+                            color: project.shared
+                                ? theme.colorScheme.primary
+                                : theme.colorScheme.onSurfaceVariant,
+                          ),
                         ),
                       ),
                     ),
