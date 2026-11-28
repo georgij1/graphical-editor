@@ -351,6 +351,7 @@ class AppLocalizations {
     'Project files': 'Файлы проекта',
     'Project actions': 'Действия с проектом',
     'Project settings': 'Настройки проекта',
+    'Project details': 'Сведения о проекте',
     'Root project name': 'Имя корневого проекта',
     'Not set': 'Не задано',
     'Included projects': 'Подключённые проекты',
