@@ -872,64 +872,99 @@ class _ProjectSettingsDialogState extends State<ProjectSettingsDialog> {
   }
 
   void _showTransferDialog() async {
-    final eligible = widget.project.participants
-        .where((m) => m.email.toLowerCase() !=
-            widget.controller.userEmail?.toLowerCase())
-        .toList();
-    if (eligible.isEmpty) {
-      _say(context.tr('No participants available to transfer ownership to.'));
-      return;
-    }
-    String? selected = eligible.first.email;
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(context.tr('Transfer ownership')),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            Text(context.tr('Select the new owner:')),
-            const SizedBox(height: 12),
-            for (final member in eligible)
-              RadioListTile<String>(
-                value: member.email,
-                groupValue: selected,
-                title: Text(member.email),
-                secondary: UserAvatar(
-                  dataUrl: null,
-                  email: member.email,
-                  radius: 16,
-                ),
-                onChanged: (value) => selected = value,
-              ),
-          ],
-        ),
-        actions: <Widget>[
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: Text(context.tr('Cancel')),
-          ),
-          FilledButton(
-            onPressed: selected != null
-                ? () => Navigator.of(context).pop(true)
-                : null,
-            child: Text(context.tr('Transfer')),
-          ),
-        ],
-      ),
-    );
-    if (confirmed == true && selected != null && mounted) {
-      final ok = await controller.transferProjectOwnership(
-        widget.project,
-        selected!,
-      );
-      if (ok) {
-        _say(context.tr('Ownership transferred to ') + selected! + '.');
-      } else {
-        _say(context.tr('Failed to transfer ownership.'), error: true);
+    await controller.loadAccounts();
+    final candidates = <Account>[];
+    final seen = <String>{};
+    final ownerEmail = widget.project.ownerEmail?.toLowerCase();
+    final myEmail = controller.userEmail?.toLowerCase();
+    for (final m in widget.project.members) {
+      final email = m.email.trim();
+      if (email.isEmpty) continue;
+      final lower = email.toLowerCase();
+      if (lower == ownerEmail || lower == myEmail) continue;
+      if (seen.add(lower)) {
+        final acc = controller.accounts.cast<Account?>().firstWhere(
+              (a) => a!.email.toLowerCase() == lower,
+              orElse: () => null,
+            );
+        candidates.add(acc ?? Account(id: '', email: email));
       }
     }
+    for (final a in controller.accounts) {
+      final lower = a.email.toLowerCase();
+      if (lower == ownerEmail || lower == myEmail) continue;
+      if (seen.add(lower)) candidates.add(a);
+    }
+
+    if (!mounted) return;
+    if (candidates.isEmpty) {
+      _say(context.tr('No other users available.'));
+      return;
+    }
+
+    String? selected = candidates.first.email;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) {
+        return StatefulBuilder(builder: (ctx, setDialogState) {
+          return AlertDialog(
+            title: Text(ctx.tr('Transfer ownership')),
+            content: SizedBox(
+              width: 420,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Text(ctx.tr('Select the new owner:')),
+                  const SizedBox(height: 12),
+                  Flexible(
+                    child: SingleChildScrollView(
+                      child: Column(
+                        children: candidates.map<Widget>((Account a) {
+                          return RadioListTile<String>(
+                            value: a.email,
+                            groupValue: selected,
+                            title: Text(a.email),
+                            secondary: UserAvatar(
+                              dataUrl: null,
+                              email: a.email,
+                              radius: 16,
+                            ),
+                            onChanged: (v) => setDialogState(() => selected = v),
+                          );
+                        }).toList(),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            actions: <Widget>[
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(false),
+                child: Text(ctx.tr('Cancel')),
+              ),
+              FilledButton(
+                onPressed: selected == null
+                    ? null
+                    : () => Navigator.of(ctx).pop(true),
+                child: Text(ctx.tr('Transfer')),
+              ),
+            ],
+          );
+        });
+      },
+    );
+
+    if (confirmed != true || selected == null || !mounted) return;
+    final ok = await controller.transferProjectOwnership(widget.project, selected!);
+    if (!mounted) return;
+    _say(
+      ok
+          ? context.tr('Ownership transferred.')
+          : (controller.collaborationNotice ?? context.tr('Failed to transfer ownership.')),
+      error: !ok,
+    );
   }
 
   /// Adds a participant to the project and switches it to the shared mode.
