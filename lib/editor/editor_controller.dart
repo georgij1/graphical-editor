@@ -3399,7 +3399,11 @@ class EditorController extends ChangeNotifier {
   /// Sets the icon key shown on the project card.
   void setProjectIcon(Project project, String? icon) {
     final value = icon?.trim() ?? '';
-    project.icon = value.isEmpty ? null : value;
+    final normalized = value.isEmpty ? null : value;
+    for (final p in <Project>[..._projects, ..._sharedProjects]) {
+      if (p.id == project.id) p.icon = normalized;
+    }
+    project.icon = normalized;
     _persist();
     notifyListeners();
     unawaited(_pushWorkingCopyIfSignedIn());
