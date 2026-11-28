@@ -445,6 +445,8 @@ class AppLocalizations {
     'All projects': 'Все проекты',
     'Owned by me': 'Мои проекты',
     'Shared with me': 'Доступные мне',
+    'Home icon': 'Иконка главного экрана',
+    'Icon shown on the home screen and in the editor header.': 'Иконка, отображаемая на главном экране и в заголовке редактора.',
     'All time': 'За всё время',
     'Last 24 hours': 'За 24 часа',
     'Last 7 days': 'За 7 дней',

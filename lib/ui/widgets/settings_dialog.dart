@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../build_info.dart';
 import '../../editor/editor_controller.dart';
 import '../../l10n/app_localizations.dart';
+import 'project_icon_picker.dart';
 
 /// Opens the application settings dialog.
 Future<void> showSettingsDialog(
@@ -81,6 +82,42 @@ class SettingsDialog extends StatelessWidget {
                       selected: controller.languageCode == code,
                       onTap: () => controller.setLanguage(code),
                     ),
+                  const SizedBox(height: 16),
+                  _SectionHeader(
+                    title: context.tr('Home icon'),
+                    subtitle: context.tr('Icon shown on the home screen and in the editor header.'),
+                  ),
+                  Row(
+                    children: <Widget>[
+                      Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(10),
+                          color: theme.colorScheme.surfaceContainerHighest,
+                          border: Border.all(color: theme.colorScheme.outlineVariant),
+                        ),
+                        alignment: Alignment.center,
+                        child: controller.homeIcon != null
+                            ? projectIconWidget(controller.homeIcon, size: 28, color: theme.colorScheme.primary)
+                            : Icon(Icons.account_tree_outlined, size: 28, color: theme.colorScheme.primary),
+                      ),
+                      const SizedBox(width: 12),
+                      OutlinedButton.icon(
+                        onPressed: () async {
+                          final selected = await showIconPickerDialog(
+                            context,
+                            currentIcon: controller.homeIcon,
+                          );
+                          if (selected != null) {
+                            controller.setHomeIcon(selected);
+                          }
+                        },
+                        icon: const Icon(Icons.edit_outlined, size: 18),
+                        label: Text(context.tr('Change icon')),
+                      ),
+                    ],
+                  ),
                   const SizedBox(height: 16),
                   Text(
                     'Build $buildId',
