@@ -7,6 +7,7 @@ import '../editor/editor_controller.dart';
 import '../l10n/app_localizations.dart';
 import 'widgets/canvas_area.dart';
 import 'widgets/downloads_dialog.dart';
+import 'widgets/project_icon_picker.dart';
 import 'widgets/ai_fix_panel.dart';
 import 'widgets/inspector_panel.dart';
 import 'widgets/outline_panel.dart';
@@ -793,10 +794,30 @@ class _Title extends StatelessWidget {
     // on the dark theme and the project name became invisible.
     final titleStyle = Theme.of(context).textTheme.titleMedium
         ?.copyWith(fontSize: 15, fontWeight: FontWeight.w600);
+    final iconKey = controller.homeIcon;
+    final iconWidget = iconKey != null
+        ? projectIconWidget(iconKey, size: 20, color: Theme.of(context).colorScheme.onSurface)
+        : Icon(Icons.account_tree_outlined, size: 20, color: Theme.of(context).colorScheme.onSurface);
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: <Widget>[
-        const Icon(Icons.account_tree_outlined, size: 20),
+        Tooltip(
+          message: context.tr('Change icon'),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(6),
+            onTap: () async {
+              final selected = await showIconPickerDialog(
+                context,
+                currentIcon: controller.homeIcon,
+              );
+              if (selected != null) controller.setHomeIcon(selected);
+            },
+            child: Padding(
+              padding: const EdgeInsets.all(2),
+              child: iconWidget,
+            ),
+          ),
+        ),
         const SizedBox(width: 8),
         Flexible(
           child: Text(

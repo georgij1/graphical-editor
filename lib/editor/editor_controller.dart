@@ -141,6 +141,16 @@ class EditorController extends ChangeNotifier {
   String? _fileName;
   String? _looseDocument;
   String? _looseDocumentName;
+  String? _homeIcon;
+
+  String? get homeIcon => _homeIcon;
+  void setHomeIcon(String? icon) {
+    final next = (icon == null || icon.trim().isEmpty) ? null : icon.trim();
+    if (_homeIcon == next) return;
+    _homeIcon = next;
+    _persist();
+    notifyListeners();
+  }
 
   /// Handler registered by the active code editor view to run "Fix with AI"
   /// against the live (possibly unsaved) editor content.
@@ -2141,6 +2151,7 @@ class EditorController extends ChangeNotifier {
       projects: _projects,
       document: _looseDocument,
       documentName: _looseDocumentName,
+      homeIcon: _homeIcon,
     ).toJson(),
   );
 
@@ -2156,6 +2167,7 @@ class EditorController extends ChangeNotifier {
         _projects.clear();
         _looseDocument = null;
         _looseDocumentName = null;
+        _homeIcon = null;
         _currentProject = null;
         _activeScene = null;
       }
@@ -2176,6 +2188,7 @@ class EditorController extends ChangeNotifier {
       }
       _looseDocument = data.document;
       _looseDocumentName = data.documentName;
+      _homeIcon = data.homeIcon;
       // A saved document outside of any project reopens straight away, so
       // the work is where the user left it.
       if (!_standaloneOpen && data.document != null) {

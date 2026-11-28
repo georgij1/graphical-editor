@@ -237,8 +237,35 @@ class _ProjectHomeState extends State<ProjectHome> {
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: <Widget>[
-                          Icon(Icons.account_tree_outlined,
-                              size: 48, color: theme.colorScheme.primary),
+                          Tooltip(
+                            message: context.tr('Change icon'),
+                            child: InkWell(
+                              borderRadius: BorderRadius.circular(12),
+                              onTap: () async {
+                                final selected = await showIconPickerDialog(
+                                  context,
+                                  currentIcon: controller.homeIcon,
+                                );
+                                if (selected != null) {
+                                  controller.setHomeIcon(selected);
+                                }
+                              },
+                              child: Padding(
+                                padding: const EdgeInsets.all(4),
+                                child: controller.homeIcon != null
+                                    ? projectIconWidget(
+                                        controller.homeIcon,
+                                        size: 48,
+                                        color: theme.colorScheme.primary,
+                                      )
+                                    : Icon(
+                                        Icons.account_tree_outlined,
+                                        size: 48,
+                                        color: theme.colorScheme.primary,
+                                      ),
+                              ),
+                            ),
+                          ),
                           const SizedBox(height: 8),
                           Text(
                             context.tr('Choose a project'),

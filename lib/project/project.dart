@@ -265,7 +265,12 @@ class Project {
 }
 
 class WorkspaceData {
-  WorkspaceData({required this.projects, this.document, this.documentName});
+  WorkspaceData({
+    required this.projects,
+    this.document,
+    this.documentName,
+    this.homeIcon,
+  });
 
   final List<Project> projects;
 
@@ -276,11 +281,15 @@ class WorkspaceData {
   /// File name shown for [document], without the extension.
   final String? documentName;
 
+  /// Custom icon for the project home/editor title. Null means default.
+  final String? homeIcon;
+
   Map<String, dynamic> toJson() => {
         'version': 1,
         'projects': projects.map((p) => p.toJson()).toList(),
         if (document != null) 'document': document,
         if (documentName != null) 'documentName': documentName,
+        if (homeIcon != null && homeIcon!.trim().isNotEmpty) 'homeIcon': homeIcon,
       };
 
   factory WorkspaceData.fromJson(Map<String, dynamic> json) => WorkspaceData(
@@ -290,5 +299,6 @@ class WorkspaceData {
         ],
         document: json['document'] as String?,
         documentName: json['documentName'] as String?,
+        homeIcon: (json['homeIcon'] as String?)?.trim(),
       );
 }

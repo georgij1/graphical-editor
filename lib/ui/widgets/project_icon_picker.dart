@@ -64,16 +64,15 @@ Widget projectIconWidget(String? key, {double size = 18, Color? color}) {
   return Icon(projectIconData(key), size: size, color: color);
 }
 
-Future<void> showProjectIconPickerDialog(
+Future<String?> showIconPickerDialog(
   BuildContext context, {
-  required EditorController controller,
-  required Project project,
+  required String? currentIcon,
 }) async {
-  final selected = await showDialog<String>(
+  return showDialog<String>(
     context: context,
     builder: (ctx) {
       final theme = Theme.of(ctx);
-      final customBytes = decodeCustomProjectIcon(project.icon);
+      final customBytes = decodeCustomProjectIcon(currentIcon);
       return AlertDialog(
         title: Text(context.tr('Choose icon')),
         content: SizedBox(
@@ -95,12 +94,12 @@ Future<void> showProjectIconPickerDialog(
                           width: 40,
                           height: 40,
                           decoration: BoxDecoration(
-                            color: project.icon == entry.key
+                            color: currentIcon == entry.key
                                 ? theme.colorScheme.primaryContainer
                                 : null,
                             borderRadius: BorderRadius.circular(8),
                             border: Border.all(
-                              color: project.icon == entry.key
+                              color: currentIcon == entry.key
                                   ? theme.colorScheme.primary
                                   : theme.colorScheme.outlineVariant,
                             ),
@@ -108,7 +107,7 @@ Future<void> showProjectIconPickerDialog(
                           child: Icon(
                             entry.value,
                             size: 22,
-                            color: project.icon == entry.key
+                            color: currentIcon == entry.key
                                 ? theme.colorScheme.primary
                                 : theme.colorScheme.onSurfaceVariant,
                           ),
@@ -133,7 +132,7 @@ Future<void> showProjectIconPickerDialog(
                     if (customBytes != null)
                       InkWell(
                         borderRadius: BorderRadius.circular(8),
-                        onTap: () => Navigator.of(ctx).pop(project.icon),
+                        onTap: () => Navigator.of(ctx).pop(currentIcon),
                         child: Container(
                           width: 40,
                           height: 40,
@@ -230,6 +229,14 @@ Future<void> showProjectIconPickerDialog(
       );
     },
   );
+}
+
+Future<void> showProjectIconPickerDialog(
+  BuildContext context, {
+  required EditorController controller,
+  required Project project,
+}) async {
+  final selected = await showIconPickerDialog(context, currentIcon: project.icon);
   if (selected != null) {
     controller.setProjectIcon(project, selected);
   }
