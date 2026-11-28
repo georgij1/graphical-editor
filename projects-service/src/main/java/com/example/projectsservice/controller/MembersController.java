@@ -149,4 +149,58 @@ public class MembersController {
         }
         return ResponseEntity.ok(Map.of("participants", result));
     }
+
+    @PostMapping("/projects/{id}/transfer")
+    @Operation(summary = "Transfer project ownership")
+    public ResponseEntity<?> transferProject(@RequestHeader("Authorization") String auth, @PathVariable String id, @RequestBody Map<String, Object> body) {
+        var claims = auth(auth);
+        if (claims == null) return ResponseEntity.status(401).body(Map.of("error", "Not authenticated."));
+        String uid = jwt.userId(claims);
+        String email = jwt.email(claims);
+        SharedProject project = projects.find(id);
+        if (project == null) return ResponseEntity.status(404).body(Map.of("error", "Project not found."));
+        if (project.ownerId == null || !project.ownerId.equals(uid)) {
+            return ResponseEntity.status(403).body(Map.of("error", "Only the owner can transfer the project."));
+        }
+        String newEmail = str(body, "email").trim().toLowerCase();
+        if (!newEmail.matches("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$")) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Enter a valid email address."));
+        }
+        if (newEmail.equalsIgnoreCase(email)) {
+            return ResponseEntity.badRequest().body(Map.of("error", "You already own this project."));
+        }
+        ProjectMember targetMember = project.memberOf(newEmail);
+        // If not a participant yet, add them as editor so ownership can be transferred.
+        if (targetMember == null) {
+            project.members.add(new ProjectMember(newEmail, "editor"));
+        }
+        String newOwnerId = str(body, "userId");
+        if (newOwnerId.isBlank()) newOwnerId = str(body, "id");
+        if (newOwnerId.isBlank()) {
+            // Try to resolve from other projects owned by this email.
+            for (SharedProject p : projects.listAll()) {
+                if (p != null && newEmail.equalsIgnoreCase(p.ownerEmail) && p.ownerId != null && !p.ownerId.isBlank()) {
+                    newOwnerId = p.ownerId;
+                    break;
+                }
+            }
+        }
+        // Previous owner becomes a participant (editor) so they keep access.
+        ProjectMember previous = project.memberOf(email);
+        if (previous == null) {
+            project.members.add(new ProjectMember(email, "editor"));
+        } else {
+            previous.role = "editor";
+        }
+        // Remove new owner from members list.
+        final String ne = newEmail;
+        project.members.removeIf(m -> m.email != null && m.email.equalsIgnoreCase(ne));
+
+        project.ownerEmail = newEmail;
+        if (!newOwnerId.isBlank()) {
+            project.ownerId = newOwnerId;
+        }
+        SharedProject saved = projects.save(project);
+        return ResponseEntity.ok(saved);
+    }
 }
