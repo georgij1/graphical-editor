@@ -686,7 +686,7 @@ return Card(
                       tooltip: context.tr(project.shared ? 'Published' : 'Publish project'),
                       onPressed: () => _publish(context),
                       icon: Icon(
-                        project.shared ? Icons.cloud_done : Icons.cloud_upload_outlined,
+                        project.shared ? Icons.check_circle : Icons.cloud_upload_outlined,
                         size: 20,
                         color: project.shared
                             ? theme.colorScheme.primary
