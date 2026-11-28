@@ -611,10 +611,12 @@ class _ProjectCard extends StatelessWidget {
     final theme = Theme.of(context);
 return Card(
       clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onOpen,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(12, 8, 8, 6),
+      child: Stack(
+        children: <Widget>[
+          InkWell(
+            onTap: onOpen,
+            child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 8, 8, 28),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
@@ -683,72 +685,73 @@ return Card(
                  ),
                ),
                const SizedBox(height: 2),
-              // The whole card opens the project, so it needs no button here.
-              // The owner of the project shares the row with the scene count.
-              Align(
-                alignment: Alignment.centerLeft,
-                child: Tooltip(
-                  message: controller.userEmail?.toLowerCase() ==
+            ],
+          ),
+        ),
+      ),
+          Positioned(
+            left: 12,
+            bottom: 6,
+            child: Tooltip(
+              message: controller.userEmail?.toLowerCase() ==
+                      project.ownerEmail?.toLowerCase()
+                  ? context.tr('Transfer project')
+                  : (project.ownerEmail ?? ''),
+              child: MouseRegion(
+                cursor: controller.userEmail?.toLowerCase() ==
+                        project.ownerEmail?.toLowerCase()
+                    ? SystemMouseCursors.click
+                    : SystemMouseCursors.basic,
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: controller.userEmail?.toLowerCase() ==
                           project.ownerEmail?.toLowerCase()
-                      ? context.tr('Transfer project')
-                      : (project.ownerEmail ?? ''),
-                  child: MouseRegion(
-                    cursor: controller.userEmail?.toLowerCase() ==
-                            project.ownerEmail?.toLowerCase()
-                        ? SystemMouseCursors.click
-                        : SystemMouseCursors.basic,
-                    child: GestureDetector(
-                      behavior: HitTestBehavior.opaque,
-                      onTap: controller.userEmail?.toLowerCase() ==
-                              project.ownerEmail?.toLowerCase()
-                          ? () => _showTransferDialog(context)
-                          : null,
-                      child: Container(
-                      padding: const EdgeInsets.fromLTRB(2, 0, 8, 0),
-                      decoration: BoxDecoration(
-                        color: theme.colorScheme.primaryContainer
-                            .withValues(alpha: 0.5),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: <Widget>[
-                          UserAvatar(
-                            dataUrl: null,
-                            email: project.ownerEmail,
-                            radius: 6,
-                          ),
-                          const SizedBox(width: 4),
-                          Flexible(
-                            child: Text(
-                              project.ownerEmail ?? '',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: theme.colorScheme.onPrimaryContainer,
-                              ),
-                            ),
-                          ),
-                          if (controller.userEmail?.toLowerCase() ==
-                              project.ownerEmail?.toLowerCase()) ...<Widget>[
-                            const SizedBox(width: 4),
-                            Icon(
-                              Icons.swap_horiz,
-                              size: 13,
+                      ? () => _showTransferDialog(context)
+                      : null,
+                  child: Container(
+                    padding: const EdgeInsets.fromLTRB(2, 0, 8, 0),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.primaryContainer
+                          .withValues(alpha: 0.5),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: <Widget>[
+                        UserAvatar(
+                          dataUrl: null,
+                          email: project.ownerEmail,
+                          radius: 6,
+                        ),
+                        const SizedBox(width: 4),
+                        Flexible(
+                          child: Text(
+                            project.ownerEmail ?? '',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 11,
                               color: theme.colorScheme.onPrimaryContainer,
                             ),
-                          ],
+                          ),
+                        ),
+                        if (controller.userEmail?.toLowerCase() ==
+                            project.ownerEmail?.toLowerCase()) ...<Widget>[
+                          const SizedBox(width: 4),
+                          Icon(
+                            Icons.swap_horiz,
+                            size: 13,
+                            color: theme.colorScheme.onPrimaryContainer,
+                          ),
                         ],
-                      ),
+                      ],
                     ),
                   ),
                 ),
               ),
-              ),
-            ],
+            ),
           ),
-        ),
+        ],
       ),
     );
   }
