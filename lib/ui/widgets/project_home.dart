@@ -509,19 +509,6 @@ class _ProjectCard extends StatelessWidget {
     controller.setProjectPackage(project, result);
   }
 
-  Future<void> _publish(BuildContext context) async {
-    final ok = await controller.publishSharedProject(project);
-    if (!context.mounted) return;
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(
-        content: Text(ok
-            ? context.tr('Project published.')
-            : (controller.collaborationNotice ?? context.tr('Could not publish the project.'))),
-        behavior: SnackBarBehavior.floating,
-      ));
-  }
-
   Future<void> _showTransferDialog(BuildContext context) async {
     final controller = this.controller;
     final project = this.project;
@@ -679,23 +666,6 @@ return Card(
                             size: 15, color: theme.colorScheme.primary),
                       ),
                     ),
-                  SizedBox(
-                    width: 28,
-                    height: 28,
-                    child: IconButton(
-                      tooltip: context.tr(project.shared ? 'Published' : 'Publish project'),
-                      onPressed: () => _publish(context),
-                      icon: Icon(
-                        project.shared ? Icons.check_circle : Icons.cloud_upload_outlined,
-                        size: 20,
-                        color: project.shared
-                            ? theme.colorScheme.primary
-                            : theme.colorScheme.onSurfaceVariant,
-                      ),
-                      visualDensity: VisualDensity.compact,
-                      padding: EdgeInsets.zero,
-                    ),
-                  ),
                   // Settings open in a modal window, not a popup list.
                   SizedBox(
                     width: 28,

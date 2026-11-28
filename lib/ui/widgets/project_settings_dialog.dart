@@ -695,13 +695,41 @@ class _ProjectSettingsDialogState extends State<ProjectSettingsDialog> {
                     const SizedBox(height: 16),
 
                     // ---- Publish ----
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: OutlinedButton.icon(
-                        onPressed: _busy ? null : _publish,
-                        icon: const Icon(
-                            Icons.cloud_upload_outlined, size: 18),
-                        label: Text(context.tr('Publish for the participants')),
+                    _SectionCard(
+                      title: context.tr('Publication'),
+                      icon: Icons.cloud_outlined,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: <Widget>[
+                          Row(
+                            children: <Widget>[
+                              Icon(
+                                project.shared
+                                    ? Icons.check_circle
+                                    : Icons.cloud_off_outlined,
+                                size: 18,
+                                color: project.shared
+                                    ? Colors.green
+                                    : theme.colorScheme.onSurfaceVariant,
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                context.tr(project.shared
+                                    ? 'Published'
+                                    : 'Not published'),
+                                style: theme.textTheme.bodyMedium,
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                          OutlinedButton.icon(
+                            onPressed: _busy ? null : _publish,
+                            icon: const Icon(Icons.cloud_upload_outlined, size: 18),
+                            label: Text(context.tr(project.shared
+                                ? 'Publish again'
+                                : 'Publish project')),
+                          ),
+                        ],
                       ),
                     ),
                     if (_message != null) ...<Widget>[
