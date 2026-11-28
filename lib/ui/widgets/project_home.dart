@@ -651,7 +651,7 @@ return Card(
           InkWell(
             onTap: onOpen,
             child: Padding(
-          padding: const EdgeInsets.fromLTRB(12, 8, 8, 28),
+          padding: const EdgeInsets.fromLTRB(12, 8, 8, 60),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
@@ -687,8 +687,7 @@ return Card(
                       onPressed: () => _publish(context),
                       icon: Icon(
                         project.shared ? Icons.cloud_done : Icons.cloud_upload_outlined,
-                        size: 18,
-                        color: project.shared ? theme.colorScheme.primary : null,
+                        size: 20,
                       ),
                       visualDensity: VisualDensity.compact,
                       padding: EdgeInsets.zero,
@@ -735,6 +734,23 @@ return Card(
                  ),
                ),
                const SizedBox(height: 2),
+               Align(
+                 alignment: Alignment.centerLeft,
+                 child: OutlinedButton.icon(
+                   onPressed: () => _publish(context),
+                   icon: Icon(
+                     project.shared ? Icons.cloud_done : Icons.cloud_upload_outlined,
+                     size: 16,
+                   ),
+                   label: Text(context.tr(project.shared ? 'Published' : 'Publish project')),
+                   style: OutlinedButton.styleFrom(
+                     visualDensity: VisualDensity.compact,
+                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
+                     minimumSize: const Size(0, 30),
+                     tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                   ),
+                 ),
+               ),
             ],
           ),
         ),
