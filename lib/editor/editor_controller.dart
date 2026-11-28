@@ -3736,16 +3736,22 @@ class EditorController extends ChangeNotifier {
         newOwner,
         userId: newOwnerAccount?.id,
       );
-      if (!result.isOk || result.value == null) {
+      if (result.isOk && result.value != null) {
+        final updated = result.value!;
+        _applyProjectUpdate(project, updated);
+        _persist();
+        notifyListeners();
+        return true;
+      }
+      // If project is not on server (local-only/ghost), fall back to local transfer.
+      final msg = (result.message ?? '').toLowerCase();
+      final notOnServer = msg.contains('project not found');
+      if (!notOnServer) {
         collaborationNotice = result.message ?? 'Failed to transfer ownership.';
         notifyListeners();
         return false;
       }
-      final updated = result.value!;
-      _applyProjectUpdate(project, updated);
-      _persist();
-      notifyListeners();
-      return true;
+      // fall through to local fallback
     }
 
     // Local-only fallback.
