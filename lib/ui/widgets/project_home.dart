@@ -513,8 +513,21 @@ class _ProjectCard extends StatelessWidget {
     final controller = this.controller;
     final project = this.project;
     final isOwner = controller.userEmail?.toLowerCase() ==
-        project.ownerEmail?.toLowerCase();
-    if (!isOwner) return;
+            project.ownerEmail?.toLowerCase() ||
+        (controller.userId != null &&
+            controller.userId!.isNotEmpty &&
+            controller.userId == project.ownerId);
+    if (!isOwner) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(SnackBar(
+            content: Text(context.tr('Only the project owner can transfer the project.')),
+            behavior: SnackBarBehavior.floating,
+          ));
+      }
+      return;
+    }
 
     await controller.loadAccounts();
     final candidates = <Account>[];
@@ -609,6 +622,11 @@ class _ProjectCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isProjectOwner = controller.userEmail?.toLowerCase() ==
+            project.ownerEmail?.toLowerCase() ||
+        (controller.userId != null &&
+            controller.userId!.isNotEmpty &&
+            controller.userId == project.ownerId);
 return Card(
       clipBehavior: Clip.antiAlias,
       child: Stack(
@@ -693,21 +711,16 @@ return Card(
             left: 12,
             bottom: 6,
             child: Tooltip(
-              message: controller.userEmail?.toLowerCase() ==
-                      project.ownerEmail?.toLowerCase()
+              message: isProjectOwner
                   ? context.tr('Transfer project')
                   : (project.ownerEmail ?? ''),
               child: MouseRegion(
-                cursor: controller.userEmail?.toLowerCase() ==
-                        project.ownerEmail?.toLowerCase()
+                cursor: isProjectOwner
                     ? SystemMouseCursors.click
                     : SystemMouseCursors.basic,
                 child: GestureDetector(
                   behavior: HitTestBehavior.opaque,
-                  onTap: controller.userEmail?.toLowerCase() ==
-                          project.ownerEmail?.toLowerCase()
-                      ? () => _showTransferDialog(context)
-                      : null,
+                  onTap: () => _showTransferDialog(context),
                   child: Container(
                     padding: const EdgeInsets.fromLTRB(2, 0, 8, 0),
                     decoration: BoxDecoration(
@@ -735,8 +748,7 @@ return Card(
                             ),
                           ),
                         ),
-                        if (controller.userEmail?.toLowerCase() ==
-                            project.ownerEmail?.toLowerCase()) ...<Widget>[
+                        if (isProjectOwner) ...<Widget>[
                           const SizedBox(width: 4),
                           Icon(
                             Icons.swap_horiz,

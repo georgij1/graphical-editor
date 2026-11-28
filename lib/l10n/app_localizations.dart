@@ -479,8 +479,8 @@ class AppLocalizations {
     'Transfer ownership': 'Передать право владения',
     'New owner': 'Новый владелец',
     'Transfer': 'Передать',
-    'Only the project owner can transfer ownership.':
-        'Только владелец проекта может передать право владения.',
+    'Only the project owner can transfer ownership.': 'Только владелец проекта может передать право владения.',
+    'Only the project owner can transfer the project.': 'Только владелец проекта может передать проект.',
     'The new owner must be a participant of the project.':
         'Новый владелец должен быть участником проекта.',
     'Ownership transferred to {0}.': 'Право владения передано {0}.',
