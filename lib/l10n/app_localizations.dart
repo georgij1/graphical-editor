@@ -522,6 +522,7 @@ class AppLocalizations {
     'Save icon': 'Сохранить иконку',
     'Create icon': 'Создать иконку',
     'Edit current icon': 'Редактировать текущую иконку',
+    'Edit main components': 'Редактировать основные компоненты',
     'Drawing': 'Рисование',
     'Brush color': 'Цвет кисти',
     'Brush size': 'Размер кисти',

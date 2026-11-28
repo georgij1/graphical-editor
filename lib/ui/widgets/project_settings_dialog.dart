@@ -59,7 +59,6 @@ class _ProjectSettingsDialogState extends State<ProjectSettingsDialog> {
   bool _busy = false;
   String? _message;
   bool _error = false;
-  String? _packageError;
   OverlayEntry? _toastEntry;
 
   /// Debounce timer for auto-saving name/description after the user stops
@@ -173,11 +172,10 @@ class _ProjectSettingsDialogState extends State<ProjectSettingsDialog> {
     if (repackaged) {
       final error = _validatePackage(package);
       if (error != null) {
-        _packageError = error;
+        _say(error, error: true);
         return;
       }
     }
-    _packageError = null;
 
     if (!renamed && !described && !repackaged && !reclassed) return;
     final changed = <String>[];
@@ -437,38 +435,6 @@ class _ProjectSettingsDialogState extends State<ProjectSettingsDialog> {
                             onChanged: (_) => _scheduleSave(),
                           ),
                           const SizedBox(height: 16),
-                          TextField(
-                            controller: _packageController,
-                            enabled: !_busy,
-                            style: theme.textTheme.bodyMedium,
-                            decoration: InputDecoration(
-                              labelText: context.tr('Java package'),
-                              helperText: context.tr(
-                                  'Used for the generated Java sources.'),
-                              errorText: _packageError,
-                              border: const OutlineInputBorder(),
-                              isDense: true,
-                            ),
-                            onChanged: (value) {
-                              _packageError = _validatePackage(value);
-                              _scheduleSave();
-                            },
-                          ),
-                          const SizedBox(height: 12),
-                          TextField(
-                            controller: _mainClassController,
-                            enabled: !_busy,
-                            style: theme.textTheme.bodyMedium,
-                            decoration: InputDecoration(
-                              labelText: context.tr('Main class'),
-                              helperText: context.tr(
-                                  'Entry point of the generated application.'),
-                              border: const OutlineInputBorder(),
-                              isDense: true,
-                            ),
-                            onChanged: (_) => _scheduleSave(),
-                          ),
-                          const SizedBox(height: 16),
                           // Owner badge.
                           if (project.ownerEmail != null) ...<Widget>[
                             Builder(builder: (context) {
@@ -556,7 +522,11 @@ class _ProjectSettingsDialogState extends State<ProjectSettingsDialog> {
                         runSpacing: 10,
                         alignment: WrapAlignment.start,
                         children: <Widget>[
-
+                          _ActionButton(
+                            icon: Icons.tune_outlined,
+                            label: context.tr('Edit main components'),
+                            onPressed: _busy ? null : _showEditMainComponentsDialog,
+                          ),
                           _ActionButton(
                             icon: Icons.copy_all_outlined,
                             label: context.tr('Duplicate'),
@@ -899,6 +869,94 @@ class _ProjectSettingsDialogState extends State<ProjectSettingsDialog> {
         ),
       ),
     );
+  }
+
+  Future<void> _showEditMainComponentsDialog() async {
+    final packageCtrl = TextEditingController(text: widget.project.package);
+    final mainClassCtrl = TextEditingController(text: widget.project.mainClass);
+    String? packageError;
+    final saved = await showDialog<bool>(
+      context: context,
+      builder: (ctx) {
+        return StatefulBuilder(builder: (ctx, setDialogState) {
+          return AlertDialog(
+            title: Text(ctx.tr('Edit main components')),
+            content: SizedBox(
+              width: 420,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: <Widget>[
+                  TextField(
+                    controller: packageCtrl,
+                    autofocus: true,
+                    decoration: InputDecoration(
+                      labelText: ctx.tr('Java package'),
+                      helperText: ctx.tr('Used for the generated Java sources.'),
+                      errorText: packageError,
+                      border: const OutlineInputBorder(),
+                      isDense: true,
+                    ),
+                    onChanged: (v) => setDialogState(() {
+                      packageError = _validatePackage(v);
+                    }),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: mainClassCtrl,
+                    decoration: InputDecoration(
+                      labelText: ctx.tr('Main class'),
+                      helperText: ctx.tr('Entry point of the generated application.'),
+                      border: const OutlineInputBorder(),
+                      isDense: true,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            actions: <Widget>[
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(false),
+                child: Text(ctx.tr('Cancel')),
+              ),
+              FilledButton(
+                onPressed: () {
+                  final err = _validatePackage(packageCtrl.text);
+                  if (err != null) {
+                    setDialogState(() => packageError = err);
+                    return;
+                  }
+                  Navigator.of(ctx).pop(true);
+                },
+                child: Text(ctx.tr('Save')),
+              ),
+            ],
+          );
+        });
+      },
+    );
+    if (saved != true || !mounted) {
+      packageCtrl.dispose();
+      mainClassCtrl.dispose();
+      return;
+    }
+    final newPackage = packageCtrl.text.trim();
+    final newMainClass = mainClassCtrl.text.trim().isEmpty ? widget.project.mainClass : mainClassCtrl.text.trim();
+    final changed = <String>[];
+    if (newPackage != widget.project.package) {
+      controller.setProjectPackage(widget.project, newPackage);
+      _packageController.text = newPackage;
+      changed.add(context.tr('package'));
+    }
+    if (newMainClass != widget.project.mainClass) {
+      controller.setProjectMainClass(widget.project, newMainClass);
+      _mainClassController.text = newMainClass;
+      changed.add(context.tr('main class'));
+    }
+    packageCtrl.dispose();
+    mainClassCtrl.dispose();
+    if (changed.isNotEmpty) {
+      _say('${context.tr('Project updated')} (${changed.join(', ')}).');
+    }
   }
 
   void _showTransferDialog() async {
