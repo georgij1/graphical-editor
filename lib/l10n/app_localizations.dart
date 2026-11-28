@@ -465,6 +465,7 @@ class AppLocalizations {
     'Project name': 'Название проекта',
     'Java package': 'Java-пакет',
     'Main class': 'Главный класс',
+    'Entry point of the generated application.': 'Точка входа сгенерированного приложения.',
     'Invalid Java package': 'Недопустимый Java-пакет',
     'Java file': 'Java-файл',
     'Invalid Java class name.': 'Недопустимое имя Java-класса: допустимы только идентификаторы, не являющиеся зарезервированными словами.',
