@@ -679,24 +679,19 @@ return Card(
                             size: 15, color: theme.colorScheme.primary),
                       ),
                     ),
-                  Tooltip(
-                    message: context.tr(project.shared ? 'Published' : 'Publish project'),
-                    child: InkWell(
-                      borderRadius: BorderRadius.circular(8),
-                      onTap: () => _publish(context),
-                      child: SizedBox(
-                        width: 28,
-                        height: 28,
-                        child: Center(
-                          child: Icon(
-                            project.shared ? Icons.cloud_done : Icons.cloud_upload_outlined,
-                            size: 18,
-                            color: project.shared
-                                ? theme.colorScheme.primary
-                                : theme.colorScheme.onSurfaceVariant,
-                          ),
-                        ),
+                  SizedBox(
+                    width: 28,
+                    height: 28,
+                    child: IconButton(
+                      tooltip: context.tr(project.shared ? 'Published' : 'Publish project'),
+                      onPressed: () => _publish(context),
+                      icon: Icon(
+                        project.shared ? Icons.cloud_done : Icons.cloud_upload_outlined,
+                        size: 18,
+                        color: project.shared ? theme.colorScheme.primary : null,
                       ),
+                      visualDensity: VisualDensity.compact,
+                      padding: EdgeInsets.zero,
                     ),
                   ),
                   // Settings open in a modal window, not a popup list.
