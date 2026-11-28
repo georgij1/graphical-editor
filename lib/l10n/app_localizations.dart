@@ -492,6 +492,7 @@ class AppLocalizations {
     'Change icon': 'Изменить иконку',
     'Choose icon': 'Выберите иконку',
     'Upload icon': 'Загрузить иконку',
+    'Custom icon': 'Своя иконка',
     'Icon is too large (max 512 KB).': 'Иконка слишком большая (макс. 512 КБ).',
     'Published': 'Опубликован',
     'Project published.': 'Проект опубликован.',

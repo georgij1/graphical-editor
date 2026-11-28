@@ -577,99 +577,123 @@ class _ProjectCard extends StatelessWidget {
           content: SizedBox(
             width: 340,
             child: SingleChildScrollView(
-              child: Wrap(
-                spacing: 8,
-                runSpacing: 8,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
-                  for (final entry in kProjectIcons.entries)
-                    InkWell(
-                      borderRadius: BorderRadius.circular(8),
-                      onTap: () => Navigator.of(ctx).pop(entry.key),
-                      child: Container(
-                        width: 40,
-                        height: 40,
-                        decoration: BoxDecoration(
-                          color: project.icon == entry.key
-                              ? theme.colorScheme.primaryContainer
-                              : null,
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: <Widget>[
+                      for (final entry in kProjectIcons.entries)
+                        InkWell(
                           borderRadius: BorderRadius.circular(8),
-                          border: Border.all(
-                            color: project.icon == entry.key
-                                ? theme.colorScheme.primary
-                                : theme.colorScheme.outlineVariant,
+                          onTap: () => Navigator.of(ctx).pop(entry.key),
+                          child: Container(
+                            width: 40,
+                            height: 40,
+                            decoration: BoxDecoration(
+                              color: project.icon == entry.key
+                                  ? theme.colorScheme.primaryContainer
+                                  : null,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: project.icon == entry.key
+                                    ? theme.colorScheme.primary
+                                    : theme.colorScheme.outlineVariant,
+                              ),
+                            ),
+                            child: Icon(
+                              entry.value,
+                              size: 22,
+                              color: project.icon == entry.key
+                                  ? theme.colorScheme.primary
+                                  : theme.colorScheme.onSurfaceVariant,
+                            ),
                           ),
                         ),
-                        child: Icon(
-                          entry.value,
-                          size: 22,
-                          color: project.icon == entry.key
-                              ? theme.colorScheme.primary
-                              : theme.colorScheme.onSurfaceVariant,
-                        ),
-                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Divider(height: 1, color: theme.colorScheme.outlineVariant),
+                  const SizedBox(height: 12),
+                  Text(
+                    context.tr('Custom icon'),
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
                     ),
-                  if (customBytes != null)
-                    InkWell(
-                      borderRadius: BorderRadius.circular(8),
-                      onTap: () => Navigator.of(ctx).pop(project.icon),
-                      child: Container(
-                        width: 40,
-                        height: 40,
-                        decoration: BoxDecoration(
-                          color: theme.colorScheme.primaryContainer,
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: <Widget>[
+                      if (customBytes != null)
+                        InkWell(
                           borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: theme.colorScheme.primary),
+                          onTap: () => Navigator.of(ctx).pop(project.icon),
+                          child: Container(
+                            width: 40,
+                            height: 40,
+                            decoration: BoxDecoration(
+                              color: theme.colorScheme.primaryContainer,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: theme.colorScheme.primary),
+                            ),
+                            padding: const EdgeInsets.all(4),
+                            child: Image.memory(customBytes, fit: BoxFit.cover),
+                          ),
                         ),
-                        padding: const EdgeInsets.all(4),
-                        child: Image.memory(customBytes, fit: BoxFit.cover),
-                      ),
-                    ),
-                  Tooltip(
-                    message: context.tr('Upload icon'),
-                    child: InkWell(
-                      borderRadius: BorderRadius.circular(8),
-                      onTap: () async {
-                        final result = await FilePicker.platform.pickFiles(
-                          type: FileType.image,
-                          withData: true,
-                        );
-                        if (result == null || result.files.isEmpty) return;
-                        final file = result.files.first;
-                        final bytes = file.bytes;
-                        if (bytes == null || bytes.isEmpty) return;
-                        if (bytes.length > 512 * 1024) {
-                          if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                              content: Text(context.tr('Icon is too large (max 512 KB).')),
-                              behavior: SnackBarBehavior.floating,
-                            ));
-                          }
-                          return;
-                        }
-                        final ext = (file.extension ?? 'png').toLowerCase();
-                        final mime = switch (ext) {
-                          'jpg' || 'jpeg' => 'image/jpeg',
-                          'gif' => 'image/gif',
-                          'webp' => 'image/webp',
-                          _ => 'image/png',
-                        };
-                        final dataUrl = 'data:$mime;base64,${base64Encode(bytes)}';
-                        if (ctx.mounted) Navigator.of(ctx).pop(dataUrl);
-                      },
-                      child: Container(
-                        width: 40,
-                        height: 40,
-                        decoration: BoxDecoration(
+                      Tooltip(
+                        message: context.tr('Upload icon'),
+                        child: InkWell(
                           borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: theme.colorScheme.outlineVariant),
-                        ),
-                        child: Icon(
-                          Icons.add_photo_alternate_outlined,
-                          size: 22,
-                          color: theme.colorScheme.onSurfaceVariant,
+                          onTap: () async {
+                            final result = await FilePicker.platform.pickFiles(
+                              type: FileType.image,
+                              withData: true,
+                            );
+                            if (result == null || result.files.isEmpty) return;
+                            final file = result.files.first;
+                            final bytes = file.bytes;
+                            if (bytes == null || bytes.isEmpty) return;
+                            if (bytes.length > 512 * 1024) {
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                                  content: Text(context.tr('Icon is too large (max 512 KB).')),
+                                  behavior: SnackBarBehavior.floating,
+                                ));
+                              }
+                              return;
+                            }
+                            final ext = (file.extension ?? 'png').toLowerCase();
+                            final mime = switch (ext) {
+                              'jpg' || 'jpeg' => 'image/jpeg',
+                              'gif' => 'image/gif',
+                              'webp' => 'image/webp',
+                              _ => 'image/png',
+                            };
+                            final dataUrl =
+                                'data:$mime;base64,${base64Encode(bytes)}';
+                            if (ctx.mounted) Navigator.of(ctx).pop(dataUrl);
+                          },
+                          child: Container(
+                            width: 40,
+                            height: 40,
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                  color: theme.colorScheme.outlineVariant),
+                            ),
+                            child: Icon(
+                              Icons.add_photo_alternate_outlined,
+                              size: 22,
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                          ),
                         ),
                       ),
-                    ),
+                    ],
                   ),
                 ],
               ),
