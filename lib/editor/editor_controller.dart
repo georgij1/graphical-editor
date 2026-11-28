@@ -2729,10 +2729,18 @@ class EditorController extends ChangeNotifier {
     };
     final seenLocal = <String>{};
     final nextLocal = <Project>[];
+    void preserveLocal(Project server, Project local) {
+      if ((server.icon == null || server.icon!.trim().isEmpty) &&
+          (local.icon != null && local.icon!.trim().isNotEmpty)) {
+        server.icon = local.icon;
+      }
+    }
+
     for (final p in _projects) {
       if (!seenLocal.add(p.id)) continue;
       final byId = sharedById[p.id];
       if (byId != null) {
+        preserveLocal(byId, p);
         nextLocal.add(byId);
         continue;
       }
@@ -2742,6 +2750,7 @@ class EditorController extends ChangeNotifier {
       final byOwnerName = ownerKey == null ? null : sharedByOwnerName[ownerKey];
       if (byOwnerName != null) {
         // Local ghost duplicate with different id; prefer server project.
+        preserveLocal(byOwnerName, p);
         if (seenLocal.add(byOwnerName.id)) nextLocal.add(byOwnerName);
         continue;
       }
