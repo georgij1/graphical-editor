@@ -2371,6 +2371,7 @@ class EditorController extends ChangeNotifier {
     if (!isAutoSaveMode && !explicit) {
       return Future<void>.value();
     }
+    _currentProject?.updatedAt = DateTime.now();
     final generation = ++_persistGeneration;
     _persistChain = _persistChain.then((_) async {
       if (generation != _persistGeneration) return;
@@ -2494,6 +2495,7 @@ class EditorController extends ChangeNotifier {
       // A new project belongs to the account that is signed in.
       ownerId: _userId,
       ownerEmail: _userEmail,
+      updatedAt: DateTime.now(),
     );
     final controllerSimple = '${safeMain}Controller';
     final controllerFqn = project.package.isEmpty
@@ -2899,9 +2901,21 @@ class EditorController extends ChangeNotifier {
       ..package = remote.package
       ..mainClass = remote.mainClass
       ..description = remote.description
+      ..ownerId = remote.ownerId
+      ..ownerEmail = remote.ownerEmail
       ..revision = remote.revision
       ..shared = remote.shared
-      ..buildTool = remote.buildTool;
+      ..buildTool = remote.buildTool
+      ..icon = remote.icon
+      ..aiModel = remote.aiModel
+      ..aiHiddenDefaultsSeeded = remote.aiHiddenDefaultsSeeded
+      ..updatedAt = remote.updatedAt;
+    project.aiCustomModels
+      ..clear()
+      ..addAll(remote.aiCustomModels.map((e) => Map<String, dynamic>.from(e)));
+    project.aiHiddenModels
+      ..clear()
+      ..addAll(remote.aiHiddenModels);
     project.replaceMembers(remote.members);
     project.scenes
       ..clear()
@@ -3725,8 +3739,10 @@ class EditorController extends ChangeNotifier {
       ..revision = source.revision
       ..shared = source.shared
       ..buildTool = source.buildTool
+      ..icon = source.icon
       ..aiModel = source.aiModel
-      ..aiHiddenDefaultsSeeded = source.aiHiddenDefaultsSeeded;
+      ..aiHiddenDefaultsSeeded = source.aiHiddenDefaultsSeeded
+      ..updatedAt = source.updatedAt;
     target.aiCustomModels
       ..clear()
       ..addAll(source.aiCustomModels);
@@ -3812,7 +3828,8 @@ class EditorController extends ChangeNotifier {
     }
     final copy = project.copy()
       ..id = _newId()
-      ..name = name;
+      ..name = name
+      ..updatedAt = DateTime.now();
     final idx = _projects.indexOf(project);
     if (idx >= 0) {
       _projects.insert(idx + 1, copy);

@@ -59,6 +59,7 @@ class Project {
     this.buildTool = 'maven',
     this.icon,
     this.aiModel,
+    this.updatedAt,
     List<Map<String, dynamic>>? aiCustomModels,
     List<String>? aiHiddenModels,
     this.aiHiddenDefaultsSeeded = false,
@@ -99,6 +100,9 @@ class Project {
 
   /// Selected AI model id for this project.
   String? aiModel;
+
+  /// Last update timestamp (from server/local save).
+  DateTime? updatedAt;
 
   /// Project-scoped custom AI models.
   final List<Map<String, dynamic>> aiCustomModels;
@@ -182,6 +186,7 @@ class Project {
         'buildTool': buildTool,
         if (icon != null && icon!.trim().isNotEmpty) 'icon': icon,
         if (aiModel != null && aiModel!.trim().isNotEmpty) 'aiModel': aiModel,
+        if (updatedAt != null) 'updatedAt': updatedAt!.toIso8601String(),
         if (aiCustomModels.isNotEmpty) 'aiCustomModels': aiCustomModels,
         if (aiHiddenModels.isNotEmpty) 'aiHiddenModels': aiHiddenModels,
         if (aiHiddenDefaultsSeeded) 'aiHiddenDefaultsSeeded': true,
@@ -205,6 +210,9 @@ class Project {
       buildTool: (json['buildTool'] as String?) ?? 'maven',
       icon: (json['icon'] as String?)?.trim(),
       aiModel: (json['aiModel'] as String?)?.trim(),
+      updatedAt: json['updatedAt'] != null
+          ? DateTime.tryParse(json['updatedAt'].toString())
+          : null,
       aiCustomModels: [
         for (final m in (json['aiCustomModels'] as List? ?? []))
           if (m is Map) Map<String, dynamic>.from(m),
@@ -244,6 +252,7 @@ class Project {
         buildTool: buildTool,
         icon: icon,
         aiModel: aiModel,
+        updatedAt: updatedAt,
         aiCustomModels: [
           for (final m in aiCustomModels) Map<String, dynamic>.from(m),
         ],

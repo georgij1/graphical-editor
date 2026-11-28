@@ -68,12 +68,15 @@ class ProjectHome extends StatefulWidget {
 
 enum _ProjectFilter { all, owned, shared }
 
+enum _DateFilter { allTime, today, last7Days, last30Days }
+
 class _ProjectHomeState extends State<ProjectHome> {
   /// Updated on every layout pass; drives the slicing and the page counter.
   _PageLayout _layout = const _PageLayout(columns: 1, perPage: 1);
   int _page = 0;
   String _search = '';
   _ProjectFilter _filter = _ProjectFilter.all;
+  _DateFilter _dateFilter = _DateFilter.allTime;
   final TextEditingController _searchController = TextEditingController();
 
   @override
@@ -95,6 +98,24 @@ class _ProjectHomeState extends State<ProjectHome> {
 
   /// The projects of the account: the ones it owns and the ones it takes
   /// part in. Projects without an owner are not shown.
+  bool _matchesDateFilter(Project p) {
+    if (_dateFilter == _DateFilter.allTime) return true;
+    final updated = p.updatedAt;
+    if (updated == null) return false;
+    final now = DateTime.now();
+    final diff = now.difference(updated);
+    switch (_dateFilter) {
+      case _DateFilter.today:
+        return diff.inHours < 24;
+      case _DateFilter.last7Days:
+        return diff.inDays < 7;
+      case _DateFilter.last30Days:
+        return diff.inDays < 30;
+      case _DateFilter.allTime:
+        return true;
+    }
+  }
+
   List<Project> get _visibleProjects {
     var all = controller.myProjects;
     switch (_filter) {
@@ -106,6 +127,9 @@ class _ProjectHomeState extends State<ProjectHome> {
         break;
       case _ProjectFilter.all:
         break;
+    }
+    if (_dateFilter != _DateFilter.allTime) {
+      all = all.where(_matchesDateFilter).toList();
     }
     final q = _search.trim().toLowerCase();
     if (q.isEmpty) return all;
@@ -297,6 +321,43 @@ class _ProjectHomeState extends State<ProjectHome> {
                                       if (v == null) return;
                                       setState(() {
                                         _filter = v;
+                                        _page = 0;
+                                      });
+                                    },
+                                  ),
+                                ),
+                                SizedBox(
+                                  width: 200,
+                                  child: DropdownButtonFormField<_DateFilter>(
+                                    value: _dateFilter,
+                                    isDense: true,
+                                    decoration: InputDecoration(
+                                      isDense: true,
+                                      prefixIcon: const Icon(Icons.calendar_today, size: 18),
+                                      border: const OutlineInputBorder(),
+                                    ),
+                                    items: <DropdownMenuItem<_DateFilter>>[
+                                      DropdownMenuItem(
+                                        value: _DateFilter.allTime,
+                                        child: Text(context.tr('All time')),
+                                      ),
+                                      DropdownMenuItem(
+                                        value: _DateFilter.today,
+                                        child: Text(context.tr('Last 24 hours')),
+                                      ),
+                                      DropdownMenuItem(
+                                        value: _DateFilter.last7Days,
+                                        child: Text(context.tr('Last 7 days')),
+                                      ),
+                                      DropdownMenuItem(
+                                        value: _DateFilter.last30Days,
+                                        child: Text(context.tr('Last 30 days')),
+                                      ),
+                                    ],
+                                    onChanged: (v) {
+                                      if (v == null) return;
+                                      setState(() {
+                                        _dateFilter = v;
                                         _page = 0;
                                       });
                                     },

@@ -445,6 +445,10 @@ class AppLocalizations {
     'All projects': 'Все проекты',
     'Owned by me': 'Мои проекты',
     'Shared with me': 'Доступные мне',
+    'All time': 'За всё время',
+    'Last 24 hours': 'За 24 часа',
+    'Last 7 days': 'За 7 дней',
+    'Last 30 days': 'За 30 дней',
     'Create your first JavaFX application to start building scenes and generating Java sources.': 'Создайте первое JavaFX-приложение, чтобы начать строить сцены и генерировать Java-код.',
     'Open an existing project or start a new one.':
         'Откройте существующий проект или создайте новый.',
