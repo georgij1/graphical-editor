@@ -12,6 +12,7 @@ import 'build_report_dialog.dart';
 import 'user_avatar.dart';
 import 'export_dialog.dart';
 import 'project_dialogs.dart';
+import 'project_icon_picker.dart';
 
 /// Opens the settings window of a single project.
 Future<void> showProjectSettingsDialog(
@@ -321,6 +322,45 @@ class _ProjectSettingsDialogState extends State<ProjectSettingsDialog> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: <Widget>[
+                          ListenableBuilder(
+                            listenable: controller,
+                            builder: (context, _) {
+                              return Row(
+                                children: <Widget>[
+                                  Container(
+                                    width: 44,
+                                    height: 44,
+                                    decoration: BoxDecoration(
+                                      color: theme
+                                          .colorScheme.surfaceContainerHighest,
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    alignment: Alignment.center,
+                                    child: projectIconWidget(
+                                      widget.project.icon,
+                                      size: 28,
+                                      color: theme.colorScheme.primary,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  OutlinedButton.icon(
+                                    onPressed: _busy
+                                        ? null
+                                        : () async {
+                                            await showProjectIconPickerDialog(
+                                              context,
+                                              controller: controller,
+                                              project: widget.project,
+                                            );
+                                          },
+                                    icon: const Icon(Icons.edit_outlined, size: 18),
+                                    label: Text(context.tr('Change icon')),
+                                  ),
+                                ],
+                              );
+                            },
+                          ),
+                          const SizedBox(height: 12),
                           TextField(
                             controller: _name,
                             enabled: !_busy,
