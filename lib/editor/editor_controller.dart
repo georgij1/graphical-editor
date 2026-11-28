@@ -2638,21 +2638,39 @@ class EditorController extends ChangeNotifier {
   /// Every project the picker knows: the own ones and the shared ones.
   List<Project> get allProjects {
     final seenIds = <String>{};
-    final seenOwnerNames = <String>{};
     final result = <Project>[];
+    final nameIndex = <String, int>{};
+
+    int score(Project p) {
+      var s = 0;
+      if ((p.ownerId ?? '').isNotEmpty) s += 4;
+      if ((p.ownerEmail ?? '').isNotEmpty) s += 2;
+      if (p.shared) s += 1;
+      return s;
+    }
+
     void add(Project project) {
+      final nameKey = project.name.trim().toLowerCase();
       if (!seenIds.add(project.id)) return;
-      final ownerId = project.ownerId ?? '';
-      final ownerNameKey = ownerId.isEmpty
-          ? null
-          : '$ownerId::${project.name.trim().toLowerCase()}';
-      if (ownerNameKey != null && !seenOwnerNames.add(ownerNameKey)) return;
+      final existingIdx = nameIndex[nameKey];
+      if (existingIdx != null) {
+        final existing = result[existingIdx];
+        // Same-name duplicate: prefer the richer/server-backed project.
+        if (score(project) > score(existing)) {
+          seenIds.remove(existing.id);
+          result[existingIdx] = project;
+          seenIds.add(project.id);
+        }
+        return;
+      }
+      if (nameKey.isNotEmpty) nameIndex[nameKey] = result.length;
       result.add(project);
     }
-    for (final project in _projects) {
+
+    for (final project in _sharedProjects) {
       add(project);
     }
-    for (final project in _sharedProjects) {
+    for (final project in _projects) {
       add(project);
     }
     return result;
