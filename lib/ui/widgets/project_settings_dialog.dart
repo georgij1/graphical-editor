@@ -469,7 +469,7 @@ class _ProjectSettingsDialogState extends State<ProjectSettingsDialog> {
                             onChanged: (_) => _scheduleSave(),
                           ),
                           const SizedBox(height: 16),
-                          // Owner badge shown as on the project card.
+                          // Owner badge.
                           if (project.ownerEmail != null) ...<Widget>[
                             Builder(builder: (context) {
                               final isProjectOwner =
@@ -478,56 +478,65 @@ class _ProjectSettingsDialogState extends State<ProjectSettingsDialog> {
                                       (controller.userId != null &&
                                           controller.userId!.isNotEmpty &&
                                           controller.userId == project.ownerId);
-                              return Tooltip(
-                                message: isProjectOwner
-                                    ? context.tr('Transfer project')
-                                    : (project.ownerEmail ?? ''),
-                                child: MouseRegion(
-                                  cursor: isProjectOwner
-                                      ? SystemMouseCursors.click
-                                      : SystemMouseCursors.basic,
-                                  child: GestureDetector(
-                                    behavior: HitTestBehavior.opaque,
-                                    onTap: isProjectOwner ? _showTransferDialog : null,
-                                    child: Container(
-                                      padding: const EdgeInsets.fromLTRB(2, 4, 8, 4),
-                                      decoration: BoxDecoration(
-                                        color: theme.colorScheme.primaryContainer
-                                            .withValues(alpha: 0.5),
-                                        borderRadius: BorderRadius.circular(12),
-                                      ),
-                                      child: Row(
-                                        mainAxisSize: MainAxisSize.min,
+                              final borderColor = theme.colorScheme.outlineVariant
+                                  .withValues(alpha: 0.5);
+                              return Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 12, vertical: 10),
+                                decoration: BoxDecoration(
+                                  color: theme.colorScheme.surfaceContainerHighest
+                                      .withValues(alpha: 0.35),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(color: borderColor),
+                                ),
+                                child: Row(
+                                  children: <Widget>[
+                                    UserAvatar(
+                                      dataUrl: null,
+                                      email: project.ownerEmail,
+                                      radius: 18,
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
                                         children: <Widget>[
-                                          UserAvatar(
-                                            dataUrl: null,
-                                            email: project.ownerEmail,
-                                            radius: 10,
-                                          ),
-                                          const SizedBox(width: 6),
-                                          Flexible(
-                                            child: Text(
-                                              project.ownerEmail ?? '',
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
-                                              style: TextStyle(
-                                                fontSize: 12,
-                                                color: theme.colorScheme.onPrimaryContainer,
-                                              ),
+                                          Text(
+                                            context.tr('Owner'),
+                                            style: theme.textTheme.labelSmall?.copyWith(
+                                              color: theme.colorScheme.onSurfaceVariant,
+                                              letterSpacing: 0.2,
                                             ),
                                           ),
-                                          if (isProjectOwner) ...<Widget>[
-                                            const SizedBox(width: 4),
-                                            Icon(
-                                              Icons.swap_horiz,
-                                              size: 14,
-                                              color: theme.colorScheme.onPrimaryContainer,
+                                          const SizedBox(height: 2),
+                                          Text(
+                                            project.ownerEmail ?? '',
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: theme.textTheme.bodyMedium?.copyWith(
+                                              fontWeight: FontWeight.w500,
                                             ),
-                                          ],
+                                          ),
                                         ],
                                       ),
                                     ),
-                                  ),
+                                    if (isProjectOwner) ...<Widget>[
+                                      const SizedBox(width: 8),
+                                      Tooltip(
+                                        message: context.tr('Transfer project'),
+                                        child: OutlinedButton.icon(
+                                          onPressed: _showTransferDialog,
+                                          icon: const Icon(Icons.swap_horiz, size: 16),
+                                          label: Text(context.tr('Transfer')),
+                                          style: OutlinedButton.styleFrom(
+                                            visualDensity: VisualDensity.compact,
+                                            padding: const EdgeInsets.symmetric(
+                                                horizontal: 12, vertical: 8),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ],
                                 ),
                               );
                             }),
