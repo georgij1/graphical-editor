@@ -469,33 +469,68 @@ class _ProjectSettingsDialogState extends State<ProjectSettingsDialog> {
                             onChanged: (_) => _scheduleSave(),
                           ),
                           const SizedBox(height: 16),
-                          // Owner badge shown as a colored pill:
+                          // Owner badge shown as on the project card.
                           if (project.ownerEmail != null) ...<Widget>[
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 12, vertical: 6),
-                              decoration: BoxDecoration(
-                                color: theme.colorScheme.primaryContainer
-                                    .withValues(alpha: 0.3),
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: <Widget>[
-                                  const Icon(Icons.person, size: 14,
-                                      color: Colors.white),
-                                  const SizedBox(width: 6),
-                                  Text(
-                                    project.ownerEmail!,
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.w600,
-                                      fontSize: 12,
+                            Builder(builder: (context) {
+                              final isProjectOwner =
+                                  controller.userEmail?.toLowerCase() ==
+                                          project.ownerEmail?.toLowerCase() ||
+                                      (controller.userId != null &&
+                                          controller.userId!.isNotEmpty &&
+                                          controller.userId == project.ownerId);
+                              return Tooltip(
+                                message: isProjectOwner
+                                    ? context.tr('Transfer project')
+                                    : (project.ownerEmail ?? ''),
+                                child: MouseRegion(
+                                  cursor: isProjectOwner
+                                      ? SystemMouseCursors.click
+                                      : SystemMouseCursors.basic,
+                                  child: GestureDetector(
+                                    behavior: HitTestBehavior.opaque,
+                                    onTap: isProjectOwner ? _showTransferDialog : null,
+                                    child: Container(
+                                      padding: const EdgeInsets.fromLTRB(2, 4, 8, 4),
+                                      decoration: BoxDecoration(
+                                        color: theme.colorScheme.primaryContainer
+                                            .withValues(alpha: 0.5),
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: <Widget>[
+                                          UserAvatar(
+                                            dataUrl: null,
+                                            email: project.ownerEmail,
+                                            radius: 10,
+                                          ),
+                                          const SizedBox(width: 6),
+                                          Flexible(
+                                            child: Text(
+                                              project.ownerEmail ?? '',
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: TextStyle(
+                                                fontSize: 12,
+                                                color: theme.colorScheme.onPrimaryContainer,
+                                              ),
+                                            ),
+                                          ),
+                                          if (isProjectOwner) ...<Widget>[
+                                            const SizedBox(width: 4),
+                                            Icon(
+                                              Icons.swap_horiz,
+                                              size: 14,
+                                              color: theme.colorScheme.onPrimaryContainer,
+                                            ),
+                                          ],
+                                        ],
+                                      ),
                                     ),
                                   ),
-                                ],
-                              ),
-                            ),
+                                ),
+                              );
+                            }),
                           ],
                           const SizedBox(height: 16),
                         ],
