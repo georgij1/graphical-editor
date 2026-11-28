@@ -449,6 +449,77 @@ class _ProjectCard extends StatelessWidget {
     return null;
   }
 
+  Future<void> _showContextMenu(BuildContext context, Offset globalPosition) async {
+    final overlay = Overlay.of(context).context.findRenderObject() as RenderBox;
+    final selected = await showMenu<String>(
+      context: context,
+      position: RelativeRect.fromRect(
+        Rect.fromLTWH(globalPosition.dx, globalPosition.dy, 0, 0),
+        Offset.zero & overlay.size,
+      ),
+      items: <PopupMenuEntry<String>>[
+        PopupMenuItem<String>(
+          value: 'open',
+          child: ListTile(
+            dense: true,
+            leading: const Icon(Icons.open_in_new, size: 18),
+            title: Text(context.tr('Open project')),
+          ),
+        ),
+        PopupMenuItem<String>(
+          value: 'settings',
+          child: ListTile(
+            dense: true,
+            leading: const Icon(Icons.settings_outlined, size: 18),
+            title: Text(context.tr('Project settings')),
+          ),
+        ),
+        const PopupMenuDivider(),
+        PopupMenuItem<String>(
+          value: 'duplicate',
+          child: ListTile(
+            dense: true,
+            leading: const Icon(Icons.copy_all_outlined, size: 18),
+            title: Text(context.tr('Duplicate')),
+          ),
+        ),
+        PopupMenuItem<String>(
+          value: 'delete',
+          child: ListTile(
+            dense: true,
+            leading: Icon(Icons.delete_outline, size: 18, color: Theme.of(context).colorScheme.error),
+            title: Text(context.tr('Delete'), style: TextStyle(color: Theme.of(context).colorScheme.error)),
+          ),
+        ),
+      ],
+    );
+    if (selected == null || !context.mounted) return;
+    switch (selected) {
+      case 'open':
+        onOpen();
+        break;
+      case 'settings':
+        onSettings();
+        break;
+      case 'duplicate':
+        controller.duplicateProject(project);
+        if (context.mounted) {
+          ScaffoldMessenger.of(context)
+            ..hideCurrentSnackBar()
+            ..showSnackBar(SnackBar(content: Text(context.tr('Project duplicated.')), behavior: SnackBarBehavior.floating));
+        }
+        break;
+      case 'delete':
+        final ok = await confirmDialog(
+          context,
+          title: context.tr('Delete project'),
+          message: '${context.tr('Delete project')} "${project.name}"?',
+        );
+        if (ok == true) controller.deleteProject(project);
+        break;
+    }
+  }
+
   Future<void> _editPackage(BuildContext context) async {
     final textController = TextEditingController(text: project.package);
     String? error;
@@ -644,9 +715,12 @@ return Card(
       clipBehavior: Clip.antiAlias,
       child: Stack(
         children: <Widget>[
-          InkWell(
-            onTap: onOpen,
-            child: Padding(
+          GestureDetector(
+            onSecondaryTapUp: (d) => _showContextMenu(context, d.globalPosition),
+            onLongPressStart: (d) => _showContextMenu(context, d.globalPosition),
+            child: InkWell(
+              onTap: onOpen,
+              child: Padding(
           padding: const EdgeInsets.fromLTRB(12, 8, 8, 28),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -723,6 +797,7 @@ return Card(
           ),
         ),
       ),
+          ),
           Positioned(
             left: 12,
             bottom: 6,
