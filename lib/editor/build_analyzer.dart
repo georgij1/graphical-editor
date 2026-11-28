@@ -170,7 +170,6 @@ class BuildAnalyzer {
 
     final inputs = _Inputs(<String, double>{
       'scenes': project.scenes.length.toDouble(),
-      'hasDescription': project.description.isNotEmpty ? 1.0 : 0.0,
       'packageValid': _isValidJavaPackage(project.package) ? 1.0 : 0.0,
       'mainClassValid': project.mainClass.isNotEmpty ? 1.0 : 0.0,
       'hasScenes': project.scenes.isNotEmpty ? 1.0 : 0.0,
@@ -191,8 +190,6 @@ class BuildAnalyzer {
       'packageCheck': (i) => i['packageValid'],
       // Is the main class set?
       'mainClassCheck': (i) => i['mainClassValid'],
-      // Is there a project description?
-      'descriptionCheck': (i) => i['hasDescription'],
       // Do the FXML controllers match the project package?
       'controllerCheck': (i) => i['controllersOk'],
       // Does every FXML element have the <?import?> it needs?
@@ -210,20 +207,18 @@ class BuildAnalyzer {
     // Each set sums to 1.0.
     final weights = hasBuild
         ? <String, double>{
-            'sceneCheck': 0.15,
+            'sceneCheck': 0.20,
             'packageCheck': 0.10,
             'mainClassCheck': 0.10,
-            'descriptionCheck': 0.05,
             'buildCheck': 0.20,
             'speedCheck': 0.10,
             'controllerCheck': 0.20,
             'importCheck': 0.10,
           }
         : <String, double>{
-            'sceneCheck': 0.20,
+            'sceneCheck': 0.25,
             'packageCheck': 0.15,
             'mainClassCheck': 0.10,
-            'descriptionCheck': 0.05,
             'controllerCheck': 0.25,
             'importCheck': 0.25,
           };
@@ -254,13 +249,6 @@ class BuildAnalyzer {
             issues.add(const ReportLine.critical('Main class is not set.'));
             suggestions.add(
               const ReportLine('Set the main class in project settings.'),
-            );
-          case 'descriptionCheck':
-            issues.add(const ReportLine('Project description is empty.'));
-            suggestions.add(
-              const ReportLine(
-                'Add a description — it will appear in the exported README.',
-              ),
             );
           case 'buildCheck':
             issues.add(const ReportLine.critical('Build failed.'));
