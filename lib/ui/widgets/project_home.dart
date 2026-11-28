@@ -532,21 +532,25 @@ class _ProjectCard extends StatelessWidget {
     await controller.loadAccounts();
     final candidates = <Account>[];
     final seen = <String>{};
+    final ownerEmail = project.ownerEmail?.toLowerCase();
+    final myEmail = controller.userEmail?.toLowerCase();
     for (final m in project.members) {
       final email = m.email.trim();
       if (email.isEmpty) continue;
-      if (email.toLowerCase() == project.ownerEmail?.toLowerCase()) continue;
-      if (seen.add(email.toLowerCase())) {
+      final lower = email.toLowerCase();
+      if (lower == ownerEmail || lower == myEmail) continue;
+      if (seen.add(lower)) {
         final acc = controller.accounts.cast<Account?>().firstWhere(
-              (a) => a!.email.toLowerCase() == email.toLowerCase(),
+              (a) => a!.email.toLowerCase() == lower,
               orElse: () => null,
             );
         candidates.add(acc ?? Account(id: '', email: email));
       }
     }
     for (final a in controller.accounts) {
-      if (a.email.toLowerCase() == project.ownerEmail?.toLowerCase()) continue;
-      if (seen.add(a.email.toLowerCase())) candidates.add(a);
+      final lower = a.email.toLowerCase();
+      if (lower == ownerEmail || lower == myEmail) continue;
+      if (seen.add(lower)) candidates.add(a);
     }
 
     if (!context.mounted) return;
