@@ -60,6 +60,7 @@ class _ProjectSettingsDialogState extends State<ProjectSettingsDialog> {
   String? _message;
   bool _error = false;
   String? _packageError;
+  OverlayEntry? _toastEntry;
 
   /// Debounce timer for auto-saving name/description after the user stops
   /// typing.
@@ -93,6 +94,8 @@ class _ProjectSettingsDialogState extends State<ProjectSettingsDialog> {
   @override
   void dispose() {
     _saveTimer?.cancel();
+    _toastEntry?.remove();
+    _toastEntry = null;
     _name.dispose();
     _description.dispose();
     _packageController.dispose();
@@ -100,11 +103,55 @@ class _ProjectSettingsDialogState extends State<ProjectSettingsDialog> {
     super.dispose();
   }
 
+  void _showOverlayToast(String message, {bool error = false}) {
+    _toastEntry?.remove();
+    _toastEntry = null;
+    final overlay = Overlay.of(context, rootOverlay: true);
+    late OverlayEntry entry;
+    entry = OverlayEntry(
+      builder: (ctx) => Positioned(
+        left: 24,
+        right: 24,
+        bottom: 24,
+        child: IgnorePointer(
+          child: Material(
+            color: Colors.transparent,
+            child: Center(
+              child: Container(
+                constraints: const BoxConstraints(maxWidth: 560),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  color: error ? const Color(0xFFB3261E) : const Color(0xFF323232),
+                  borderRadius: BorderRadius.circular(8),
+                  boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 8, offset: Offset(0, 2))],
+                ),
+                child: Text(
+                  message,
+                  style: const TextStyle(color: Colors.white, fontSize: 14),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    _toastEntry = entry;
+    overlay.insert(entry);
+    Future<void>.delayed(const Duration(seconds: 2), () {
+      if (_toastEntry == entry) {
+        entry.remove();
+        _toastEntry = null;
+      }
+    });
+  }
+
   void _say(String message, {bool error = false}) {
     setState(() {
       _message = message;
       _error = error;
     });
+    _showOverlayToast(message, error: error);
   }
 
   /// Saves the name, description, package and main class together.
