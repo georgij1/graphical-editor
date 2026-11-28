@@ -679,28 +679,28 @@ return Card(
                             size: 15, color: theme.colorScheme.primary),
                       ),
                     ),
-                  SizedBox(
-                    width: 28,
-                    height: 28,
-                    child: IconButton(
-                      tooltip: context.tr(project.shared ? 'Published' : 'Publish project'),
-                      onPressed: () => _publish(context),
-                      icon: Icon(
-                        project.shared ? Icons.cloud_done : Icons.cloud_upload_outlined,
-                        size: 16,
-                        color: project.shared
-                            ? theme.colorScheme.onPrimary
-                            : theme.colorScheme.onSurfaceVariant,
+                  Tooltip(
+                    message: context.tr(project.shared ? 'Published' : 'Publish project'),
+                    child: Material(
+                      color: project.shared
+                          ? theme.colorScheme.primary
+                          : theme.colorScheme.surfaceContainerHighest,
+                      borderRadius: BorderRadius.circular(8),
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(8),
+                        onTap: () => _publish(context),
+                        child: SizedBox(
+                          width: 28,
+                          height: 28,
+                          child: Icon(
+                            project.shared ? Icons.cloud_done : Icons.cloud_upload_outlined,
+                            size: 16,
+                            color: project.shared
+                                ? theme.colorScheme.onPrimary
+                                : theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
                       ),
-                      style: IconButton.styleFrom(
-                        backgroundColor: project.shared
-                            ? theme.colorScheme.primary
-                            : theme.colorScheme.surfaceContainerHighest,
-                        padding: EdgeInsets.zero,
-                        minimumSize: const Size(28, 28),
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      ),
-                      visualDensity: VisualDensity.compact,
                     ),
                   ),
                   // Settings open in a modal window, not a popup list.
