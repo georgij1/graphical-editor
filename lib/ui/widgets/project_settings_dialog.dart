@@ -556,16 +556,7 @@ class _ProjectSettingsDialogState extends State<ProjectSettingsDialog> {
                         runSpacing: 10,
                         alignment: WrapAlignment.start,
                         children: <Widget>[
-                          _ActionButton(
-                            icon: Icons.open_in_new,
-                            label: context.tr('Open project'),
-                            onPressed: _busy
-                                ? null
-                                : () {
-                                    Navigator.of(context).pop();
-                                    controller.openProject(widget.project);
-                                  },
-                          ),
+
                           _ActionButton(
                             icon: Icons.copy_all_outlined,
                             label: context.tr('Duplicate'),
