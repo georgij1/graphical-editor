@@ -679,6 +679,30 @@ return Card(
                             size: 15, color: theme.colorScheme.primary),
                       ),
                     ),
+                  if (project.shared)
+                    Container(
+                      margin: const EdgeInsets.only(right: 4),
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.primaryContainer,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: <Widget>[
+                          Icon(Icons.cloud_done, size: 12, color: theme.colorScheme.onPrimaryContainer),
+                          const SizedBox(width: 4),
+                          Text(
+                            context.tr('Published'),
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w600,
+                              color: theme.colorScheme.onPrimaryContainer,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   SizedBox(
                     width: 28,
                     height: 28,
