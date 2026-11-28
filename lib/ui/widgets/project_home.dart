@@ -689,14 +689,16 @@ return Card(
                         project.shared ? Icons.cloud_done : Icons.cloud_upload_outlined,
                         size: 16,
                         color: project.shared
-                            ? theme.colorScheme.onPrimaryContainer
-                            : null,
+                            ? theme.colorScheme.onPrimary
+                            : theme.colorScheme.onSurfaceVariant,
                       ),
                       style: IconButton.styleFrom(
                         backgroundColor: project.shared
-                            ? theme.colorScheme.primaryContainer
-                            : null,
+                            ? theme.colorScheme.primary
+                            : theme.colorScheme.surfaceContainerHighest,
                         padding: EdgeInsets.zero,
+                        minimumSize: const Size(28, 28),
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                       ),
                       visualDensity: VisualDensity.compact,
                     ),
