@@ -242,6 +242,47 @@ Future<String?> showIconStudioDialog(BuildContext context) {
   );
 }
 
+class _IconStroke {
+  _IconStroke({required this.color, required this.width, required List<Offset> points})
+      : points = List<Offset>.from(points);
+  final Color color;
+  final double width;
+  final List<Offset> points;
+}
+
+class _IconStrokePainter extends CustomPainter {
+  _IconStrokePainter(this.strokes);
+  final List<_IconStroke> strokes;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    canvas.save();
+    canvas.clipRect(Offset.zero & size);
+    for (final stroke in strokes) {
+      if (stroke.points.isEmpty) continue;
+      final paint = Paint()
+        ..color = stroke.color
+        ..strokeWidth = stroke.width
+        ..strokeCap = StrokeCap.round
+        ..strokeJoin = StrokeJoin.round
+        ..style = PaintingStyle.stroke;
+      if (stroke.points.length == 1) {
+        canvas.drawPoints(ui.PointMode.points, stroke.points, paint);
+      } else {
+        final path = Path()..moveTo(stroke.points.first.dx, stroke.points.first.dy);
+        for (var i = 1; i < stroke.points.length; i++) {
+          path.lineTo(stroke.points[i].dx, stroke.points[i].dy);
+        }
+        canvas.drawPath(path, paint);
+      }
+    }
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(covariant _IconStrokePainter oldDelegate) => true;
+}
+
 class _IconStudioDialog extends StatefulWidget {
   const _IconStudioDialog();
 
@@ -257,6 +298,10 @@ class _IconStudioDialogState extends State<_IconStudioDialog> {
   String _iconKey = 'folder';
   double _iconSize = 56;
   bool _saving = false;
+  bool _drawMode = false;
+  Color _brushColor = Colors.white;
+  double _brushSize = 4;
+  final List<_IconStroke> _strokes = <_IconStroke>[];
 
   static const List<Color> _palette = <Color>[
     Color(0xFF4F46E5), Color(0xFF2563EB), Color(0xFF0891B2), Color(0xFF059669),
@@ -291,6 +336,19 @@ class _IconStudioDialogState extends State<_IconStudioDialog> {
     } catch (_) {
       if (mounted) setState(() => _saving = false);
     }
+  }
+
+  void _startStroke(Offset p) {
+    setState(() {
+      _strokes.add(_IconStroke(color: _brushColor, width: _brushSize, points: <Offset>[p]));
+    });
+  }
+
+  void _extendStroke(Offset p) {
+    if (_strokes.isEmpty) return;
+    setState(() {
+      _strokes.last.points.add(p);
+    });
   }
 
   @override
@@ -330,17 +388,39 @@ class _IconStudioDialogState extends State<_IconStudioDialog> {
                         children: <Widget>[
                           RepaintBoundary(
                             key: _previewKey,
-                            child: Container(
-                              width: 128,
-                              height: 128,
-                              decoration: BoxDecoration(
-                                color: _bgColor,
-                                borderRadius: _radius,
-                              ),
-                              child: Icon(
-                                kProjectIcons[_iconKey] ?? Icons.folder_copy_outlined,
-                                size: _iconSize,
-                                color: _fgColor,
+                            child: ClipRRect(
+                              borderRadius: _radius,
+                              child: Container(
+                                width: 128,
+                                height: 128,
+                                decoration: BoxDecoration(
+                                  color: _bgColor,
+                                  borderRadius: _radius,
+                                ),
+                                child: Stack(
+                                  children: <Widget>[
+                                    Center(
+                                      child: Icon(
+                                        kProjectIcons[_iconKey] ?? Icons.folder_copy_outlined,
+                                        size: _iconSize,
+                                        color: _fgColor,
+                                      ),
+                                    ),
+                                    Positioned.fill(
+                                      child: IgnorePointer(
+                                        ignoring: !_drawMode,
+                                        child: GestureDetector(
+                                          behavior: HitTestBehavior.opaque,
+                                          onPanStart: (d) => _startStroke(d.localPosition),
+                                          onPanUpdate: (d) => _extendStroke(d.localPosition),
+                                          child: CustomPaint(
+                                            painter: _IconStrokePainter(_strokes),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
                           ),
@@ -467,6 +547,76 @@ class _IconStudioDialogState extends State<_IconStudioDialog> {
                               label: _iconSize.round().toString(),
                               onChanged: (v) => setState(() => _iconSize = v),
                             ),
+                            const SizedBox(height: 16),
+                            Row(
+                              children: <Widget>[
+                                Expanded(
+                                  child: Text(context.tr('Drawing'), style: theme.textTheme.titleSmall),
+                                ),
+                                Switch(
+                                  value: _drawMode,
+                                  onChanged: (v) => setState(() => _drawMode = v),
+                                ),
+                              ],
+                            ),
+                            if (_drawMode) ...<Widget>[
+                              const SizedBox(height: 8),
+                              Text(context.tr('Brush color'), style: theme.textTheme.bodySmall),
+                              const SizedBox(height: 8),
+                              Wrap(
+                                spacing: 8,
+                                runSpacing: 8,
+                                children: <Widget>[
+                                  for (final c in [..._fgPalette, ..._palette])
+                                    GestureDetector(
+                                      onTap: () => setState(() => _brushColor = c),
+                                      child: Container(
+                                        width: 24,
+                                        height: 24,
+                                        decoration: BoxDecoration(
+                                          color: c,
+                                          shape: BoxShape.circle,
+                                          border: Border.all(
+                                            color: _brushColor == c
+                                                ? theme.colorScheme.primary
+                                                : theme.colorScheme.outlineVariant,
+                                            width: 2,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                ],
+                              ),
+                              const SizedBox(height: 12),
+                              Text(context.tr('Brush size'), style: theme.textTheme.bodySmall),
+                              Slider(
+                                value: _brushSize,
+                                min: 1,
+                                max: 16,
+                                divisions: 15,
+                                label: _brushSize.round().toString(),
+                                onChanged: (v) => setState(() => _brushSize = v),
+                              ),
+                              Row(
+                                children: <Widget>[
+                                  OutlinedButton.icon(
+                                    onPressed: _strokes.isEmpty
+                                        ? null
+                                        : () => setState(() => _strokes.removeLast()),
+                                    icon: const Icon(Icons.undo, size: 16),
+                                    label: Text(context.tr('Undo')),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  OutlinedButton.icon(
+                                    onPressed: _strokes.isEmpty
+                                        ? null
+                                        : () => setState(() => _strokes.clear()),
+                                    icon: const Icon(Icons.delete_outline, size: 16),
+                                    label: Text(context.tr('Clear')),
+                                  ),
+                                ],
+                              ),
+                            ],
                           ],
                         ),
                       ),
