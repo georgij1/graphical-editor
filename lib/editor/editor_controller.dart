@@ -3678,6 +3678,34 @@ class EditorController extends ChangeNotifier {
     return null;
   }
 
+  void _applyProjectUpdate(Project target, Project source) {
+    target
+      ..name = source.name
+      ..package = source.package
+      ..mainClass = source.mainClass
+      ..description = source.description
+      ..ownerId = source.ownerId
+      ..ownerEmail = source.ownerEmail
+      ..revision = source.revision
+      ..shared = source.shared
+      ..buildTool = source.buildTool
+      ..aiModel = source.aiModel
+      ..aiHiddenDefaultsSeeded = source.aiHiddenDefaultsSeeded;
+    target.aiCustomModels
+      ..clear()
+      ..addAll(source.aiCustomModels);
+    target.aiHiddenModels
+      ..clear()
+      ..addAll(source.aiHiddenModels);
+    target.replaceMembers(source.members);
+    target.scenes
+      ..clear()
+      ..addAll(source.scenes);
+    target.sourceOverrides
+      ..clear()
+      ..addAll(source.sourceOverrides);
+  }
+
   /// Transfers project ownership to another participant. Only the current
   /// owner may do this, and the new owner must already take part in the
   /// project.
@@ -3686,26 +3714,52 @@ class EditorController extends ChangeNotifier {
     String newOwnerEmail,
   ) async {
     final currentUser = _userEmail;
-    if (currentUser == null || project.ownerEmail != currentUser) return false;
+    if (currentUser == null || project.ownerEmail?.toLowerCase() != currentUser.toLowerCase()) {
+      return false;
+    }
 
     final newOwner = newOwnerEmail.trim();
-    if (newOwner.isEmpty || newOwner.toLowerCase() == currentUser.toLowerCase())
+    if (newOwner.isEmpty || newOwner.toLowerCase() == currentUser.toLowerCase()) {
       return false;
+    }
 
     final isParticipant = project.members.any(
       (m) => m.email.toLowerCase() == newOwner.toLowerCase(),
     );
     if (!isParticipant) return false;
 
-    // Look up the account id by email.
-    final newOwnerAccount = _accounts.firstWhere(
-      (a) => a.email.toLowerCase() == newOwner.toLowerCase(),
-      orElse: () => Account(id: '', email: newOwner),
+    final token = _token;
+    final newOwnerAccount = _accounts.cast<Account?>().firstWhere(
+      (a) => a!.email.toLowerCase() == newOwner.toLowerCase(),
+      orElse: () => null,
     );
 
-    // The old owner stays in the project as a participant.
-    project.ownerId = newOwnerAccount.id.isNotEmpty ? newOwnerAccount.id : null;
+    if (token != null) {
+      final result = await _api.transferProjectOwnership(
+        token,
+        project.id,
+        newOwner,
+        userId: newOwnerAccount?.id,
+      );
+      if (!result.isOk || result.value == null) {
+        collaborationNotice = result.message ?? 'Failed to transfer ownership.';
+        notifyListeners();
+        return false;
+      }
+      final updated = result.value!;
+      _applyProjectUpdate(project, updated);
+      _persist();
+      notifyListeners();
+      return true;
+    }
+
+    // Local-only fallback.
+    project.ownerId = (newOwnerAccount?.id.isNotEmpty ?? false) ? newOwnerAccount!.id : project.ownerId;
     project.ownerEmail = newOwner;
+    project.members.removeWhere((m) => m.email.toLowerCase() == newOwner.toLowerCase());
+    if (!project.members.any((m) => m.email.toLowerCase() == currentUser.toLowerCase())) {
+      project.members.add(ProjectMember(email: currentUser, role: 'editor'));
+    }
     _persist();
     notifyListeners();
     return true;

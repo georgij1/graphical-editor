@@ -130,6 +130,10 @@ abstract class ApiClient {
   Future<ApiResult<Project>> removeProjectMember(
       String token, String projectId, String email);
 
+  /// Transfers project ownership to another participant.
+  Future<ApiResult<Project>> transferProjectOwnership(
+      String token, String projectId, String email, {String? userId});
+
   // ---------------------------------------------------------- invitation links
 
   /// Issues an invitation link for the project.
@@ -693,6 +697,22 @@ class HttpApiClient implements ApiClient {
       String token, String projectId, String email) async {
     final result = await _projectRequest(
         'DELETE', '/projects/$projectId/members/$email', token);
+    if (!result.isOk || result.value == null) {
+      return ApiResult<Project>.failure(result.status, result.message);
+    }
+    return ApiResult<Project>.ok(
+        Project.fromJson(result.value!)..shared = true);
+  }
+
+  @override
+  Future<ApiResult<Project>> transferProjectOwnership(
+      String token, String projectId, String email, {String? userId}) async {
+    final result = await _projectRequest(
+        'POST', '/projects/$projectId/transfer', token,
+        body: <String, dynamic>{
+          'email': email,
+          if (userId != null && userId.isNotEmpty) 'userId': userId,
+        });
     if (!result.isOk || result.value == null) {
       return ApiResult<Project>.failure(result.status, result.message);
     }

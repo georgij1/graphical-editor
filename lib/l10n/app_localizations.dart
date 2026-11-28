@@ -485,6 +485,9 @@ class AppLocalizations {
         'Новый владелец должен быть участником проекта.',
     'Ownership transferred to {0}.': 'Право владения передано {0}.',
     'Failed to transfer ownership.': 'Не удалось передать право владения.',
+    'Transfer project': 'Передать проект',
+    'No other users available.': 'Нет доступных пользователей.',
+    'Ownership transferred.': 'Права владельца переданы.',
     'The project belongs to {0}.': 'Проект принадлежит {0}.',
     'No participants available to transfer ownership to.':
         'Нет участников, которым можно передать право владения.',

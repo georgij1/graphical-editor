@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import 'user_avatar.dart';
 
+import '../../auth/api_client.dart';
 import '../../editor/editor_controller.dart';
 import '../../l10n/app_localizations.dart';
 import '../../project/project.dart';
@@ -508,6 +509,103 @@ class _ProjectCard extends StatelessWidget {
     controller.setProjectPackage(project, result);
   }
 
+  Future<void> _showTransferDialog(BuildContext context) async {
+    final controller = this.controller;
+    final project = this.project;
+    final isOwner = controller.userEmail?.toLowerCase() ==
+        project.ownerEmail?.toLowerCase();
+    if (!isOwner) return;
+
+    await controller.loadAccounts();
+    final candidates = <Account>[];
+    final seen = <String>{};
+    for (final m in project.members) {
+      final email = m.email.trim();
+      if (email.isEmpty) continue;
+      if (email.toLowerCase() == project.ownerEmail?.toLowerCase()) continue;
+      if (seen.add(email.toLowerCase())) {
+        final acc = controller.accounts.cast<Account?>().firstWhere(
+              (a) => a!.email.toLowerCase() == email.toLowerCase(),
+              orElse: () => null,
+            );
+        candidates.add(acc ?? Account(id: '', email: email));
+      }
+    }
+    for (final a in controller.accounts) {
+      if (a.email.toLowerCase() == project.ownerEmail?.toLowerCase()) continue;
+      if (seen.add(a.email.toLowerCase())) candidates.add(a);
+    }
+
+    if (!context.mounted) return;
+    String? selected = candidates.isNotEmpty ? candidates.first.email : null;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) {
+        return StatefulBuilder(builder: (ctx, setDialogState) {
+          return AlertDialog(
+            title: Text(ctx.tr('Transfer project')),
+            content: SizedBox(
+              width: 420,
+              child: candidates.isEmpty
+                  ? Text(ctx.tr('No other users available.'))
+                  : Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: <Widget>[
+                        Text(ctx.tr('Select the new owner:')),
+                        const SizedBox(height: 12),
+                        Flexible(
+                          child: SingleChildScrollView(
+                            child: Column(
+                              children: candidates.map<Widget>((Account a) {
+                                return RadioListTile<String>(
+                                  value: a.email,
+                                  groupValue: selected,
+                                  title: Text(a.email),
+                                  secondary: UserAvatar(
+                                    dataUrl: null,
+                                    email: a.email,
+                                    radius: 16,
+                                  ),
+                                  onChanged: (v) => setDialogState(() => selected = v),
+                                );
+                              }).toList(),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+            ),
+            actions: <Widget>[
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(false),
+                child: Text(ctx.tr('Cancel')),
+              ),
+              FilledButton(
+                onPressed: selected == null
+                    ? null
+                    : () => Navigator.of(ctx).pop(true),
+                child: Text(ctx.tr('Transfer')),
+              ),
+            ],
+          );
+        });
+      },
+    );
+
+    if (confirmed != true || selected == null || !context.mounted) return;
+    final ok = await controller.transferProjectOwnership(project, selected!);
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(
+        content: Text(ok
+            ? context.tr('Ownership transferred.')
+            : (controller.collaborationNotice ?? context.tr('Failed to transfer ownership.'))),
+        behavior: SnackBarBehavior.floating,
+      ));
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -589,34 +687,56 @@ return Card(
               // The owner of the project shares the row with the scene count.
               Align(
                 alignment: Alignment.centerLeft,
-                child: Container(
-                   padding: const EdgeInsets.fromLTRB(2, 0, 8, 0),
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.primaryContainer
-                        .withValues(alpha: 0.5),
+                child: Tooltip(
+                  message: controller.userEmail?.toLowerCase() ==
+                          project.ownerEmail?.toLowerCase()
+                      ? context.tr('Transfer project')
+                      : (project.ownerEmail ?? ''),
+                  child: InkWell(
                     borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: <Widget>[
-                      UserAvatar(
-                        dataUrl: null,
-                        email: project.ownerEmail,
-                        radius: 6,
+                    onTap: controller.userEmail?.toLowerCase() ==
+                            project.ownerEmail?.toLowerCase()
+                        ? () => _showTransferDialog(context)
+                        : null,
+                    child: Container(
+                      padding: const EdgeInsets.fromLTRB(2, 0, 8, 0),
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.primaryContainer
+                            .withValues(alpha: 0.5),
+                        borderRadius: BorderRadius.circular(12),
                       ),
-                      const SizedBox(width: 4),
-                      Flexible(
-                        child: Text(
-                          project.ownerEmail ?? (context.l10n.isRussian ? 'гость' : 'guest'),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: theme.colorScheme.onPrimaryContainer,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: <Widget>[
+                          UserAvatar(
+                            dataUrl: null,
+                            email: project.ownerEmail,
+                            radius: 6,
                           ),
-                        ),
+                          const SizedBox(width: 4),
+                          Flexible(
+                            child: Text(
+                              project.ownerEmail ?? '',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: theme.colorScheme.onPrimaryContainer,
+                              ),
+                            ),
+                          ),
+                          if (controller.userEmail?.toLowerCase() ==
+                              project.ownerEmail?.toLowerCase()) ...<Widget>[
+                            const SizedBox(width: 4),
+                            Icon(
+                              Icons.swap_horiz,
+                              size: 13,
+                              color: theme.colorScheme.onPrimaryContainer,
+                            ),
+                          ],
+                        ],
                       ),
-                    ],
+                    ),
                   ),
                 ),
               ),
