@@ -29,7 +29,7 @@ class _PageLayout {
   static const double maxContentWidth = 880;
 
   /// Vertical budget for the parts of the picker that are not cards.
-  static const double headerHeight = 150;
+  static const double headerHeight = 190;
   static const double footerHeight = 60;
   static const double pagerHeight = 44;
 
@@ -70,12 +70,30 @@ class _ProjectHomeState extends State<ProjectHome> {
   /// Updated on every layout pass; drives the slicing and the page counter.
   _PageLayout _layout = const _PageLayout(columns: 1, perPage: 1);
   int _page = 0;
+  String _search = '';
+  final TextEditingController _searchController = TextEditingController();
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
   EditorController get controller => widget.controller;
 
   /// The projects of the account: the ones it owns and the ones it takes
   /// part in. Projects without an owner are not shown.
-  List<Project> get _visibleProjects => controller.myProjects;
+  List<Project> get _visibleProjects {
+    final all = controller.myProjects;
+    final q = _search.trim().toLowerCase();
+    if (q.isEmpty) return all;
+    return all.where((p) {
+      return p.name.toLowerCase().contains(q) ||
+          p.package.toLowerCase().contains(q) ||
+          (p.ownerEmail ?? '').toLowerCase().contains(q) ||
+          p.description.toLowerCase().contains(q);
+    }).toList();
+  }
 
   int get _pageCount {
     final total = _visibleProjects.length;
@@ -195,16 +213,57 @@ class _ProjectHomeState extends State<ProjectHome> {
                               color: theme.colorScheme.onSurfaceVariant,
                             ),
                           ),
+                          if (controller.myProjects.isNotEmpty) ...<Widget>[
+                            const SizedBox(height: 12),
+                            SizedBox(
+                              width: 360,
+                              child: TextField(
+                                controller: _searchController,
+                                decoration: InputDecoration(
+                                  isDense: true,
+                                  prefixIcon: const Icon(Icons.search, size: 20),
+                                  hintText: context.tr('Search projects'),
+                                  border: const OutlineInputBorder(),
+                                  suffixIcon: _search.isNotEmpty
+                                      ? IconButton(
+                                          icon: const Icon(Icons.clear, size: 18),
+                                          onPressed: () => setState(() {
+                                            _searchController.clear();
+                                            _search = '';
+                                            _page = 0;
+                                          }),
+                                        )
+                                      : null,
+                                ),
+                                onChanged: (v) => setState(() {
+                                  _search = v;
+                                  _page = 0;
+                                }),
+                              ),
+                            ),
+                          ],
                         ],
                       ),
                     ),
                     if (projects.isEmpty)
                       Expanded(
                         child: Center(
-                          child: _EmptyState(
-                            onCreate: () => _create(context),
-                            onImport: () => _import(context),
-                          ),
+                          child: controller.myProjects.isEmpty
+                              ? _EmptyState(
+                                  onCreate: () => _create(context),
+                                  onImport: () => _import(context),
+                                )
+                              : Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: <Widget>[
+                                    Icon(Icons.search_off, size: 48, color: theme.colorScheme.onSurfaceVariant),
+                                    const SizedBox(height: 12),
+                                    Text(
+                                      context.tr('No projects found'),
+                                      style: theme.textTheme.titleMedium,
+                                    ),
+                                  ],
+                                ),
                         ),
                       )
                     else

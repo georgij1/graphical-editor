@@ -440,6 +440,8 @@ class AppLocalizations {
     'Previous page': 'Предыдущая страница',
     'Next page': 'Следующая страница',
     'Choose a project': 'Выберите проект',
+    'Search projects': 'Поиск проектов',
+    'No projects found': 'Проекты не найдены',
     'Create your first JavaFX application to start building scenes and generating Java sources.': 'Создайте первое JavaFX-приложение, чтобы начать строить сцены и генерировать Java-код.',
     'Open an existing project or start a new one.':
         'Откройте существующий проект или создайте новый.',
