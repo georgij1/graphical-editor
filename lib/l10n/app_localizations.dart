@@ -491,6 +491,8 @@ class AppLocalizations {
     'Publish again': 'Опубликовать снова',
     'Change icon': 'Изменить иконку',
     'Choose icon': 'Выберите иконку',
+    'Upload icon': 'Загрузить иконку',
+    'Icon is too large (max 512 KB).': 'Иконка слишком большая (макс. 512 КБ).',
     'Published': 'Опубликован',
     'Project published.': 'Проект опубликован.',
     'Could not publish the project.': 'Не удалось опубликовать проект.',

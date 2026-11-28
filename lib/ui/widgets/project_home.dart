@@ -1,5 +1,8 @@
-﻿import 'dart:math' as math;
+﻿import 'dart:convert';
+import 'dart:math' as math;
+import 'dart:typed_data';
 
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
 import 'user_avatar.dart';
@@ -32,6 +35,38 @@ const Map<String, IconData> kProjectIcons = <String, IconData>{
 
 IconData projectIconData(String? key) =>
     kProjectIcons[key] ?? Icons.folder_copy_outlined;
+
+bool isCustomProjectIcon(String? key) =>
+    key != null && key.startsWith('data:image');
+
+Uint8List? decodeCustomProjectIcon(String? key) {
+  if (!isCustomProjectIcon(key)) return null;
+  final comma = key!.indexOf(',');
+  if (comma < 0 || comma == key.length - 1) return null;
+  try {
+    return base64Decode(key.substring(comma + 1));
+  } catch (_) {
+    return null;
+  }
+}
+
+Widget projectIconWidget(String? key, {double size = 18, Color? color}) {
+  final bytes = decodeCustomProjectIcon(key);
+  if (bytes != null) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(3),
+      child: Image.memory(
+        bytes,
+        width: size,
+        height: size,
+        fit: BoxFit.contain,
+        errorBuilder: (_, _, _) =>
+            Icon(Icons.folder_copy_outlined, size: size, color: color),
+      ),
+    );
+  }
+  return Icon(projectIconData(key), size: size, color: color);
+}
 
 /// How many project cards fit on one page of the picker.
 ///
@@ -536,42 +571,108 @@ class _ProjectCard extends StatelessWidget {
       context: context,
       builder: (ctx) {
         final theme = Theme.of(ctx);
+        final customBytes = decodeCustomProjectIcon(project.icon);
         return AlertDialog(
           title: Text(context.tr('Choose icon')),
           content: SizedBox(
-            width: 320,
-            child: Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: <Widget>[
-                for (final entry in kProjectIcons.entries)
-                  InkWell(
-                    borderRadius: BorderRadius.circular(8),
-                    onTap: () => Navigator.of(ctx).pop(entry.key),
-                    child: Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        color: project.icon == entry.key
-                            ? theme.colorScheme.primaryContainer
-                            : null,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(
+            width: 340,
+            child: SingleChildScrollView(
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: <Widget>[
+                  for (final entry in kProjectIcons.entries)
+                    InkWell(
+                      borderRadius: BorderRadius.circular(8),
+                      onTap: () => Navigator.of(ctx).pop(entry.key),
+                      child: Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: project.icon == entry.key
+                              ? theme.colorScheme.primaryContainer
+                              : null,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: project.icon == entry.key
+                                ? theme.colorScheme.primary
+                                : theme.colorScheme.outlineVariant,
+                          ),
+                        ),
+                        child: Icon(
+                          entry.value,
+                          size: 22,
                           color: project.icon == entry.key
                               ? theme.colorScheme.primary
-                              : theme.colorScheme.outlineVariant,
+                              : theme.colorScheme.onSurfaceVariant,
                         ),
                       ),
-                      child: Icon(
-                        entry.value,
-                        size: 22,
-                        color: project.icon == entry.key
-                            ? theme.colorScheme.primary
-                            : theme.colorScheme.onSurfaceVariant,
+                    ),
+                  if (customBytes != null)
+                    InkWell(
+                      borderRadius: BorderRadius.circular(8),
+                      onTap: () => Navigator.of(ctx).pop(project.icon),
+                      child: Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.primaryContainer,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: theme.colorScheme.primary),
+                        ),
+                        padding: const EdgeInsets.all(4),
+                        child: Image.memory(customBytes, fit: BoxFit.cover),
+                      ),
+                    ),
+                  Tooltip(
+                    message: context.tr('Upload icon'),
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(8),
+                      onTap: () async {
+                        final result = await FilePicker.platform.pickFiles(
+                          type: FileType.image,
+                          withData: true,
+                        );
+                        if (result == null || result.files.isEmpty) return;
+                        final file = result.files.first;
+                        final bytes = file.bytes;
+                        if (bytes == null || bytes.isEmpty) return;
+                        if (bytes.length > 512 * 1024) {
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                              content: Text(context.tr('Icon is too large (max 512 KB).')),
+                              behavior: SnackBarBehavior.floating,
+                            ));
+                          }
+                          return;
+                        }
+                        final ext = (file.extension ?? 'png').toLowerCase();
+                        final mime = switch (ext) {
+                          'jpg' || 'jpeg' => 'image/jpeg',
+                          'gif' => 'image/gif',
+                          'webp' => 'image/webp',
+                          _ => 'image/png',
+                        };
+                        final dataUrl = 'data:$mime;base64,${base64Encode(bytes)}';
+                        if (ctx.mounted) Navigator.of(ctx).pop(dataUrl);
+                      },
+                      child: Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: theme.colorScheme.outlineVariant),
+                        ),
+                        child: Icon(
+                          Icons.add_photo_alternate_outlined,
+                          size: 22,
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
                       ),
                     ),
                   ),
-              ],
+                ],
+              ),
             ),
           ),
           actions: <Widget>[
@@ -730,8 +831,8 @@ return Card(
                       onTap: () => _pickIcon(context),
                       child: Padding(
                         padding: const EdgeInsets.all(2),
-                        child: Icon(
-                          projectIconData(project.icon),
+                        child: projectIconWidget(
+                          project.icon,
                           size: 18,
                           color: theme.colorScheme.primary,
                         ),
