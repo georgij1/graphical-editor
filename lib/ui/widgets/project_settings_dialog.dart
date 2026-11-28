@@ -1238,13 +1238,8 @@ class _ParticipantRow extends StatelessWidget {
                     onChanged: (value) => onRoleChanged(value ?? 'editor'),
                   ),
                 ] else ...<Widget>[
-                  const SizedBox(height: 2),
-                  Text(
-                    member.canEdit ? context.tr('Editor') : context.tr('Viewer'),
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                  ),
+                  const SizedBox(height: 4),
+                  _RoleTag(role: member.role),
                 ],
               ],
             ),
@@ -1257,6 +1252,34 @@ class _ParticipantRow extends StatelessWidget {
             color: theme.colorScheme.onSurfaceVariant,
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _RoleTag extends StatelessWidget {
+  const _RoleTag({required this.role});
+  final String role;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isEditor = role == 'editor';
+    final color = isEditor ? theme.colorScheme.primary : theme.colorScheme.tertiary;
+    final bg = color.withValues(alpha: 0.12);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: color.withValues(alpha: 0.25)),
+      ),
+      child: Text(
+        context.tr(isEditor ? 'Editor' : 'Viewer'),
+        style: theme.textTheme.labelSmall?.copyWith(
+          color: color,
+          fontWeight: FontWeight.w600,
+        ),
       ),
     );
   }
@@ -1276,24 +1299,40 @@ class _RoleChoice extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return DropdownButtonHideUnderline(
-      child: DropdownButton<String>(
-        value: value,
-        isDense: true,
-        underline: const SizedBox.shrink(),
-        borderRadius: BorderRadius.circular(8),
-        style: Theme.of(context).textTheme.bodySmall,
-        onChanged: enabled ? onChanged : null,
-        items: <DropdownMenuItem<String>>[
-          DropdownMenuItem<String>(
-            value: 'editor',
-            child: Text(context.tr('Editor')),
+    final theme = Theme.of(context);
+    final isEditor = value == 'editor';
+    final color = isEditor ? theme.colorScheme.primary : theme.colorScheme.tertiary;
+    final bg = color.withValues(alpha: 0.12);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 1),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: color.withValues(alpha: 0.25)),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String>(
+          value: value,
+          isDense: true,
+          underline: const SizedBox.shrink(),
+          borderRadius: BorderRadius.circular(8),
+          style: theme.textTheme.labelSmall?.copyWith(
+            color: color,
+            fontWeight: FontWeight.w600,
           ),
-          DropdownMenuItem<String>(
-            value: 'viewer',
-            child: Text(context.tr('Viewer')),
-          ),
-        ],
+          icon: Icon(Icons.expand_more, size: 16, color: color),
+          onChanged: enabled ? onChanged : null,
+          items: <DropdownMenuItem<String>>[
+            DropdownMenuItem<String>(
+              value: 'editor',
+              child: Text(context.tr('Editor')),
+            ),
+            DropdownMenuItem<String>(
+              value: 'viewer',
+              child: Text(context.tr('Viewer')),
+            ),
+          ],
+        ),
       ),
     );
   }
