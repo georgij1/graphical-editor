@@ -599,7 +599,11 @@ class _ProjectSettingsDialogState extends State<ProjectSettingsDialog> {
                             ...project.participants.map((member) =>
                                 _ParticipantRow(
                                   member: member,
-                                  isOwner: controller.userId == project.ownerId,
+                                  isOwner: controller.userEmail?.toLowerCase() ==
+                                          project.ownerEmail?.toLowerCase() ||
+                                      (controller.userId != null &&
+                                          controller.userId!.isNotEmpty &&
+                                          controller.userId == project.ownerId),
                                   enabled: !_busy,
                                   onRoleChanged: (role) =>
                                       _changeRole(member, role),
