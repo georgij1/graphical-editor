@@ -271,60 +271,6 @@ public class ProjectController {
         return ResponseEntity.ok(history.recordBuild(id, build));
     }
 
-    @GetMapping("/projects/{id}/checks")
-    @Operation(summary = "File check/compilation history")
-    public ResponseEntity<?> getChecks(@RequestHeader("Authorization") String auth,
-                                       @PathVariable String id,
-                                       @RequestParam(value = "file", required = false) String file,
-                                       @RequestParam(value = "limit", required = false, defaultValue = "50") int limit) {
-        var claims = auth(auth);
-        if (claims == null) return ResponseEntity.status(401).body(Map.of("error", "Not authenticated."));
-        SharedProject project = projects.find(id);
-        if (project == null) return ResponseEntity.status(404).body(Map.of("error", "Project not found."));
-        if (!project.canRead(jwt.userId(claims), jwt.email(claims))) {
-            return ResponseEntity.status(403).body(Map.of("error", "You cannot open this project."));
-        }
-        return ResponseEntity.ok(Map.of("checks", history.getChecks(id, file, Math.max(1, Math.min(limit, 200)))));
-    }
-
-    @PostMapping("/projects/{id}/checks")
-    @Operation(summary = "Record a file check/compilation result")
-    public ResponseEntity<?> recordCheck(@RequestHeader("Authorization") String auth,
-                                         @PathVariable String id,
-                                         @RequestBody Map<String, Object> body) {
-        var claims = auth(auth);
-        if (claims == null) return ResponseEntity.status(401).body(Map.of("error", "Not authenticated."));
-        SharedProject project = projects.find(id);
-        if (project == null) return ResponseEntity.status(404).body(Map.of("error", "Project not found."));
-        if (!project.canRead(jwt.userId(claims), jwt.email(claims))) {
-            return ResponseEntity.status(403).body(Map.of("error", "You cannot open this project."));
-        }
-        String file = str(body, "file");
-        if (file.isBlank()) {
-            return ResponseEntity.badRequest().body(Map.of("error", "File is required."));
-        }
-        Map<String, Object> check = new java.util.HashMap<>();
-        check.put("id", java.util.UUID.randomUUID().toString());
-        check.put("file", file);
-        check.put("date", java.time.Instant.now().toString());
-        check.put("author", jwt.email(claims));
-        Object diags = body == null ? null : body.get("diagnostics");
-        if (diags instanceof List) {
-            check.put("diagnostics", diags);
-        } else {
-            check.put("diagnostics", List.of());
-        }
-        String contentHash = str(body, "contentHash");
-        if (!contentHash.isBlank()) {
-            check.put("contentHash", contentHash);
-        }
-        if (body.containsKey("content") && body.get("content") != null) {
-            check.put("content", String.valueOf(body.get("content")));
-        }
-        history.recordCheck(id, check);
-        return ResponseEntity.ok(check);
-    }
-
     private SharedProject fromJson(Map<String, Object> body, String id, SharedProject existing, String uid, String email) {
         SharedProject p = new SharedProject();
         p.id = id;

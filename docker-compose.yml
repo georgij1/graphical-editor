@@ -74,11 +74,17 @@ services:
     build: ./analyzer-service
     environment:
       PORT: 8080
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
+      SPRING_DATASOURCE_URL: ${SPRING_DATASOURCE_URL:-jdbc:postgresql://postgres:5432/graphical_editor}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-editor}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-editor}
       JAVAFX_LIB: /opt/javafx/lib
       JAVA_MODULES: javafx.controls,javafx.fxml
       DOWNLOADS_DIR: /downloads
     volumes:
       - ./downloads:/downloads:ro
+    depends_on:
+      - postgres
     restart: unless-stopped
     networks:
       - editor-net
