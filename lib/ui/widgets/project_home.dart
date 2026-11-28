@@ -681,24 +681,18 @@ return Card(
                     ),
                   Tooltip(
                     message: context.tr(project.shared ? 'Published' : 'Publish project'),
-                    child: Material(
-                      color: project.shared
-                          ? theme.colorScheme.primary
-                          : theme.colorScheme.surfaceContainerHighest,
+                    child: InkWell(
                       borderRadius: BorderRadius.circular(8),
-                      child: InkWell(
-                        borderRadius: BorderRadius.circular(8),
-                        onTap: () => _publish(context),
-                        child: SizedBox(
-                          width: 28,
-                          height: 28,
-                          child: Icon(
-                            project.shared ? Icons.cloud_done : Icons.cloud_upload_outlined,
-                            size: 16,
-                            color: project.shared
-                                ? theme.colorScheme.onPrimary
-                                : theme.colorScheme.onSurfaceVariant,
-                          ),
+                      onTap: () => _publish(context),
+                      child: SizedBox(
+                        width: 28,
+                        height: 28,
+                        child: Icon(
+                          project.shared ? Icons.cloud_done : Icons.cloud_upload_outlined,
+                          size: 16,
+                          color: project.shared
+                              ? theme.colorScheme.primary
+                              : theme.colorScheme.onSurfaceVariant,
                         ),
                       ),
                     ),
